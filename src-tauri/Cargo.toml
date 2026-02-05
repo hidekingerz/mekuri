@@ -21,6 +21,9 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 natord = "1"
 base64 = "0.22"
 
+[dev-dependencies]
+tempfile = "3"
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

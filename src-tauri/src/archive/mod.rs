@@ -55,3 +55,44 @@ pub fn mime_type_from_name(name: &str) -> &'static str {
         "image/jpeg"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_image_file() {
+        assert!(is_image_file("photo.jpg"));
+        assert!(is_image_file("photo.JPEG"));
+        assert!(is_image_file("image.png"));
+        assert!(is_image_file("image.webp"));
+        assert!(is_image_file("anim.gif"));
+        assert!(!is_image_file("readme.txt"));
+        assert!(!is_image_file("archive.zip"));
+        assert!(!is_image_file("noext"));
+    }
+
+    #[test]
+    fn test_mime_type_from_name() {
+        assert_eq!(mime_type_from_name("photo.jpg"), "image/jpeg");
+        assert_eq!(mime_type_from_name("photo.jpeg"), "image/jpeg");
+        assert_eq!(mime_type_from_name("image.png"), "image/png");
+        assert_eq!(mime_type_from_name("image.PNG"), "image/png");
+        assert_eq!(mime_type_from_name("image.webp"), "image/webp");
+        assert_eq!(mime_type_from_name("anim.gif"), "image/gif");
+        assert_eq!(mime_type_from_name("unknown.bmp"), "image/jpeg");
+    }
+
+    #[test]
+    fn test_unsupported_archive_format() {
+        let result = list_images("test.tar");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unsupported"));
+    }
+
+    #[test]
+    fn test_nonexistent_archive() {
+        let result = list_images("nonexistent.zip");
+        assert!(result.is_err());
+    }
+}

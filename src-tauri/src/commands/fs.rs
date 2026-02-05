@@ -15,8 +15,8 @@ pub struct DirectoryEntry {
 pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
     let dir_path = PathBuf::from(&path);
 
-    let entries = std::fs::read_dir(&dir_path)
-        .map_err(|e| format!("Failed to read directory: {e}"))?;
+    let entries =
+        std::fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {e}"))?;
 
     let mut result: Vec<DirectoryEntry> = entries
         .filter_map(|entry| {

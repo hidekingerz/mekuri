@@ -95,7 +95,7 @@ src-tauri/              # バックエンド (Rust)
 ### 1. テストコードの追加
 
 - Rust: `archive/` 配下のロジックには `#[cfg(test)]` モジュールで単体テストを書く
-- TypeScript: 必要に応じてテストを追加する
+- TypeScript: `utils/` 等のロジックには Vitest でテストを書く（`*.test.ts`）
 
 ### 2. フォーマッタ実行
 
@@ -115,6 +115,7 @@ pnpm lint                     # TypeScript (ESLint)
 
 ```bash
 cd src-tauri && cargo test    # Rust テスト
+pnpm test                     # TypeScript テスト (Vitest)
 ```
 
 ### 5. 型チェック

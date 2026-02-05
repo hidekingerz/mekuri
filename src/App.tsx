@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { FolderTree } from "./components/FolderTree/FolderTree";
+import { viewerLabel, fileNameFromPath } from "./utils/windowLabel";
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -14,8 +15,7 @@ function App() {
   }, []);
 
   const handleArchiveSelect = useCallback(async (archivePath: string) => {
-    // Create a unique window label from the path
-    const label = "viewer-" + hashCode(archivePath);
+    const label = viewerLabel(archivePath);
 
     // Check if window already exists
     const existing = await WebviewWindow.getByLabel(label);
@@ -24,11 +24,9 @@ function App() {
       return;
     }
 
-    const fileName = archivePath.split(/[/\\]/).pop() ?? "Viewer";
-
     new WebviewWindow(label, {
       url: `viewer.html?archive=${encodeURIComponent(archivePath)}`,
-      title: `${fileName} - mekuri`,
+      title: `${fileNameFromPath(archivePath)} - mekuri`,
       width: 1200,
       height: 900,
     });
@@ -56,16 +54,6 @@ function App() {
       </div>
     </div>
   );
-}
-
-function hashCode(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
 }
 
 export default App;

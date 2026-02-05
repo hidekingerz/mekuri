@@ -88,6 +88,43 @@ src-tauri/              # バックエンド (Rust)
 - 日本語はドキュメント（`docs/`）とコメントで使用可
 - 不要なコードやコメントは残さない
 
+## 機能追加時の品質チェック
+
+機能を追加・変更した際は、コミット前に以下を必ず実行し、エラーがあれば修正すること。
+
+### 1. テストコードの追加
+
+- Rust: `archive/` 配下のロジックには `#[cfg(test)]` モジュールで単体テストを書く
+- TypeScript: 必要に応じてテストを追加する
+
+### 2. フォーマッタ実行
+
+```bash
+cargo fmt                     # Rust
+pnpm format                   # TypeScript (Prettier)
+```
+
+### 3. リンター実行
+
+```bash
+cargo clippy                  # Rust（警告ゼロであること）
+pnpm lint                     # TypeScript (ESLint)
+```
+
+### 4. テスト実行
+
+```bash
+cd src-tauri && cargo test    # Rust テスト
+```
+
+### 5. 型チェック
+
+```bash
+npx tsc --noEmit              # TypeScript 型チェック
+```
+
+エラーが出た場合はすべて修正してからコミットする。
+
 ## 重要な設計判断
 
 - **マルチウィンドウ**: Vite の multi-input + Tauri の `WebviewWindow` で実現。同じアーカイブの二重オープンを防止する

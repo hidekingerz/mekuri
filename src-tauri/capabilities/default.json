@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicehash/tauri/v2/crates/tauri-utils/schema/capability.json",
+  "identifier": "default",
+  "description": "Default capabilities for mekuri",
+  "windows": ["main", "viewer-*"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "core:window:allow-create",
+    "core:window:allow-close",
+    "core:window:allow-set-title",
+    "core:window:allow-set-size",
+    "core:window:allow-set-focus"
+  ]
+}

@@ -14,6 +14,7 @@ export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: Spread
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const spreads: Spread[] = useMemo(() => buildSpreads(imageNames.length), [imageNames.length]);
 
@@ -31,19 +32,26 @@ export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: Spread
     async function loadImages() {
       setRightSrc(null);
       setLeftSrc(null);
+      setLoadError(null);
 
-      const [right, left] = await Promise.all([
-        currentSpread.right !== null
-          ? getArchiveImage(archivePath, imageNames[currentSpread.right])
-          : Promise.resolve(null),
-        currentSpread.left !== null
-          ? getArchiveImage(archivePath, imageNames[currentSpread.left])
-          : Promise.resolve(null),
-      ]);
+      try {
+        const [right, left] = await Promise.all([
+          currentSpread.right !== null
+            ? getArchiveImage(archivePath, imageNames[currentSpread.right])
+            : Promise.resolve(null),
+          currentSpread.left !== null
+            ? getArchiveImage(archivePath, imageNames[currentSpread.left])
+            : Promise.resolve(null),
+        ]);
 
-      if (!cancelled) {
-        setRightSrc(right);
-        setLeftSrc(left);
+        if (!cancelled) {
+          setRightSrc(right);
+          setLeftSrc(left);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(String(err));
+        }
       }
     }
 
@@ -88,6 +96,11 @@ export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: Spread
 
   return (
     <div className="spread-viewer">
+      {loadError && (
+        <div className="spread-viewer__error">
+          <p>Failed to load image: {loadError}</p>
+        </div>
+      )}
       <div className="spread-viewer__pages">
         {/* RTL: left side = later page, click to go next */}
         {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}

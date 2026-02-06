@@ -17,6 +17,8 @@
         "title": "mekuri",
         "width": 400,
         "height": 700,
+        "minWidth": 280,
+        "minHeight": 400,
         "resizable": true,
         "url": "index.html"
       }

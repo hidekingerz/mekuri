@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { readDirectory } from "../../hooks/useDirectory";
-import { TreeNode } from "./TreeNode";
 import type { DirectoryEntry } from "../../types";
+import { TreeNode } from "./TreeNode";
 
 interface TreeNodeData {
   entry: DirectoryEntry;
@@ -24,9 +24,7 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
     setLoading(true);
     try {
       const entries = await readDirectory(rootPath);
-      setNodes(
-        entries.map((entry) => ({ entry, children: null, isOpen: false })),
-      );
+      setNodes(entries.map((entry) => ({ entry, children: null, isOpen: false })));
       setLoaded(true);
     } catch (err) {
       console.error("Failed to load root directory:", err);
@@ -48,51 +46,46 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
     setLoaded(false);
   }
 
-  const toggleNode = useCallback(
-    async (path: string) => {
-      const toggle = async (
-        items: TreeNodeData[],
-      ): Promise<TreeNodeData[]> => {
-        const result: TreeNodeData[] = [];
-        for (const node of items) {
-          if (node.entry.path === path) {
-            if (node.isOpen) {
-              result.push({ ...node, isOpen: false });
-            } else {
-              let children = node.children;
-              if (children === null) {
-                try {
-                  const entries = await readDirectory(path);
-                  children = entries.map((entry) => ({
-                    entry,
-                    children: null,
-                    isOpen: false,
-                  }));
-                } catch {
-                  children = [];
-                }
-              }
-              result.push({ ...node, isOpen: true, children });
-            }
-          } else if (node.children && node.isOpen) {
-            result.push({
-              ...node,
-              children: await toggle(node.children),
-            });
+  const toggleNode = useCallback(async (path: string) => {
+    const toggle = async (items: TreeNodeData[]): Promise<TreeNodeData[]> => {
+      const result: TreeNodeData[] = [];
+      for (const node of items) {
+        if (node.entry.path === path) {
+          if (node.isOpen) {
+            result.push({ ...node, isOpen: false });
           } else {
-            result.push(node);
+            let children = node.children;
+            if (children === null) {
+              try {
+                const entries = await readDirectory(path);
+                children = entries.map((entry) => ({
+                  entry,
+                  children: null,
+                  isOpen: false,
+                }));
+              } catch {
+                children = [];
+              }
+            }
+            result.push({ ...node, isOpen: true, children });
           }
+        } else if (node.children && node.isOpen) {
+          result.push({
+            ...node,
+            children: await toggle(node.children),
+          });
+        } else {
+          result.push(node);
         }
-        return result;
-      };
+      }
+      return result;
+    };
 
-      setNodes((prev) => {
-        toggle(prev).then(setNodes);
-        return prev;
-      });
-    },
-    [],
-  );
+    setNodes((prev) => {
+      toggle(prev).then(setNodes);
+      return prev;
+    });
+  }, []);
 
   if (loading && nodes.length === 0) {
     return <div className="folder-tree-loading">Loading...</div>;

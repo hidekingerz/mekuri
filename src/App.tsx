@@ -1,8 +1,8 @@
-import { useState, useCallback } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useCallback, useState } from "react";
 import { FolderTree } from "./components/FolderTree/FolderTree";
-import { viewerLabel, fileNameFromPath } from "./utils/windowLabel";
+import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
@@ -35,17 +35,14 @@ function App() {
   return (
     <div className="app">
       <div className="toolbar">
-        <button className="toolbar__btn" onClick={handleSelectFolder}>
+        <button type="button" className="toolbar__btn" onClick={handleSelectFolder}>
           Open Folder
         </button>
         {rootPath && <span className="toolbar__path">{rootPath}</span>}
       </div>
       <div className="tree-container">
         {rootPath ? (
-          <FolderTree
-            rootPath={rootPath}
-            onArchiveSelect={handleArchiveSelect}
-          />
+          <FolderTree rootPath={rootPath} onArchiveSelect={handleArchiveSelect} />
         ) : (
           <div className="tree-empty">
             <p>Click "Open Folder" to browse archives</p>

@@ -16,7 +16,7 @@ export function hashCode(str: string): string {
  * Generate a unique Tauri window label for a viewer window.
  */
 export function viewerLabel(archivePath: string): string {
-  return "viewer-" + hashCode(archivePath);
+  return `viewer-${hashCode(archivePath)}`;
 }
 
 /**

@@ -1,11 +1,22 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
   const [rootPath, setRootPath] = useState<string | null>(null);
+
+  // Update main window title when folder changes
+  useEffect(() => {
+    if (rootPath) {
+      const folderName = fileNameFromPath(rootPath);
+      getCurrentWindow().setTitle(`${folderName} - mekuri`);
+    } else {
+      getCurrentWindow().setTitle("mekuri");
+    }
+  }, [rootPath]);
 
   const handleSelectFolder = useCallback(async () => {
     const selected = await open({ directory: true });
@@ -29,6 +40,8 @@ function App() {
       title: `${fileNameFromPath(archivePath)} - mekuri`,
       width: 1200,
       height: 900,
+      minWidth: 600,
+      minHeight: 400,
     });
   }, []);
 

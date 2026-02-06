@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useCallback, useEffect, useState } from "react";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
 import { listArchiveImages } from "./hooks/useArchive";
+import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
@@ -43,6 +45,16 @@ function Viewer() {
     };
   }, [archivePath]);
 
+  const handleSpreadChange = useCallback(
+    (spreadIndex: number, totalSpreads: number) => {
+      if (!archivePath) return;
+      const fileName = fileNameFromPath(archivePath);
+      const title = `${fileName} [${spreadIndex + 1}/${totalSpreads}] - mekuri`;
+      getCurrentWindow().setTitle(title);
+    },
+    [archivePath],
+  );
+
   if (error) {
     return (
       <div className="viewer viewer--error">
@@ -62,7 +74,11 @@ function Viewer() {
 
   return (
     <div className="viewer">
-      <SpreadViewer archivePath={archivePath} imageNames={imageNames} />
+      <SpreadViewer
+        archivePath={archivePath}
+        imageNames={imageNames}
+        onSpreadChange={handleSpreadChange}
+      />
     </div>
   );
 }

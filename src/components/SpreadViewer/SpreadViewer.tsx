@@ -7,9 +7,10 @@ import { PageImage } from "./PageImage";
 interface SpreadViewerProps {
   archivePath: string;
   imageNames: string[];
+  onSpreadChange?: (spreadIndex: number, totalSpreads: number) => void;
 }
 
-export function SpreadViewer({ archivePath, imageNames }: SpreadViewerProps) {
+export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: SpreadViewerProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
@@ -17,6 +18,11 @@ export function SpreadViewer({ archivePath, imageNames }: SpreadViewerProps) {
   const spreads: Spread[] = useMemo(() => buildSpreads(imageNames.length), [imageNames.length]);
 
   const currentSpread = spreads[spreadIndex] ?? { right: null, left: null };
+
+  // Notify parent of spread change
+  useEffect(() => {
+    onSpreadChange?.(spreadIndex, spreads.length);
+  }, [spreadIndex, spreads.length, onSpreadChange]);
 
   // Load images for current spread
   useEffect(() => {

@@ -1,3 +1,4 @@
+mod rar;
 mod zip;
 
 use std::path::Path;
@@ -15,6 +16,7 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
 
     match ext.as_str() {
         "zip" | "cbz" => zip::list_images(archive_path),
+        "rar" | "cbr" => rar::list_images(archive_path),
         _ => Err(format!("Unsupported archive format: .{ext}")),
     }
 }
@@ -30,6 +32,7 @@ pub fn get_image_base64(archive_path: &str, entry_name: &str) -> Result<String, 
 
     match ext.as_str() {
         "zip" | "cbz" => zip::get_image_base64(archive_path, entry_name),
+        "rar" | "cbr" => rar::get_image_base64(archive_path, entry_name),
         _ => Err(format!("Unsupported archive format: .{ext}")),
     }
 }
@@ -93,6 +96,26 @@ mod tests {
     #[test]
     fn test_nonexistent_archive() {
         let result = list_images("nonexistent.zip");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nonexistent_rar_archive() {
+        let result = list_images("nonexistent.rar");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cbr_dispatches_to_rar() {
+        let result = list_images("nonexistent.cbr");
+        assert!(result.is_err());
+        // Should not say "Unsupported" — it should be a file-not-found error
+        assert!(!result.unwrap_err().contains("Unsupported"));
+    }
+
+    #[test]
+    fn test_rar_get_image_nonexistent() {
+        let result = get_image_base64("nonexistent.rar", "image.jpg");
         assert!(result.is_err());
     }
 }

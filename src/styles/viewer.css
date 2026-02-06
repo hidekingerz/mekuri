@@ -57,9 +57,18 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
   overflow: hidden;
+  cursor: pointer;
+}
+
+/* RTL spread: left half shows later page, image aligned to right (spine side) */
+.spread-viewer__half:first-child {
+  justify-content: flex-end;
+}
+
+/* RTL spread: right half shows earlier page, image aligned to left (spine side) */
+.spread-viewer__half:last-child {
+  justify-content: flex-start;
 }
 
 /* Page image */

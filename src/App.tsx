@@ -35,13 +35,16 @@ function App() {
       return;
     }
 
-    new WebviewWindow(label, {
+    const webview = new WebviewWindow(label, {
       url: `viewer.html?archive=${encodeURIComponent(archivePath)}`,
       title: `${fileNameFromPath(archivePath)} - mekuri`,
       width: 1200,
       height: 900,
       minWidth: 600,
       minHeight: 400,
+    });
+    webview.once("tauri://error", (e) => {
+      console.error("Failed to create viewer window:", e);
     });
   }, []);
 

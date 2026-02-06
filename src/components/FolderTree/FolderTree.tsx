@@ -18,16 +18,18 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
   const [nodes, setNodes] = useState<TreeNodeData[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadRoot = useCallback(async () => {
     if (loaded) return;
     setLoading(true);
+    setError(null);
     try {
       const entries = await readDirectory(rootPath);
       setNodes(entries.map((entry) => ({ entry, children: null, isOpen: false })));
       setLoaded(true);
     } catch (err) {
-      console.error("Failed to load root directory:", err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -44,6 +46,7 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
     setPrevRoot(rootPath);
     setNodes([]);
     setLoaded(false);
+    setError(null);
   }
 
   const toggleNode = useCallback(async (path: string) => {
@@ -89,6 +92,15 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
 
   if (loading && nodes.length === 0) {
     return <div className="folder-tree-loading">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="folder-tree-error">
+        <p>Failed to read directory</p>
+        <p className="folder-tree-error__detail">{error}</p>
+      </div>
+    );
   }
 
   return (

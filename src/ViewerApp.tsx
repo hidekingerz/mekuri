@@ -7,6 +7,7 @@ import { fileNameFromPath } from "./utils/windowLabel";
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
   const [imageNames, setImageNames] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Read archive path from URL query parameter
@@ -24,6 +25,7 @@ function Viewer() {
     const path = archivePath;
 
     let cancelled = false;
+    setLoading(true);
 
     async function load() {
       try {
@@ -35,6 +37,10 @@ function Viewer() {
       } catch (err) {
         if (!cancelled) {
           setError(String(err));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     }
@@ -64,10 +70,18 @@ function Viewer() {
     );
   }
 
-  if (!archivePath || imageNames.length === 0) {
+  if (!archivePath || loading) {
     return (
       <div className="viewer viewer--loading">
         <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (imageNames.length === 0) {
+    return (
+      <div className="viewer viewer--empty">
+        <p>No images found in this archive</p>
       </div>
     );
   }

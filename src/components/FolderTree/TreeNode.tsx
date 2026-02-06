@@ -16,12 +16,7 @@ interface TreeNodeProps {
   onArchiveSelect: (path: string) => void;
 }
 
-export function TreeNode({
-  node,
-  depth,
-  onToggle,
-  onArchiveSelect,
-}: TreeNodeProps) {
+export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodeProps) {
   const { entry } = node;
   const indent = depth * 16;
 
@@ -41,7 +36,14 @@ export function TreeNode({
         className={`tree-node ${entry.is_archive ? "tree-node--archive" : ""}`}
         style={{ paddingLeft: `${indent + 4}px` }}
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
         role="treeitem"
+        tabIndex={0}
       >
         <span className="tree-node__icon">{icon}</span>
         <span className="tree-node__name">{entry.name}</span>

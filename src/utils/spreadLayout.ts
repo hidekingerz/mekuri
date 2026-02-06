@@ -46,11 +46,6 @@ export function buildSpreads(totalPages: number): Spread[] {
 /**
  * Get the spread index that contains a given page index.
  */
-export function spreadIndexForPage(
-  spreads: Spread[],
-  pageIndex: number,
-): number {
-  return spreads.findIndex(
-    (s) => s.right === pageIndex || s.left === pageIndex,
-  );
+export function spreadIndexForPage(spreads: Spread[], pageIndex: number): number {
+  return spreads.findIndex((s) => s.right === pageIndex || s.left === pageIndex);
 }

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { listArchiveImages } from "./hooks/useArchive";
+import { useEffect, useState } from "react";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
+import { listArchiveImages } from "./hooks/useArchive";
 
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
@@ -19,12 +19,13 @@ function Viewer() {
   // Load image list when archive path is set
   useEffect(() => {
     if (!archivePath) return;
+    const path = archivePath;
 
     let cancelled = false;
 
     async function load() {
       try {
-        const names = await listArchiveImages(archivePath!);
+        const names = await listArchiveImages(path);
         if (!cancelled) {
           setImageNames(names);
           setError(null);

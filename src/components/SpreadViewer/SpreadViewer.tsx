@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getArchiveImage } from "../../hooks/useArchive";
+import type { Spread } from "../../utils/spreadLayout";
 import { buildSpreads } from "../../utils/spreadLayout";
 import { PageImage } from "./PageImage";
-import type { Spread } from "../../utils/spreadLayout";
 
 interface SpreadViewerProps {
   archivePath: string;
@@ -14,10 +14,7 @@ export function SpreadViewer({ archivePath, imageNames }: SpreadViewerProps) {
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
 
-  const spreads: Spread[] = useMemo(
-    () => buildSpreads(imageNames.length),
-    [imageNames.length],
-  );
+  const spreads: Spread[] = useMemo(() => buildSpreads(imageNames.length), [imageNames.length]);
 
   const currentSpread = spreads[spreadIndex] ?? { right: null, left: null };
 
@@ -87,36 +84,30 @@ export function SpreadViewer({ archivePath, imageNames }: SpreadViewerProps) {
     <div className="spread-viewer">
       <div className="spread-viewer__pages">
         {/* RTL: left side = later page, click to go next */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
         <div className="spread-viewer__half" onClick={goNext}>
           <PageImage
             src={leftSrc}
-            alt={
-              currentSpread.left !== null
-                ? imageNames[currentSpread.left]
-                : ""
-            }
+            alt={currentSpread.left !== null ? imageNames[currentSpread.left] : ""}
           />
         </div>
         {/* RTL: right side = earlier page, click to go prev */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
         <div className="spread-viewer__half" onClick={goPrev}>
           <PageImage
             src={rightSrc}
-            alt={
-              currentSpread.right !== null
-                ? imageNames[currentSpread.right]
-                : ""
-            }
+            alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
           />
         </div>
       </div>
       <div className="spread-viewer__nav">
-        <button disabled={isLast} onClick={goNext}>
+        <button type="button" disabled={isLast} onClick={goNext}>
           ←
         </button>
         <span className="spread-viewer__info">
           {spreadIndex + 1} / {spreads.length}
         </span>
-        <button disabled={isFirst} onClick={goPrev}>
+        <button type="button" disabled={isFirst} onClick={goPrev}>
           →
         </button>
       </div>

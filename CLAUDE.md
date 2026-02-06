@@ -32,8 +32,8 @@ Tauri v2（Rust バックエンド + React フロントエンド）で構成さ�
 pnpm install          # 依存インストール
 pnpm dev              # 開発サーバー起動（Tauri 経由）
 pnpm build            # プロダクションビルド
-pnpm lint             # ESLint 実行
-pnpm format           # Prettier 実行
+pnpm lint             # Biome リント実行
+pnpm format           # Biome フォーマット実行
 
 # Rust (src-tauri/ 配下で実行)
 cargo clippy           # リンタ
@@ -77,7 +77,7 @@ src-tauri/              # バックエンド (Rust)
 
 ### TypeScript / React
 
-- ESLint + Prettier に準拠
+- Biome に準拠（リント + フォーマット）
 - コンポーネントは関数コンポーネント + hooks で実装
 - Tauri IPC 呼び出しはカスタムフック（`hooks/`）に集約する
 - 型定義は `types/` に集約する
@@ -101,14 +101,14 @@ src-tauri/              # バックエンド (Rust)
 
 ```bash
 cargo fmt                     # Rust
-pnpm format                   # TypeScript (Prettier)
+pnpm format                   # TypeScript (Biome)
 ```
 
 ### 3. リンター実行
 
 ```bash
 cargo clippy                  # Rust（警告ゼロであること）
-pnpm lint                     # TypeScript (ESLint)
+pnpm lint                     # TypeScript (Biome)
 ```
 
 ### 4. テスト実行

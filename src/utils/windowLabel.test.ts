@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { hashCode, viewerLabel, fileNameFromPath } from "./windowLabel";
+import { describe, expect, it } from "vitest";
+import { fileNameFromPath, hashCode, viewerLabel } from "./windowLabel";
 
 describe("hashCode", () => {
   it("returns a string", () => {
@@ -40,9 +40,7 @@ describe("fileNameFromPath", () => {
   });
 
   it("extracts file name from Windows path", () => {
-    expect(fileNameFromPath("C:\\Users\\test\\comics\\vol1.cbz")).toBe(
-      "vol1.cbz",
-    );
+    expect(fileNameFromPath("C:\\Users\\test\\comics\\vol1.cbz")).toBe("vol1.cbz");
   });
 
   it("returns the string itself if no separator", () => {

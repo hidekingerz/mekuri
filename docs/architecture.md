@@ -35,9 +35,13 @@ UI の描画とユーザー操作を担当する。Tauri の IPC（`invoke`）�
 
 | コンポーネント | 責務 |
 |---------------|------|
+| `FavoritesSidebar` | お気に入りフォルダの一覧表示・選択・削除（コンテキストメニュー） |
 | `FolderTree` | ディレクトリ階層のツリー表示・操作 |
-| `SpreadViewer` | 見開き画像表示・ページ送り |
-| `Toolbar` | ルートフォルダ選択等のアクション |
+| `TreeNode` | ツリーノード描画・展開/折りたたみ・コンテキストメニュー（お気に入り追加） |
+| `FileList` | 選択中フォルダ内のアーカイブファイル一覧表示 |
+| `SpreadViewer` | 見開き画像表示・ページ送り・プログレスバー |
+| `PageImage` | 個別の画像表示 |
+| `Icons` | カスタム SVG アイコン（ChevronRight, FolderIcon, ArchiveIcon 等） |
 
 ### 2. バックエンド（Rust）
 
@@ -45,8 +49,11 @@ UI の描画とユーザー操作を担当する。Tauri の IPC（`invoke`）�
 
 | モジュール | 責務 |
 |-----------|------|
-| `fs` | ディレクトリ走査、ファイル一覧取得 |
-| `archive` | アーカイブの展開、画像エントリ一覧取得、画像データ抽出 |
+| `commands/fs` | ディレクトリ走査、ファイル一覧取得 |
+| `commands/archive` | Tauri IPC コマンドの定義（アーカイブ操作） |
+| `archive` | アーカイブ処理の実装ロジック（Tauri 非依存） |
+| `archive/zip` | ZIP/CBZ ファイル処理 |
+| `archive/rar` | RAR/CBR ファイル処理 |
 
 ## Tauri IPC コマンド設計
 
@@ -62,10 +69,28 @@ DirectoryEntry {
   path: string
   is_dir: boolean
   is_archive: boolean
+  has_subfolders: boolean
 }
 ```
 
 ツリーの遅延読み込みに対応する。フォルダを展開した時点でそのフォルダの直下のみを取得する。
+`has_subfolders` はサブフォルダの有無を示し、UI 側でシェブロン表示の制御に使用する。
+結果はディレクトリ優先、自然順ソート済みで返却される。隠しファイルとアーカイブ以外のファイルは除外される。
+
+### アーカイブ内容分析
+
+```
+Command: analyze_archive_contents
+Input:   { archive_path: string }
+Output:  ArchiveContents
+
+ArchiveContents =
+  | { type: "Images", names: string[] }       // 画像を含む（自然順ソート済み）
+  | { type: "NestedArchives", names: string[] } // ネストアーカイブを含む
+  | { type: "Empty" }                          // 画像もアーカイブもなし
+```
+
+アーカイブを開く際に最初に呼ばれる。画像を直接含む場合はそのまま表示、ネストアーカイブを含む場合は選択 UI を表示する。
 
 ### アーカイブ画像一覧取得
 
@@ -80,42 +105,110 @@ Output:  string[]   // 画像エントリ名の自然順ソート済みリスト
 ```
 Command: get_archive_image
 Input:   { archive_path: string, entry_name: string }
-Output:  number[]   // 画像バイナリデータ（Base64 or バイト配列）
+Output:  string   // Base64 エンコードされた data URL（例: "data:image/jpeg;base64,..."）
 ```
+
+MIME タイプは拡張子から推定する（`.png` → `image/png`, `.webp` → `image/webp`, `.gif` → `image/gif`, その他 → `image/jpeg`）。
+
+### ネストアーカイブ展開
+
+```
+Command: extract_nested_archive
+Input:   { parent_path: string, nested_name: string }
+Output:  string   // 展開された一時ファイルのパス
+```
+
+親アーカイブ内のネストアーカイブを一時ディレクトリに展開し、そのパスを返す。一時ディレクトリはアプリ終了まで保持される。
 
 ## ウィンドウ管理
 
 Tauri のマルチウィンドウ機能を使用する。
 
-- メインウィンドウ: アプリ起動時に1つ生成
+- メインウィンドウ: アプリ起動時に1つ生成（初期状態は非表示、設定読み込み後に表示）
 - ビューワーウィンドウ: アーカイブ選択時に `WebviewWindow` で動的に生成
-  - ウィンドウラベルにはアーカイブパスのハッシュ等を使い一意にする
-  - 同じアーカイブを二重に開かない制御を行う
+  - ウィンドウラベルはアーカイブパスのハッシュ（`viewer-{hash}`）で一意にする（`utils/windowLabel.ts`）
+  - 同じアーカイブを二重に開かない制御を行う（既存ウィンドウがあればフォーカス）
+  - 最小サイズ: 600 x 400
+- ウィンドウタイトル:
+  - メインウィンドウ: `{お気に入りフォルダ名} - mekuri`（未選択時は `mekuri`）
+  - ビューワーウィンドウ: `{ファイル名} [{現在位置}/{総数}] - mekuri`
 
 ## データフロー
+
+### お気に入りフォルダの管理
+
+```
+ユーザー操作: 「Add Folder」ボタンクリック
+  → React: open() でフォルダ選択ダイアログを表示
+  → React: useFavorites.addFavorite() で tauri-plugin-store に保存
+  → React: FavoritesSidebar を更新
+
+ユーザー操作: お気に入りを右クリック → 削除
+  → React: useFavorites.removeFavorite() で tauri-plugin-store から削除
+  → React: FavoritesSidebar を更新
+```
 
 ### フォルダツリー表示
 
 ```
-ユーザー操作: フォルダ展開
+ユーザー操作: お気に入りフォルダを選択
   → React: invoke("read_directory", { path })
-  → Rust: fs::read_dir → フィルタリング・ソート
-  → React: ツリーノード追加描画
+  → Rust: fs::read_dir → フィルタリング・ソート（ディレクトリ優先、自然順）
+  → React: ツリーノード描画（has_subfolders でシェブロン表示制御）
+
+ユーザー操作: フォルダ展開
+  → React: invoke("read_directory", { path })（遅延読み込み）
+  → React: 子ノード追加描画
+```
+
+### ファイルリスト表示
+
+```
+ユーザー操作: フォルダ選択
+  → React: invoke("read_directory", { path })
+  → React: アーカイブファイルのみフィルタして FileList に表示
 ```
 
 ### アーカイブ閲覧
 
 ```
 ユーザー操作: アーカイブファイルをクリック
-  → React (メイン): 新しい WebviewWindow を生成
-  → React (ビューワー): invoke("list_archive_images", { archive_path })
-  → Rust: archive::list_images → 自然順ソート済みリスト返却
-  → React (ビューワー): 先頭ページの画像を取得・表示
+  → React (メイン): 既存ウィンドウを検索 → あればフォーカス、なければ新規生成
+  → React (ビューワー): invoke("analyze_archive_contents", { archive_path })
+  → Rust: archive::analyze_contents → 内容判定
+
+  [画像を含む場合]
+  → React (ビューワー): 先頭見開きの画像を取得・表示
+
+  [ネストアーカイブを含む場合]
+  → React (ビューワー): ネストアーカイブ選択 UI を表示
+  → ユーザー操作: アーカイブを選択
+  → React: invoke("extract_nested_archive", { parent_path, nested_name })
+  → Rust: 一時ディレクトリに展開 → パス返却
+  → React: invoke("list_archive_images", { archive_path: 展開パス })
+  → React (ビューワー): 画像表示
 
 ユーザー操作: ページ送り
   → React (ビューワー): invoke("get_archive_image", { archive_path, entry_name })
-  → Rust: archive::get_image → 画像バイナリ返却
-  → React (ビューワー): Base64 → data URL → <img> 表示
+  → Rust: archive::get_image_base64 → data URL 返却
+  → React (ビューワー): <img src={dataUrl}> で表示
+
+ユーザー操作: Alt+矢印で兄弟アーカイブ移動
+  → React: invoke("read_directory", { path: 親フォルダ })
+  → React: 兄弟アーカイブリストから次/前のアーカイブを特定
+  → React: 新しいアーカイブで analyze_archive_contents を再実行
+```
+
+### 設定の永続化
+
+```
+ウィンドウリサイズ/カラムリサイズ
+  → React: 500ms デバウンス後に useSettings.saveWindowSettings() 呼び出し
+  → tauri-plugin-store: settings.json に保存
+
+アプリ起動
+  → React: useSettings.getWindowSettings() で設定読み込み
+  → React: ウィンドウサイズ・カラム幅を復元 → ウィンドウ表示
 ```
 
 ## エラーハンドリング方針
@@ -133,6 +226,23 @@ Tauri のマルチウィンドウ機能を使用する。
 |---------------|---------------|---------|
 | `FolderTree` | ルートディレクトリ読み込み失敗 | ツリー領域にエラーメッセージを表示 |
 | `FolderTree` | サブフォルダ展開失敗 | 子ノードを空配列として扱い、静かに処理 |
-| `ViewerApp` | アーカイブ画像一覧の取得失敗 | エラー画面を表示（エラー詳細付き） |
+| `ViewerApp` | アーカイブ内容分析の失敗 | エラー画面を表示（エラー詳細付き） |
 | `ViewerApp` | アーカイブ内に画像なし | 「No images found」メッセージを表示 |
+| `ViewerApp` | ネストアーカイブ展開失敗 | エラー画面を表示 |
 | `SpreadViewer` | 個別の画像読み込み失敗 | ページ上部にエラーメッセージを表示（ナビゲーションは維持） |
+
+## フロントエンドフック設計
+
+| フック / モジュール | 責務 |
+|-------------------|------|
+| `useDirectory` | `read_directory` の呼び出し、フォルダ/ファイルのフィルタリング、兄弟アーカイブ取得 |
+| `useArchive` | アーカイブ関連の IPC 呼び出し（一覧取得、画像取得、内容分析、ネスト展開） |
+| `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
+| `useSettings` | ウィンドウサイズ・カラム幅の保存/復元（`tauri-plugin-store` 経由） |
+
+## ユーティリティ
+
+| モジュール | 責務 |
+|-----------|------|
+| `spreadLayout` | 見開きレイアウトの計算（先頭単ページ、以降ペア、末尾が奇数なら単ページ） |
+| `windowLabel` | アーカイブパスからウィンドウラベルのハッシュ生成、ファイル名抽出 |

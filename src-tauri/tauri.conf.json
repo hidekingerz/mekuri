@@ -21,8 +21,7 @@
         "minHeight": 400,
         "resizable": true,
         "visible": false,
-        "url": "index.html",
-        "icon": "icons/icon.png"
+        "url": "index.html"
       }
     ],
     "security": {

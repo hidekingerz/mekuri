@@ -7,6 +7,7 @@ import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
+import { useWindowResize } from "./hooks/useWindowResize";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -37,28 +38,10 @@ function App() {
     loadSettings();
   }, []);
 
-  // Save window size on resize (debounced)
-  useEffect(() => {
-    if (!settingsLoaded) return;
-
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const win = getCurrentWindow();
-
-    const unlisten = win.onResized(async (event) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await saveWindowSettings({
-          width: event.payload.width,
-          height: event.payload.height,
-        });
-      }, 500);
-    });
-
-    return () => {
-      clearTimeout(timeoutId);
-      unlisten.then((fn) => fn());
-    };
-  }, [settingsLoaded]);
+  const handleWindowResize = useCallback(async (size: { width: number; height: number }) => {
+    await saveWindowSettings(size);
+  }, []);
+  useWindowResize(handleWindowResize, settingsLoaded);
 
   // Update main window title
   useEffect(() => {

@@ -9,6 +9,7 @@ import {
 import { getSiblingArchives } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
+import { useWindowResize } from "./hooks/useWindowResize";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -29,26 +30,10 @@ function Viewer() {
     }
   }, []);
 
-  // Save window size on resize (debounced)
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const win = getCurrentWindow();
-
-    const unlisten = win.onResized(async (event) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(async () => {
-        await saveViewerSettings({
-          width: event.payload.width,
-          height: event.payload.height,
-        });
-      }, 500);
-    });
-
-    return () => {
-      clearTimeout(timeoutId);
-      unlisten.then((fn) => fn());
-    };
+  const handleWindowResize = useCallback(async (size: { width: number; height: number }) => {
+    await saveViewerSettings(size);
   }, []);
+  useWindowResize(handleWindowResize);
 
   // Navigate to sibling archive with Alt+Arrow keys
   useEffect(() => {

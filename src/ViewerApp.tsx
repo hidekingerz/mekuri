@@ -55,43 +55,26 @@ function Viewer() {
     if (!archivePath) return;
 
     const handleKeyDown = async (e: KeyboardEvent) => {
-      // Alt+Up or Alt+Down
       if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
 
       e.preventDefault();
-      console.log("Alt+Arrow pressed:", e.key, "archivePath:", archivePath);
 
       try {
         const { archives, currentIndex } = await getSiblingArchives(archivePath);
-        console.log("Sibling archives:", archives, "currentIndex:", currentIndex);
-
-        if (currentIndex === -1 || archives.length <= 1) {
-          console.log("Cannot navigate: currentIndex or archives.length issue");
-          return;
-        }
+        if (currentIndex === -1 || archives.length <= 1) return;
 
         let newIndex: number;
         if (e.key === "ArrowUp") {
-          // Next file (up in list order)
           newIndex = currentIndex + 1;
-          if (newIndex >= archives.length) {
-            console.log("Already at last archive");
-            return;
-          }
+          if (newIndex >= archives.length) return;
         } else {
-          // Previous file (down in list order)
           newIndex = currentIndex - 1;
-          if (newIndex < 0) {
-            console.log("Already at first archive");
-            return;
-          }
+          if (newIndex < 0) return;
         }
 
         const newPath = archives[newIndex];
-        console.log("Navigating to:", newPath);
         setArchivePath(newPath);
 
-        // Update window title
         const fileName = fileNameFromPath(newPath);
         await getCurrentWindow().setTitle(`${fileName} - mekuri`);
       } catch (err) {

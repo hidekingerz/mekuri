@@ -13,11 +13,14 @@ body,
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
-  color: #1a1a1a;
-  background-color: #f5f5f5;
+  color: #1f2937;
+  background-color: #f9fafb;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .app {
@@ -31,28 +34,39 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-bottom: 1px solid #ddd;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
   background-color: #fff;
 }
 
 .toolbar__btn {
-  padding: 4px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   background: #fff;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
+  color: #374151;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .toolbar__btn:hover {
-  background: #f0f0f0;
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.toolbar__btn:active {
+  background: #e5e7eb;
 }
 
 .toolbar__path {
   font-size: 11px;
-  color: #666;
+  color: #6b7280;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -63,7 +77,8 @@ body {
 .tree-container {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 8px 0;
+  background-color: #fff;
 }
 
 .tree-empty {
@@ -71,41 +86,121 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
+  color: #9ca3af;
+  font-size: 13px;
 }
 
 /* Tree nodes */
+.folder-tree {
+  padding: 4px 0;
+}
+
 .folder-tree-loading {
-  padding: 8px;
-  color: #999;
+  padding: 16px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.folder-tree-error {
+  padding: 16px;
+  color: #dc2626;
+}
+
+.folder-tree-error__detail {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6b7280;
 }
 
 .tree-node {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 4px;
+  gap: 6px;
+  padding: 5px 8px;
+  padding-right: 12px;
   cursor: pointer;
   line-height: 1.4;
+  border-radius: 4px;
+  margin: 1px 6px;
+  transition:
+    background-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .tree-node:hover {
-  background-color: #e8e8e8;
+  background-color: #f3f4f6;
+}
+
+.tree-node:focus {
+  outline: none;
+  background-color: #e5e7eb;
+}
+
+.tree-node:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.tree-node--folder {
+  font-weight: 500;
 }
 
 .tree-node--archive {
-  color: #0066cc;
+  color: #2563eb;
 }
 
+.tree-node--archive:hover {
+  background-color: #eff6ff;
+}
+
+/* Indent guides */
+.tree-node__guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.tree-node__guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: #e5e7eb;
+}
+
+/* Chevron */
+.tree-node__chevron {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #6b7280;
+  transition: transform 0.15s ease;
+}
+
+.tree-node__chevron--hidden {
+  visibility: hidden;
+}
+
+/* Icon */
 .tree-node__icon {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 16px;
-  text-align: center;
-  font-size: 10px;
+  height: 16px;
 }
 
 .tree-node__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }

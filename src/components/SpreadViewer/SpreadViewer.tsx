@@ -8,9 +8,15 @@ interface SpreadViewerProps {
   archivePath: string;
   imageNames: string[];
   onSpreadChange?: (spreadIndex: number, totalSpreads: number) => void;
+  onBack?: () => void;
 }
 
-export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: SpreadViewerProps) {
+export function SpreadViewer({
+  archivePath,
+  imageNames,
+  onSpreadChange,
+  onBack,
+}: SpreadViewerProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
@@ -91,8 +97,42 @@ export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: Spread
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrev, spreads.length]);
 
+  // Mouse wheel navigation
+  useEffect(() => {
+    let lastWheelTime = 0;
+    const wheelThrottleMs = 200;
+
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheelTime < wheelThrottleMs) return;
+      lastWheelTime = now;
+
+      if (e.deltaY > 0) {
+        goNext();
+      } else if (e.deltaY < 0) {
+        goPrev();
+      }
+    }
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => window.removeEventListener("wheel", handleWheel);
+  }, [goNext, goPrev]);
+
   const isFirst = spreadIndex === 0;
   const isLast = spreadIndex >= spreads.length - 1;
+  const progressPercent = spreads.length > 1 ? (spreadIndex / (spreads.length - 1)) * 100 : 100;
+
+  const handleProgressClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = rect.right - e.clientX;
+      const ratio = clickX / rect.width;
+      const newIndex = Math.round(ratio * (spreads.length - 1));
+      setSpreadIndex(Math.max(0, Math.min(newIndex, spreads.length - 1)));
+    },
+    [spreads.length],
+  );
 
   return (
     <div className="spread-viewer">
@@ -119,16 +159,28 @@ export function SpreadViewer({ archivePath, imageNames, onSpreadChange }: Spread
           />
         </div>
       </div>
-      <div className="spread-viewer__nav">
-        <button type="button" disabled={isLast} onClick={goNext}>
-          ←
-        </button>
-        <span className="spread-viewer__info">
-          {spreadIndex + 1} / {spreads.length}
-        </span>
-        <button type="button" disabled={isFirst} onClick={goPrev}>
-          →
-        </button>
+      <div className="spread-viewer__footer">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: mouse interaction for progress bar */}
+        <div className="spread-viewer__progress" onClick={handleProgressClick}>
+          <div className="spread-viewer__progress-fill" style={{ width: `${progressPercent}%` }} />
+          <div className="spread-viewer__progress-thumb" style={{ right: `${progressPercent}%` }} />
+        </div>
+        <div className="spread-viewer__nav">
+          {onBack && (
+            <button type="button" className="spread-viewer__back" onClick={onBack}>
+              ≡
+            </button>
+          )}
+          <button type="button" disabled={isLast} onClick={goNext}>
+            ←
+          </button>
+          <span className="spread-viewer__info">
+            {spreadIndex + 1} / {spreads.length}
+          </span>
+          <button type="button" disabled={isFirst} onClick={goPrev}>
+            →
+          </button>
+        </div>
       </div>
     </div>
   );

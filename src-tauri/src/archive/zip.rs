@@ -1,6 +1,7 @@
-use super::{is_image_file, mime_type_from_name};
+use super::{is_archive_file, is_image_file, mime_type_from_name, store_temp_dir, ArchiveContents};
 use base64::Engine;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::path::Path;
 
 /// List image file names inside a ZIP archive, sorted by natural order.
 pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
@@ -24,6 +25,92 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
 
     names.sort_by(|a, b| natord::compare(a, b));
     Ok(names)
+}
+
+/// Analyze ZIP archive contents to determine if it contains images or nested archives.
+pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
+    let file =
+        std::fs::File::open(archive_path).map_err(|e| format!("Failed to open archive: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP archive: {e}"))?;
+
+    let mut images: Vec<String> = Vec::new();
+    let mut nested_archives: Vec<String> = Vec::new();
+
+    for i in 0..archive.len() {
+        let entry = match archive.by_index_raw(i) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        if entry.is_dir() {
+            continue;
+        }
+        let name = entry.name().to_string();
+        if name.contains("__MACOSX") {
+            continue;
+        }
+
+        if is_image_file(&name) {
+            images.push(name);
+        } else if is_archive_file(&name) {
+            nested_archives.push(name);
+        }
+    }
+
+    // If we have images, return them
+    if !images.is_empty() {
+        images.sort_by(|a, b| natord::compare(a, b));
+        return Ok(ArchiveContents::Images { names: images });
+    }
+
+    // If we have nested archives, return them
+    if !nested_archives.is_empty() {
+        nested_archives.sort_by(|a, b| natord::compare(a, b));
+        return Ok(ArchiveContents::NestedArchives {
+            names: nested_archives,
+        });
+    }
+
+    Ok(ArchiveContents::Empty)
+}
+
+/// Extract a nested archive from a ZIP file and return the path to the extracted file.
+pub fn extract_nested_archive(parent_path: &str, nested_name: &str) -> Result<String, String> {
+    let file =
+        std::fs::File::open(parent_path).map_err(|e| format!("Failed to open archive: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP archive: {e}"))?;
+
+    let mut entry = archive
+        .by_name(nested_name)
+        .map_err(|e| format!("Entry not found: {e}"))?;
+
+    let mut buf = Vec::with_capacity(entry.size() as usize);
+    entry
+        .read_to_end(&mut buf)
+        .map_err(|e| format!("Failed to read entry: {e}"))?;
+
+    // Create temp directory and write file
+    let temp_dir =
+        tempfile::tempdir().map_err(|e| format!("Failed to create temp directory: {e}"))?;
+
+    let file_name = Path::new(nested_name)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("archive");
+    let temp_path = temp_dir.path().join(file_name);
+
+    let mut file = std::fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+    file.write_all(&buf)
+        .map_err(|e| format!("Failed to write temp file: {e}"))?;
+
+    let result = temp_path.to_string_lossy().to_string();
+
+    // Store temp dir to keep it alive
+    store_temp_dir(temp_dir);
+
+    Ok(result)
 }
 
 /// Extract a single image from a ZIP archive and return it as a Base64 data URL.

@@ -1,9 +1,28 @@
 mod rar;
 mod zip;
 
+use serde::Serialize;
 use std::path::Path;
+use std::sync::Mutex;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
+const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr"];
+
+/// Result of analyzing archive contents
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type")]
+pub enum ArchiveContents {
+    /// Archive contains images directly
+    Images { names: Vec<String> },
+    /// Archive contains nested archives
+    NestedArchives { names: Vec<String> },
+    /// Archive is empty or has no relevant content
+    Empty,
+}
+
+/// Global storage for extracted temporary directories
+/// This keeps temp directories alive until the app closes
+static TEMP_DIRS: Mutex<Vec<tempfile::TempDir>> = Mutex::new(Vec::new());
 
 /// List image entries in an archive, sorted by natural order.
 pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
@@ -18,6 +37,46 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
         "zip" | "cbz" => zip::list_images(archive_path),
         "rar" | "cbr" => rar::list_images(archive_path),
         _ => Err(format!("Unsupported archive format: .{ext}")),
+    }
+}
+
+/// Analyze archive contents to determine if it contains images or nested archives.
+pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
+    let path = Path::new(archive_path);
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        "zip" | "cbz" => zip::analyze_contents(archive_path),
+        "rar" | "cbr" => rar::analyze_contents(archive_path),
+        _ => Err(format!("Unsupported archive format: .{ext}")),
+    }
+}
+
+/// Extract a nested archive from a parent archive and return the path to the extracted file.
+/// The extracted file is placed in a temporary directory that persists until app closes.
+pub fn extract_nested_archive(parent_path: &str, nested_name: &str) -> Result<String, String> {
+    let path = Path::new(parent_path);
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        "zip" | "cbz" => zip::extract_nested_archive(parent_path, nested_name),
+        "rar" | "cbr" => rar::extract_nested_archive(parent_path, nested_name),
+        _ => Err(format!("Unsupported archive format: .{ext}")),
+    }
+}
+
+/// Store a temp directory to keep it alive
+pub fn store_temp_dir(dir: tempfile::TempDir) {
+    if let Ok(mut dirs) = TEMP_DIRS.lock() {
+        dirs.push(dir);
     }
 }
 
@@ -41,6 +100,14 @@ pub fn get_image_base64(archive_path: &str, entry_name: &str) -> Result<String, 
 pub fn is_image_file(name: &str) -> bool {
     let lower = name.to_lowercase();
     IMAGE_EXTENSIONS
+        .iter()
+        .any(|ext| lower.ends_with(&format!(".{ext}")))
+}
+
+/// Check if a filename has an archive extension.
+pub fn is_archive_file(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    ARCHIVE_EXTENSIONS
         .iter()
         .any(|ext| lower.ends_with(&format!(".{ext}")))
 }

@@ -1,3 +1,5 @@
+import { ArchiveIcon, ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
+
 interface TreeNodeData {
   entry: {
     name: string;
@@ -18,7 +20,6 @@ interface TreeNodeProps {
 
 export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodeProps) {
   const { entry } = node;
-  const indent = depth * 16;
 
   const handleClick = () => {
     if (entry.is_dir) {
@@ -28,13 +29,32 @@ export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodePro
     }
   };
 
-  const icon = entry.is_dir ? (node.isOpen ? "\u25BC" : "\u25B6") : "\u{1F4E6}";
+  const renderIcon = () => {
+    if (entry.is_dir) {
+      return node.isOpen ? <FolderOpenIcon size={16} /> : <FolderIcon size={16} />;
+    }
+    if (entry.is_archive) {
+      return <ArchiveIcon size={16} />;
+    }
+    return null;
+  };
+
+  const renderChevron = () => {
+    if (!entry.is_dir) {
+      return <span className="tree-node__chevron tree-node__chevron--hidden" />;
+    }
+    return (
+      <span className="tree-node__chevron">
+        {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </span>
+    );
+  };
 
   return (
     <>
       <div
-        className={`tree-node ${entry.is_archive ? "tree-node--archive" : ""}`}
-        style={{ paddingLeft: `${indent + 4}px` }}
+        className={`tree-node ${entry.is_archive ? "tree-node--archive" : ""} ${entry.is_dir ? "tree-node--folder" : ""}`}
+        style={{ paddingLeft: `${depth * 20 + 8}px` }}
         onClick={handleClick}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -45,7 +65,19 @@ export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodePro
         role="treeitem"
         tabIndex={0}
       >
-        <span className="tree-node__icon">{icon}</span>
+        {depth > 0 && (
+          <div className="tree-node__guides">
+            {Array.from({ length: depth }).map((_, i) => (
+              <span
+                key={`guide-${entry.path}-${i}`}
+                className="tree-node__guide"
+                style={{ left: `${i * 20 + 16}px` }}
+              />
+            ))}
+          </div>
+        )}
+        {renderChevron()}
+        <span className="tree-node__icon">{renderIcon()}</span>
         <span className="tree-node__name">{entry.name}</span>
       </div>
       {node.isOpen &&

@@ -52,13 +52,17 @@ pnpm tauri dev
 ## ビルド
 
 ```bash
-# プロダクションビルド
-pnpm tauri build
+# プロダクションビルド（macOS）
+pnpm tauri build --bundles app
+
+# プロダクションビルド（DMGも作成）
+pnpm tauri build --bundles dmg
 ```
 
 ビルド成果物は以下に生成されます:
 
 - **macOS**: `src-tauri/target/release/bundle/macos/mekuri.app`
+- **macOS (DMG)**: `src-tauri/target/release/bundle/dmg/mekuri_x.x.x_aarch64.dmg`
 - **Windows**: `src-tauri/target/release/bundle/msi/` または `nsis/`
 
 ## テスト・リント

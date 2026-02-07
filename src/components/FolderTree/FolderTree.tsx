@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { readDirectoryFolders } from "../../api/directory";
 import { addFavorite } from "../../api/favorites";
+import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
 import { TreeNode } from "./TreeNode";
 
@@ -27,11 +28,7 @@ export function FolderTree({
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    path: string;
-  } | null>(null);
+  const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
 
   const loadRoot = useCallback(async () => {
     if (loaded) return;
@@ -103,30 +100,13 @@ export function FolderTree({
     });
   }, []);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, path: string) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, path });
-  }, []);
-
   const handleAddFavorite = useCallback(async () => {
     if (contextMenu) {
       await addFavorite(contextMenu.path);
-      setContextMenu(null);
+      closeContextMenu();
       onFavoriteAdded?.();
     }
-  }, [contextMenu, onFavoriteAdded]);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
-  useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => closeContextMenu();
-      window.addEventListener("click", handleClick);
-      return () => window.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu, closeContextMenu]);
+  }, [contextMenu, closeContextMenu, onFavoriteAdded]);
 
   if (loading && nodes.length === 0) {
     return <div className="folder-tree-loading">Loading...</div>;
@@ -151,7 +131,7 @@ export function FolderTree({
           selectedPath={selectedPath}
           onToggle={toggleNode}
           onSelect={onFolderSelect}
-          onContextMenu={handleContextMenu}
+          onContextMenu={openContextMenu}
         />
       ))}
 

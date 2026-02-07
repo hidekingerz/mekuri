@@ -7,6 +7,7 @@ import {
   extractNestedArchive,
   listArchiveImages,
 } from "./hooks/useArchive";
+import { getSiblingArchives } from "./hooks/useDirectory";
 import { saveViewerSettings } from "./hooks/useSettings";
 import { fileNameFromPath } from "./utils/windowLabel";
 
@@ -48,6 +49,46 @@ function Viewer() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // Navigate to sibling archive with Alt+Arrow keys
+  useEffect(() => {
+    if (!archivePath) return;
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (!e.altKey) return;
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+
+      e.preventDefault();
+
+      try {
+        const { archives, currentIndex } = await getSiblingArchives(archivePath);
+        if (currentIndex === -1 || archives.length <= 1) return;
+
+        let newIndex: number;
+        if (e.key === "ArrowUp") {
+          // Next file (up in list order)
+          newIndex = currentIndex + 1;
+          if (newIndex >= archives.length) return; // Already at last
+        } else {
+          // Previous file (down in list order)
+          newIndex = currentIndex - 1;
+          if (newIndex < 0) return; // Already at first
+        }
+
+        const newPath = archives[newIndex];
+        setArchivePath(newPath);
+
+        // Update window title
+        const fileName = fileNameFromPath(newPath);
+        await getCurrentWindow().setTitle(`${fileName} - mekuri`);
+      } catch (err) {
+        console.error("Failed to navigate to sibling archive:", err);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [archivePath]);
 
   // Analyze archive contents when archive path is set
   useEffect(() => {

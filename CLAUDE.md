@@ -50,16 +50,20 @@ pnpm tauri build       # リリースビルド
 ```
 src/                    # フロントエンド (React/TypeScript)
   components/
+    FavoritesSidebar/   #   お気に入りサイドバー
     FolderTree/         #   フォルダツリーUI
+    FileList/           #   アーカイブファイル一覧
     SpreadViewer/       #   見開きビューワーUI
-  hooks/                #   カスタムフック (useDirectory, useArchive)
+    Icons/              #   カスタム SVG アイコン
+  hooks/                #   カスタムフック (useDirectory, useArchive, useFavorites, useSettings)
+  utils/                #   ユーティリティ (spreadLayout, windowLabel)
   types/                #   型定義
 
 src-tauri/              # バックエンド (Rust)
   src/
     commands/           #   Tauri コマンド層（IPC エンドポイント）
       fs.rs             #     read_directory コマンド
-      archive.rs        #     list_archive_images, get_archive_image コマンド
+      archive.rs        #     アーカイブ操作コマンド（一覧・画像取得・内容分析・ネスト展開）
     archive/            #   アーカイブ処理ロジック（Tauri 非依存）
       zip.rs            #     ZIP/CBZ 処理
       rar.rs            #     RAR/CBR 処理
@@ -129,7 +133,10 @@ npx tsc --noEmit              # TypeScript 型チェック
 ## 重要な設計判断
 
 - **マルチウィンドウ**: Vite の multi-input + Tauri の `WebviewWindow` で実現。同じアーカイブの二重オープンを防止する
+- **3カラムレイアウト**: メインウィンドウはお気に入り | フォルダツリー | ファイルリストの3カラム構成
 - **遅延読み込み**: フォルダツリーは展開時にそのフォルダ直下のみ取得する
 - **見開き表示**: 右綴じ（右→左）がデフォルト。先頭ページは単ページ表示
 - **画像転送**: Rust → React は Base64 エンコードした data URL で渡す
 - **自然順ソート**: ファイル名は `natord` クレートで自然順ソートする
+- **ネストアーカイブ**: 一時ディレクトリに展開し、アプリ終了まで保持する
+- **設定永続化**: `tauri-plugin-store` でウィンドウサイズ・カラム幅・お気に入りを自動保存

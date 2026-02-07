@@ -14,21 +14,34 @@ mekuri/
 │   ├── main.tsx                   #   メインウィンドウ エントリポイント
 │   ├── viewer.tsx                 #   ビューワーウィンドウ エントリポイント
 │   ├── App.tsx                    #   メインウィンドウ ルートコンポーネント
-│   ├── Viewer.tsx                 #   ビューワーウィンドウ ルートコンポーネント
-│   ├── components/                #   共通コンポーネント
+│   ├── ViewerApp.tsx              #   ビューワーウィンドウ ルートコンポーネント
+│   ├── components/                #   コンポーネント
+│   │   ├── FavoritesSidebar/      #     お気に入りサイドバー
+│   │   │   └── FavoritesSidebar.tsx
 │   │   ├── FolderTree/            #     フォルダツリー
 │   │   │   ├── FolderTree.tsx     #       ツリー本体
 │   │   │   └── TreeNode.tsx       #       ツリーノード
-│   │   └── SpreadViewer/          #     見開きビューワー
-│   │       ├── SpreadViewer.tsx   #       ビューワー本体
-│   │       └── PageImage.tsx      #       画像表示コンポーネント
+│   │   ├── FileList/              #     ファイルリスト（アーカイブ一覧）
+│   │   │   └── FileList.tsx
+│   │   ├── SpreadViewer/          #     見開きビューワー
+│   │   │   ├── SpreadViewer.tsx   #       ビューワー本体
+│   │   │   └── PageImage.tsx      #       画像表示コンポーネント
+│   │   └── Icons/                 #     カスタム SVG アイコン
+│   │       └── Icons.tsx
 │   ├── hooks/                     #   カスタムフック
-│   │   ├── useDirectory.ts        #     ディレクトリ読み込み
-│   │   └── useArchive.ts          #     アーカイブ操作
+│   │   ├── useDirectory.ts        #     ディレクトリ読み込み・兄弟アーカイブ取得
+│   │   ├── useArchive.ts          #     アーカイブ操作（一覧・画像取得・内容分析・ネスト展開）
+│   │   ├── useFavorites.ts        #     お気に入りフォルダ管理
+│   │   └── useSettings.ts         #     ウィンドウ設定の永続化
+│   ├── utils/                     #   ユーティリティ
+│   │   ├── spreadLayout.ts        #     見開きレイアウト計算
+│   │   ├── spreadLayout.test.ts   #     spreadLayout テスト
+│   │   ├── windowLabel.ts         #     ウィンドウラベル生成
+│   │   └── windowLabel.test.ts    #     windowLabel テスト
 │   ├── types/                     #   型定義
-│   │   └── index.ts               #     共通型
+│   │   └── index.ts               #     共通型（DirectoryEntry）
 │   └── styles/                    #   スタイル
-│       ├── global.css             #     グローバルスタイル
+│       ├── global.css             #     グローバルスタイル（メインウィンドウ）
 │       └── viewer.css             #     ビューワー用スタイル
 │
 ├── src-tauri/                     # バックエンド (Rust/Tauri)
@@ -53,8 +66,10 @@ mekuri/
 ├── viewer.html                    #   ビューワーウィンドウ HTML
 ├── vite.config.ts                 #   Vite 設定
 ├── tsconfig.json                  #   TypeScript 設定
+├── biome.json                     #   Biome 設定（リンタ + フォーマッタ）
 ├── package.json                   #   フロントエンド依存定義
 ├── pnpm-lock.yaml                 #   ロックファイル
+├── CLAUDE.md                      #   AI アシスタント向け開発ガイド
 ├── README.md                      #   プロジェクト概要
 └── LICENSE                        #   MIT ライセンス
 ```

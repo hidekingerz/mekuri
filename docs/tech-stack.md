@@ -15,9 +15,10 @@
 |-----------|------|
 | `@tauri-apps/api` | Tauri IPC 呼び出し（invoke, event, window） |
 | `@tauri-apps/plugin-dialog` | フォルダ選択ダイアログ |
-| React (組み込み) | UI コンポーネント |
+| `@tauri-apps/plugin-store` | 設定・お気に入りの永続化 |
+| `react`, `react-dom` | UI コンポーネント |
 
-最小限の依存で始め、必要に応じて追加する方針とする。
+最小限の依存で構成する方針とする。アイコンは外部ライブラリを使わず、カスタム SVG コンポーネントで実装している。
 
 ## Rust 依存クレート
 
@@ -25,10 +26,13 @@
 |---------|------|------|
 | `tauri` | アプリフレームワーク | v2 |
 | `tauri-plugin-dialog` | ダイアログプラグイン | |
-| `zip` | ZIP/CBZ ファイル展開 | `zip` crate |
-| `unrar` | RAR/CBR ファイル展開 | `unrar` crate |
+| `tauri-plugin-store` | キーバリューストアプラグイン | 設定・お気に入りの永続化 |
+| `serde`, `serde_json` | JSON シリアライズ / デシリアライズ | IPC データ変換用 |
+| `zip` | ZIP/CBZ ファイル展開 | deflate 機能のみ有効 |
+| `unrar` | RAR/CBR ファイル展開 | |
 | `natord` | 自然順ソート | ファイル名ソート用 |
 | `base64` | Base64 エンコーディング | 画像データ転送用 |
+| `tempfile` | 一時ファイル/ディレクトリ作成 | ネストアーカイブ展開用 |
 
 ## 開発ツール
 
@@ -36,6 +40,7 @@
 |--------|------|
 | `pnpm` | パッケージマネージャ |
 | `biome` | フロントエンドリンタ + フォーマッタ |
+| `vitest` | フロントエンドテストフレームワーク |
 | `clippy` | Rust リンタ |
 | `rustfmt` | Rust フォーマッタ |
 

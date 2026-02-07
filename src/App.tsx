@@ -24,9 +24,10 @@ function App() {
       const settings = await getWindowSettings();
       setTreeColumnWidth(settings.treeColumnWidth);
 
-      // Apply saved window size
+      // Apply saved window size and show window
       const win = getCurrentWindow();
       await win.setSize(new LogicalSize(settings.width, settings.height));
+      await win.show();
       setSettingsLoaded(true);
     }
     loadSettings();
@@ -105,6 +106,7 @@ function App() {
       height: viewerSettings.height,
       minWidth: 600,
       minHeight: 400,
+      visible: true,
     });
     webview.once("tauri://error", (e) => {
       console.error("Failed to create viewer window:", e);

@@ -21,14 +21,18 @@ function App() {
   // Load settings on mount
   useEffect(() => {
     async function loadSettings() {
-      const settings = await getWindowSettings();
-      setTreeColumnWidth(settings.treeColumnWidth);
-
-      // Apply saved window size and show window
       const win = getCurrentWindow();
-      await win.setSize(new LogicalSize(settings.width, settings.height));
-      await win.show();
-      setSettingsLoaded(true);
+      try {
+        const settings = await getWindowSettings();
+        setTreeColumnWidth(settings.treeColumnWidth);
+        await win.setSize(new LogicalSize(settings.width, settings.height));
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        // Always show window
+        await win.show();
+        setSettingsLoaded(true);
+      }
     }
     loadSettings();
   }, []);

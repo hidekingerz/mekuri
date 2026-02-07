@@ -2,33 +2,53 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useState } from "react";
+import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
+import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
+import { addFavorite } from "./hooks/useFavorites";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
-  const [rootPath, setRootPath] = useState<string | null>(null);
+  const [selectedFavorite, setSelectedFavorite] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [favoritesRefresh, setFavoritesRefresh] = useState(0);
 
-  // Update main window title when folder changes
+  // Update main window title
   useEffect(() => {
-    if (rootPath) {
-      const folderName = fileNameFromPath(rootPath);
+    if (selectedFavorite) {
+      const folderName = fileNameFromPath(selectedFavorite);
       getCurrentWindow().setTitle(`${folderName} - mekuri`);
     } else {
       getCurrentWindow().setTitle("mekuri");
     }
-  }, [rootPath]);
+  }, [selectedFavorite]);
 
-  const handleSelectFolder = useCallback(async () => {
+  const handleAddFolder = useCallback(async () => {
     const selected = await open({ directory: true });
     if (selected) {
-      setRootPath(selected);
+      await addFavorite(selected);
+      setFavoritesRefresh((n) => n + 1);
+      setSelectedFavorite(selected);
+      setSelectedFolder(null);
     }
+  }, []);
+
+  const handleFavoriteSelect = useCallback((path: string) => {
+    setSelectedFavorite(path);
+    setSelectedFolder(null);
+  }, []);
+
+  const handleFolderSelect = useCallback((path: string) => {
+    setSelectedFolder(path);
+  }, []);
+
+  const handleFavoriteAdded = useCallback(() => {
+    setFavoritesRefresh((n) => n + 1);
   }, []);
 
   const handleArchiveSelect = useCallback(async (archivePath: string) => {
     const label = viewerLabel(archivePath);
 
-    // Check if window already exists
     const existing = await WebviewWindow.getByLabel(label);
     if (existing) {
       await existing.setFocus();
@@ -51,19 +71,36 @@ function App() {
   return (
     <div className="app">
       <div className="toolbar">
-        <button type="button" className="toolbar__btn" onClick={handleSelectFolder}>
-          Open Folder
+        <button type="button" className="toolbar__btn" onClick={handleAddFolder}>
+          Add Folder
         </button>
-        {rootPath && <span className="toolbar__path">{rootPath}</span>}
       </div>
-      <div className="tree-container">
-        {rootPath ? (
-          <FolderTree rootPath={rootPath} onArchiveSelect={handleArchiveSelect} />
-        ) : (
-          <div className="tree-empty">
-            <p>Click "Open Folder" to browse archives</p>
-          </div>
-        )}
+      <div className="app__columns">
+        <FavoritesSidebar
+          selectedPath={selectedFavorite}
+          onSelect={handleFavoriteSelect}
+          refreshTrigger={favoritesRefresh}
+        />
+        <div className="app__tree-column">
+          {selectedFavorite ? (
+            <FolderTree
+              rootPath={selectedFavorite}
+              selectedPath={selectedFolder}
+              onFolderSelect={handleFolderSelect}
+              onFavoriteAdded={handleFavoriteAdded}
+            />
+          ) : (
+            <div className="column-empty">
+              <p>Select a favorite folder</p>
+            </div>
+          )}
+        </div>
+        <div className="app__file-column">
+          <FileList
+            folderPath={selectedFolder || selectedFavorite}
+            onArchiveSelect={handleArchiveSelect}
+          />
+        </div>
       </div>
     </div>
   );

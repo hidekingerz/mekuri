@@ -1,4 +1,4 @@
-import { ArchiveIcon, ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
+import { ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
 
 interface TreeNodeData {
   entry: {
@@ -14,52 +14,55 @@ interface TreeNodeData {
 interface TreeNodeProps {
   node: TreeNodeData;
   depth: number;
+  selectedPath: string | null;
   onToggle: (path: string) => void;
-  onArchiveSelect: (path: string) => void;
+  onSelect: (path: string) => void;
+  onContextMenu: (e: React.MouseEvent, path: string) => void;
 }
 
-export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodeProps) {
+export function TreeNode({
+  node,
+  depth,
+  selectedPath,
+  onToggle,
+  onSelect,
+  onContextMenu,
+}: TreeNodeProps) {
   const { entry } = node;
+  const isSelected = entry.path === selectedPath;
 
   const handleClick = () => {
-    if (entry.is_dir) {
-      onToggle(entry.path);
-    } else if (entry.is_archive) {
-      onArchiveSelect(entry.path);
-    }
+    onSelect(entry.path);
   };
 
-  const renderIcon = () => {
-    if (entry.is_dir) {
-      return node.isOpen ? <FolderOpenIcon size={16} /> : <FolderIcon size={16} />;
-    }
-    if (entry.is_archive) {
-      return <ArchiveIcon size={16} />;
-    }
-    return null;
+  const handleDoubleClick = () => {
+    onToggle(entry.path);
   };
 
-  const renderChevron = () => {
-    if (!entry.is_dir) {
-      return <span className="tree-node__chevron tree-node__chevron--hidden" />;
-    }
-    return (
-      <span className="tree-node__chevron">
-        {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </span>
-    );
+  const handleContextMenu = (e: React.MouseEvent) => {
+    onContextMenu(e, entry.path);
   };
 
   return (
     <>
       <div
-        className={`tree-node ${entry.is_archive ? "tree-node--archive" : ""} ${entry.is_dir ? "tree-node--folder" : ""}`}
+        className={`tree-node tree-node--folder ${isSelected ? "tree-node--selected" : ""}`}
         style={{ paddingLeft: `${depth * 20 + 8}px` }}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             handleClick();
+          }
+          if (e.key === "ArrowRight" && !node.isOpen) {
+            e.preventDefault();
+            onToggle(entry.path);
+          }
+          if (e.key === "ArrowLeft" && node.isOpen) {
+            e.preventDefault();
+            onToggle(entry.path);
           }
         }}
         role="treeitem"
@@ -76,8 +79,20 @@ export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodePro
             ))}
           </div>
         )}
-        {renderChevron()}
-        <span className="tree-node__icon">{renderIcon()}</span>
+        <button
+          type="button"
+          className="tree-node__chevron"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(entry.path);
+          }}
+          tabIndex={-1}
+        >
+          {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        <span className="tree-node__icon">
+          {node.isOpen ? <FolderOpenIcon size={16} /> : <FolderIcon size={16} />}
+        </span>
         <span className="tree-node__name">{entry.name}</span>
       </div>
       {node.isOpen &&
@@ -86,8 +101,10 @@ export function TreeNode({ node, depth, onToggle, onArchiveSelect }: TreeNodePro
             key={child.entry.path}
             node={child}
             depth={depth + 1}
+            selectedPath={selectedPath}
             onToggle={onToggle}
-            onArchiveSelect={onArchiveSelect}
+            onSelect={onSelect}
+            onContextMenu={onContextMenu}
           />
         ))}
     </>

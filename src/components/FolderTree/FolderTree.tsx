@@ -1,31 +1,44 @@
-import { useCallback, useState } from "react";
-import { readDirectory } from "../../hooks/useDirectory";
+import { useCallback, useEffect, useState } from "react";
+import { readDirectoryFolders } from "../../hooks/useDirectory";
+import { addFavorite } from "../../hooks/useFavorites";
 import type { DirectoryEntry } from "../../types";
 import { TreeNode } from "./TreeNode";
 
 interface TreeNodeData {
   entry: DirectoryEntry;
-  children: TreeNodeData[] | null; // null = not loaded yet
+  children: TreeNodeData[] | null;
   isOpen: boolean;
 }
 
 interface FolderTreeProps {
   rootPath: string;
-  onArchiveSelect: (path: string) => void;
+  selectedPath: string | null;
+  onFolderSelect: (path: string) => void;
+  onFavoriteAdded?: () => void;
 }
 
-export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
+export function FolderTree({
+  rootPath,
+  selectedPath,
+  onFolderSelect,
+  onFavoriteAdded,
+}: FolderTreeProps) {
   const [nodes, setNodes] = useState<TreeNodeData[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    path: string;
+  } | null>(null);
 
   const loadRoot = useCallback(async () => {
     if (loaded) return;
     setLoading(true);
     setError(null);
     try {
-      const entries = await readDirectory(rootPath);
+      const entries = await readDirectoryFolders(rootPath);
       setNodes(entries.map((entry) => ({ entry, children: null, isOpen: false })));
       setLoaded(true);
     } catch (err) {
@@ -35,12 +48,12 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
     }
   }, [rootPath, loaded]);
 
-  // Load root on first render
-  if (!loaded && !loading) {
-    loadRoot();
-  }
+  useEffect(() => {
+    if (!loaded && !loading) {
+      loadRoot();
+    }
+  }, [loaded, loading, loadRoot]);
 
-  // Reset when rootPath changes
   const [prevRoot, setPrevRoot] = useState(rootPath);
   if (prevRoot !== rootPath) {
     setPrevRoot(rootPath);
@@ -60,7 +73,7 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
             let children = node.children;
             if (children === null) {
               try {
-                const entries = await readDirectory(path);
+                const entries = await readDirectoryFolders(path);
                 children = entries.map((entry) => ({
                   entry,
                   children: null,
@@ -90,6 +103,31 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
     });
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent, path: string) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, path });
+  }, []);
+
+  const handleAddFavorite = useCallback(async () => {
+    if (contextMenu) {
+      await addFavorite(contextMenu.path);
+      setContextMenu(null);
+      onFavoriteAdded?.();
+    }
+  }, [contextMenu, onFavoriteAdded]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  useEffect(() => {
+    if (contextMenu) {
+      const handleClick = () => closeContextMenu();
+      window.addEventListener("click", handleClick);
+      return () => window.removeEventListener("click", handleClick);
+    }
+  }, [contextMenu, closeContextMenu]);
+
   if (loading && nodes.length === 0) {
     return <div className="folder-tree-loading">Loading...</div>;
   }
@@ -110,10 +148,20 @@ export function FolderTree({ rootPath, onArchiveSelect }: FolderTreeProps) {
           key={node.entry.path}
           node={node}
           depth={0}
+          selectedPath={selectedPath}
           onToggle={toggleNode}
-          onArchiveSelect={onArchiveSelect}
+          onSelect={onFolderSelect}
+          onContextMenu={handleContextMenu}
         />
       ))}
+
+      {contextMenu && (
+        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <button type="button" className="context-menu__item" onClick={handleAddFavorite}>
+            Add to favorites
+          </button>
+        </div>
+      )}
     </div>
   );
 }

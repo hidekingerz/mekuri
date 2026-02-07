@@ -15,10 +15,10 @@
       {
         "label": "main",
         "title": "mekuri",
-        "width": 400,
-        "height": 700,
-        "minWidth": 280,
-        "minHeight": 400,
+        "width": 480,
+        "height": 800,
+        "minWidth": 320,
+        "minHeight": 500,
         "resizable": true,
         "url": "index.html"
       }

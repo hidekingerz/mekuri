@@ -21,9 +21,9 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 unrar = "0.5"
 natord = "1"
 base64 = "0.22"
+tempfile = "3"
 
 [dev-dependencies]
-tempfile = "3"
 
 [profile.release]
 panic = "abort"

@@ -9,6 +9,8 @@ pub fn run() {
             commands::fs::read_directory,
             commands::archive::list_archive_images,
             commands::archive::get_archive_image,
+            commands::archive::analyze_archive_contents,
+            commands::archive::extract_nested_archive,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

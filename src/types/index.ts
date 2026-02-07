@@ -3,4 +3,5 @@ export interface DirectoryEntry {
   path: string;
   is_dir: boolean;
   is_archive: boolean;
+  has_subfolders: boolean;
 }

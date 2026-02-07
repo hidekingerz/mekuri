@@ -2,11 +2,11 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { addFavorite } from "./api/favorites";
+import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
-import { addFavorite } from "./hooks/useFavorites";
-import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./hooks/useSettings";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {

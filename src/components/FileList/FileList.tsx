@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { readDirectoryFiles } from "../../hooks/useDirectory";
+import { readDirectoryFiles } from "../../api/directory";
 import type { DirectoryEntry } from "../../types";
 import { ArchiveIcon } from "../Icons/Icons";
 

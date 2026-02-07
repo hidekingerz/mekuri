@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getArchiveImage } from "../../hooks/useArchive";
+import { getArchiveImage } from "../../api/archive";
 import type { Spread } from "../../utils/spreadLayout";
 import { buildSpreads } from "../../utils/spreadLayout";
 import { PageImage } from "./PageImage";

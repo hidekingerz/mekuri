@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { readDirectoryFolders } from "../../hooks/useDirectory";
-import { addFavorite } from "../../hooks/useFavorites";
+import { readDirectoryFolders } from "../../api/directory";
+import { addFavorite } from "../../api/favorites";
 import type { DirectoryEntry } from "../../types";
 import { TreeNode } from "./TreeNode";
 

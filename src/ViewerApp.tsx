@@ -1,14 +1,14 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useState } from "react";
-import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
 import {
   type ArchiveContents,
   analyzeArchiveContents,
   extractNestedArchive,
   listArchiveImages,
-} from "./hooks/useArchive";
-import { getSiblingArchives } from "./hooks/useDirectory";
-import { saveViewerSettings } from "./hooks/useSettings";
+} from "./api/archive";
+import { getSiblingArchives } from "./api/directory";
+import { saveViewerSettings } from "./api/settings";
+import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {

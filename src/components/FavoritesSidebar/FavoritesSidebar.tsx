@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getFavorites, removeFavorite } from "../../hooks/useFavorites";
+import { getFavorites, removeFavorite } from "../../api/favorites";
 import { FolderIcon } from "../Icons/Icons";
 
 interface FavoritesSidebarProps {

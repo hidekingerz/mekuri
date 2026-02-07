@@ -6,6 +6,7 @@ interface TreeNodeData {
     path: string;
     is_dir: boolean;
     is_archive: boolean;
+    has_subfolders: boolean;
   };
   children: TreeNodeData[] | null;
   isOpen: boolean;
@@ -30,8 +31,8 @@ export function TreeNode({
 }: TreeNodeProps) {
   const { entry } = node;
   const isSelected = entry.path === selectedPath;
-  // Hide chevron if we know the folder has no subfolders
-  const hasChildren = node.children === null || node.children.length > 0;
+  // Hide chevron if the folder has no subfolders
+  const hasChildren = entry.has_subfolders;
 
   const handleClick = () => {
     onSelect(entry.path);

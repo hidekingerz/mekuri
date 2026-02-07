@@ -9,6 +9,7 @@ pub struct DirectoryEntry {
     pub path: String,
     pub is_dir: bool,
     pub is_archive: bool,
+    pub has_subfolders: bool,
 }
 
 #[tauri::command]
@@ -29,7 +30,8 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
                 return None;
             }
 
-            let path = entry.path().to_string_lossy().to_string();
+            let entry_path = entry.path();
+            let path = entry_path.to_string_lossy().to_string();
             let is_dir = metadata.is_dir();
             let is_archive = !is_dir && is_archive_file(&name);
 
@@ -38,11 +40,19 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
                 return None;
             }
 
+            // Check if directory has subfolders
+            let has_subfolders = if is_dir {
+                has_subdirectories(&entry_path)
+            } else {
+                false
+            };
+
             Some(DirectoryEntry {
                 name,
                 path,
                 is_dir,
                 is_archive,
+                has_subfolders,
             })
         })
         .collect();
@@ -64,4 +74,21 @@ fn is_archive_file(name: &str) -> bool {
     ARCHIVE_EXTENSIONS
         .iter()
         .any(|ext| lower.ends_with(&format!(".{ext}")))
+}
+
+fn has_subdirectories(path: &PathBuf) -> bool {
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_dir() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    // Skip hidden directories
+                    if !name.starts_with('.') {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }

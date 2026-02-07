@@ -71,17 +71,33 @@ body {
   min-height: 0;
 }
 
+.app__columns--resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .app__tree-column {
-  flex: 1;
-  min-width: 200px;
+  min-width: 150px;
   overflow-y: auto;
   background-color: #fff;
-  border-right: 1px solid #e5e7eb;
+}
+
+.app__resize-handle {
+  width: 5px;
+  background-color: #e5e7eb;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.app__resize-handle:hover,
+.app__columns--resizing .app__resize-handle {
+  background-color: #3b82f6;
 }
 
 .app__file-column {
   flex: 1;
-  min-width: 200px;
+  min-width: 150px;
   overflow-y: auto;
   background-color: #fff;
 }

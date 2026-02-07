@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
-const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr"];
+const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr", "7z"];
 
 /// Result of analyzing archive contents
 #[derive(Debug, Clone, Serialize)]

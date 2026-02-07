@@ -30,6 +30,8 @@ export function TreeNode({
 }: TreeNodeProps) {
   const { entry } = node;
   const isSelected = entry.path === selectedPath;
+  // Hide chevron if we know the folder has no subfolders
+  const hasChildren = node.children === null || node.children.length > 0;
 
   const handleClick = () => {
     onSelect(entry.path);
@@ -79,17 +81,21 @@ export function TreeNode({
             ))}
           </div>
         )}
-        <button
-          type="button"
-          className="tree-node__chevron"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(entry.path);
-          }}
-          tabIndex={-1}
-        >
-          {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
+        {hasChildren ? (
+          <button
+            type="button"
+            className="tree-node__chevron"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(entry.path);
+            }}
+            tabIndex={-1}
+          >
+            {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+        ) : (
+          <span className="tree-node__chevron-placeholder" />
+        )}
         <span className="tree-node__icon">
           {node.isOpen ? <FolderOpenIcon size={16} /> : <FolderIcon size={16} />}
         </span>

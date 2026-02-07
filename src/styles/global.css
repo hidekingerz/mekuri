@@ -372,6 +372,12 @@ body {
   background-color: #e5e7eb;
 }
 
+.tree-node__chevron-placeholder {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
 /* Icon */
 .tree-node__icon {
   flex-shrink: 0;

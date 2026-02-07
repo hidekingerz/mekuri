@@ -6,7 +6,7 @@ import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { addFavorite } from "./hooks/useFavorites";
-import { getWindowSettings, saveWindowSettings } from "./hooks/useSettings";
+import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./hooks/useSettings";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -97,11 +97,12 @@ function App() {
       return;
     }
 
+    const viewerSettings = await getViewerSettings();
     const webview = new WebviewWindow(label, {
       url: `viewer.html?archive=${encodeURIComponent(archivePath)}`,
       title: `${fileNameFromPath(archivePath)} - mekuri`,
-      width: 1200,
-      height: 900,
+      width: viewerSettings.width,
+      height: viewerSettings.height,
       minWidth: 600,
       minHeight: 400,
     });

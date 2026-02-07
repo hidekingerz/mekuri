@@ -7,6 +7,7 @@ import {
   extractNestedArchive,
   listArchiveImages,
 } from "./hooks/useArchive";
+import { saveViewerSettings } from "./hooks/useSettings";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -25,6 +26,27 @@ function Viewer() {
     if (path) {
       setArchivePath(path);
     }
+  }, []);
+
+  // Save window size on resize (debounced)
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const win = getCurrentWindow();
+
+    const unlisten = win.onResized(async (event) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await saveViewerSettings({
+          width: event.payload.width,
+          height: event.payload.height,
+        });
+      }, 500);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   // Analyze archive contents when archive path is set

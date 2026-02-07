@@ -1,11 +1,12 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { addFavorite } from "./hooks/useFavorites";
+import { getWindowSettings, saveWindowSettings } from "./hooks/useSettings";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -13,8 +14,46 @@ function App() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
   const [treeColumnWidth, setTreeColumnWidth] = useState(300);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
+
+  // Load settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      const settings = await getWindowSettings();
+      setTreeColumnWidth(settings.treeColumnWidth);
+
+      // Apply saved window size
+      const win = getCurrentWindow();
+      await win.setSize(new LogicalSize(settings.width, settings.height));
+      setSettingsLoaded(true);
+    }
+    loadSettings();
+  }, []);
+
+  // Save window size on resize (debounced)
+  useEffect(() => {
+    if (!settingsLoaded) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const win = getCurrentWindow();
+
+    const unlisten = win.onResized(async (event) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await saveWindowSettings({
+          width: event.payload.width,
+          height: event.payload.height,
+        });
+      }, 500);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      unlisten.then((fn) => fn());
+    };
+  }, [settingsLoaded]);
 
   // Update main window title
   useEffect(() => {
@@ -79,6 +118,8 @@ function App() {
   useEffect(() => {
     if (!isResizing) return;
 
+    let currentWidth = treeColumnWidth;
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!columnsRef.current) return;
       const columnsRect = columnsRef.current.getBoundingClientRect();
@@ -86,11 +127,14 @@ function App() {
       const newWidth = e.clientX - columnsRect.left - 180;
       // Clamp between min and max
       const clampedWidth = Math.max(150, Math.min(newWidth, columnsRect.width - 180 - 150));
+      currentWidth = clampedWidth;
       setTreeColumnWidth(clampedWidth);
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      // Save column width
+      saveWindowSettings({ treeColumnWidth: currentWidth });
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -100,7 +144,7 @@ function App() {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, treeColumnWidth]);
 
   return (
     <div className="app">

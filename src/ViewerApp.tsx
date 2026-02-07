@@ -7,6 +7,8 @@ import {
   extractNestedArchive,
   listArchiveImages,
 } from "./hooks/useArchive";
+import { getSiblingArchives } from "./hooks/useDirectory";
+import { saveViewerSettings } from "./hooks/useSettings";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -26,6 +28,63 @@ function Viewer() {
       setArchivePath(path);
     }
   }, []);
+
+  // Save window size on resize (debounced)
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const win = getCurrentWindow();
+
+    const unlisten = win.onResized(async (event) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(async () => {
+        await saveViewerSettings({
+          width: event.payload.width,
+          height: event.payload.height,
+        });
+      }, 500);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // Navigate to sibling archive with Alt+Arrow keys
+  useEffect(() => {
+    if (!archivePath) return;
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+
+      e.preventDefault();
+
+      try {
+        const { archives, currentIndex } = await getSiblingArchives(archivePath);
+        if (currentIndex === -1 || archives.length <= 1) return;
+
+        let newIndex: number;
+        if (e.key === "ArrowUp") {
+          newIndex = currentIndex + 1;
+          if (newIndex >= archives.length) return;
+        } else {
+          newIndex = currentIndex - 1;
+          if (newIndex < 0) return;
+        }
+
+        const newPath = archives[newIndex];
+        setArchivePath(newPath);
+
+        const fileName = fileNameFromPath(newPath);
+        await getCurrentWindow().setTitle(`${fileName} - mekuri`);
+      } catch (err) {
+        console.error("Failed to navigate to sibling archive:", err);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [archivePath]);
 
   // Analyze archive contents when archive path is set
   useEffect(() => {

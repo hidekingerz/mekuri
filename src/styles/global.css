@@ -64,30 +64,210 @@ body {
   background: #e5e7eb;
 }
 
-.toolbar__path {
-  font-size: 11px;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+/* 3-column layout */
+.app__columns {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
-/* Tree container */
-.tree-container {
-  flex: 1;
+.app__columns--resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.app__tree-column {
+  min-width: 150px;
   overflow-y: auto;
-  padding: 8px 0;
   background-color: #fff;
 }
 
-.tree-empty {
+.app__resize-handle {
+  width: 5px;
+  background-color: #e5e7eb;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.app__resize-handle:hover,
+.app__columns--resizing .app__resize-handle {
+  background-color: #3b82f6;
+}
+
+.app__file-column {
+  flex: 1;
+  min-width: 150px;
+  overflow-y: auto;
+  background-color: #fff;
+}
+
+.column-empty {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
   color: #9ca3af;
   font-size: 13px;
+}
+
+/* Favorites Sidebar */
+.favorites-sidebar {
+  width: 180px;
+  min-width: 140px;
+  background-color: #f3f4f6;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.favorites-sidebar__header {
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.favorites-sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.favorites-sidebar__empty {
+  padding: 16px 12px;
+  color: #9ca3af;
+  font-size: 12px;
+  text-align: center;
+}
+
+.favorites-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-size: inherit;
+  color: inherit;
+}
+
+.favorites-sidebar__item:hover {
+  background-color: #e5e7eb;
+}
+
+.favorites-sidebar__item--selected {
+  background-color: #dbeafe;
+}
+
+.favorites-sidebar__item--selected:hover {
+  background-color: #bfdbfe;
+}
+
+.favorites-sidebar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+/* File List */
+.file-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-list--empty,
+.file-list--loading,
+.file-list--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.file-list--error {
+  color: #dc2626;
+}
+
+.file-list__header {
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.file-list__items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.file-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #2563eb;
+  transition: background-color 0.1s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-size: inherit;
+}
+
+.file-list__item:hover {
+  background-color: #eff6ff;
+}
+
+.file-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 160px;
+  z-index: 1000;
+}
+
+.context-menu__item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.context-menu__item:hover {
+  background-color: #f3f4f6;
 }
 
 /* Tree nodes */
@@ -146,12 +326,12 @@ body {
   font-weight: 500;
 }
 
-.tree-node--archive {
-  color: #2563eb;
+.tree-node--selected {
+  background-color: #dbeafe;
 }
 
-.tree-node--archive:hover {
-  background-color: #eff6ff;
+.tree-node--selected:hover {
+  background-color: #bfdbfe;
 }
 
 /* Indent guides */
@@ -180,11 +360,16 @@ body {
   width: 16px;
   height: 16px;
   color: #6b7280;
-  transition: transform 0.15s ease;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s ease;
+  border: none;
+  background: none;
+  padding: 0;
 }
 
-.tree-node__chevron--hidden {
-  visibility: hidden;
+.tree-node__chevron:hover {
+  background-color: #e5e7eb;
 }
 
 /* Icon */

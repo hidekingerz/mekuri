@@ -8,6 +8,27 @@ use std::sync::Mutex;
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
 const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr", "7z"];
 
+/// Supported archive format categories.
+enum ArchiveFormat {
+    Zip,
+    Rar,
+}
+
+/// Detect the archive format from a file path's extension.
+fn detect_format(archive_path: &str) -> Result<ArchiveFormat, String> {
+    let ext = Path::new(archive_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        "zip" | "cbz" => Ok(ArchiveFormat::Zip),
+        "rar" | "cbr" => Ok(ArchiveFormat::Rar),
+        _ => Err(format!("Unsupported archive format: .{ext}")),
+    }
+}
+
 /// Result of analyzing archive contents
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
@@ -26,50 +47,26 @@ static TEMP_DIRS: Mutex<Vec<tempfile::TempDir>> = Mutex::new(Vec::new());
 
 /// List image entries in an archive, sorted by natural order.
 pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
-    let path = Path::new(archive_path);
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    match ext.as_str() {
-        "zip" | "cbz" => zip::list_images(archive_path),
-        "rar" | "cbr" => rar::list_images(archive_path),
-        _ => Err(format!("Unsupported archive format: .{ext}")),
+    match detect_format(archive_path)? {
+        ArchiveFormat::Zip => zip::list_images(archive_path),
+        ArchiveFormat::Rar => rar::list_images(archive_path),
     }
 }
 
 /// Analyze archive contents to determine if it contains images or nested archives.
 pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
-    let path = Path::new(archive_path);
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    match ext.as_str() {
-        "zip" | "cbz" => zip::analyze_contents(archive_path),
-        "rar" | "cbr" => rar::analyze_contents(archive_path),
-        _ => Err(format!("Unsupported archive format: .{ext}")),
+    match detect_format(archive_path)? {
+        ArchiveFormat::Zip => zip::analyze_contents(archive_path),
+        ArchiveFormat::Rar => rar::analyze_contents(archive_path),
     }
 }
 
 /// Extract a nested archive from a parent archive and return the path to the extracted file.
 /// The extracted file is placed in a temporary directory that persists until app closes.
 pub fn extract_nested_archive(parent_path: &str, nested_name: &str) -> Result<String, String> {
-    let path = Path::new(parent_path);
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    match ext.as_str() {
-        "zip" | "cbz" => zip::extract_nested_archive(parent_path, nested_name),
-        "rar" | "cbr" => rar::extract_nested_archive(parent_path, nested_name),
-        _ => Err(format!("Unsupported archive format: .{ext}")),
+    match detect_format(parent_path)? {
+        ArchiveFormat::Zip => zip::extract_nested_archive(parent_path, nested_name),
+        ArchiveFormat::Rar => rar::extract_nested_archive(parent_path, nested_name),
     }
 }
 
@@ -82,17 +79,9 @@ pub fn store_temp_dir(dir: tempfile::TempDir) {
 
 /// Extract a single image from an archive and return it as a Base64-encoded data URL.
 pub fn get_image_base64(archive_path: &str, entry_name: &str) -> Result<String, String> {
-    let path = Path::new(archive_path);
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    match ext.as_str() {
-        "zip" | "cbz" => zip::get_image_base64(archive_path, entry_name),
-        "rar" | "cbr" => rar::get_image_base64(archive_path, entry_name),
-        _ => Err(format!("Unsupported archive format: .{ext}")),
+    match detect_format(archive_path)? {
+        ArchiveFormat::Zip => zip::get_image_base64(archive_path, entry_name),
+        ArchiveFormat::Rar => rar::get_image_base64(archive_path, entry_name),
     }
 }
 

@@ -4,12 +4,12 @@ import type { Spread } from "../../utils/spreadLayout";
 import { buildSpreads } from "../../utils/spreadLayout";
 import { PageImage } from "./PageImage";
 
-interface SpreadViewerProps {
+type SpreadViewerProps = {
   archivePath: string;
   imageNames: string[];
   onSpreadChange?: (spreadIndex: number, totalSpreads: number) => void;
   onBack?: () => void;
-}
+};
 
 export function SpreadViewer({
   archivePath,

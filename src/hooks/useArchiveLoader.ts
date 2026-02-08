@@ -6,14 +6,14 @@ import {
   listArchiveImages,
 } from "../api/archive";
 
-interface ArchiveLoaderState {
+type ArchiveLoaderState = {
   effectivePath: string | null;
   imageNames: string[];
   nestedArchives: string[] | null;
   loading: boolean;
   error: string | null;
   hasNestedCache: boolean;
-}
+};
 
 export function useArchiveLoader(archivePath: string | null) {
   const [effectivePath, setEffectivePath] = useState<string | null>(null);

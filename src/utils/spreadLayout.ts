@@ -8,12 +8,12 @@
  * - Last page may be displayed alone if total count is even
  */
 
-export interface Spread {
+export type Spread = {
   /** Page index for the right side (null if single-page spread on left) */
   right: number | null;
   /** Page index for the left side (null if single-page spread on right) */
   left: number | null;
-}
+};
 
 /**
  * Build the list of spreads for a given total page count.

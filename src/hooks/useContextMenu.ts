@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-interface ContextMenuState {
+type ContextMenuState = {
   x: number;
   y: number;
   path: string;
-}
+};
 
 export function useContextMenu() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);

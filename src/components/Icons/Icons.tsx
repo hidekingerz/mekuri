@@ -1,7 +1,7 @@
-interface IconProps {
+type IconProps = {
   size?: number;
   className?: string;
-}
+};
 
 export function ChevronRight({ size = 16, className }: IconProps) {
   return (

@@ -1,14 +1,14 @@
 import type { TreeNodeData } from "../../types";
 import { ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
 
-interface TreeNodeProps {
+type TreeNodeProps = {
   node: TreeNodeData;
   depth: number;
   selectedPath: string | null;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, path: string) => void;
-}
+};
 
 export function TreeNode({
   node,

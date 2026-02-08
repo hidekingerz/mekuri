@@ -1,15 +1,15 @@
 import { getStore } from "./store";
 
-interface MainWindowSettings {
+type MainWindowSettings = {
   width: number;
   height: number;
   treeColumnWidth: number;
-}
+};
 
-interface ViewerWindowSettings {
+type ViewerWindowSettings = {
   width: number;
   height: number;
-}
+};
 
 const DEFAULT_MAIN_SETTINGS: MainWindowSettings = {
   width: 1000,

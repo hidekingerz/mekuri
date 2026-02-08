@@ -4,11 +4,11 @@ import { useContextMenu } from "../../hooks/useContextMenu";
 import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
 
-interface FavoritesSidebarProps {
+type FavoritesSidebarProps = {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   refreshTrigger?: number;
-}
+};
 
 export function FavoritesSidebar({
   selectedPath,

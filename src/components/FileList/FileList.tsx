@@ -3,10 +3,10 @@ import { readDirectoryFiles } from "../../api/directory";
 import type { DirectoryEntry } from "../../types";
 import { ArchiveIcon } from "../Icons/Icons";
 
-interface FileListProps {
+type FileListProps = {
   folderPath: string | null;
   onArchiveSelect: (path: string) => void;
-}
+};
 
 export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);

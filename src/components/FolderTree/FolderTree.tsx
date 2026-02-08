@@ -5,12 +5,12 @@ import { useContextMenu } from "../../hooks/useContextMenu";
 import type { TreeNodeData } from "../../types";
 import { TreeNode } from "./TreeNode";
 
-interface FolderTreeProps {
+type FolderTreeProps = {
   rootPath: string;
   selectedPath: string | null;
   onFolderSelect: (path: string) => void;
   onFavoriteAdded?: () => void;
-}
+};
 
 export function FolderTree({
   rootPath,

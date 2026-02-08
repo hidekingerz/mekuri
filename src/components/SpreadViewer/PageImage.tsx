@@ -1,7 +1,7 @@
-interface PageImageProps {
+type PageImageProps = {
   src: string | null;
   alt: string;
-}
+};
 
 export function PageImage({ src, alt }: PageImageProps) {
   if (!src) {

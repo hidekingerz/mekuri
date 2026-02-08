@@ -8,6 +8,12 @@ import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { useWindowResize } from "./hooks/useWindowResize";
+import {
+  FAVORITES_SIDEBAR_WIDTH,
+  MIN_COLUMN_WIDTH,
+  VIEWER_MIN_HEIGHT,
+  VIEWER_MIN_WIDTH,
+} from "./utils/constants";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -91,8 +97,8 @@ function App() {
       title: `${fileNameFromPath(archivePath)} - mekuri`,
       width: viewerSettings.width,
       height: viewerSettings.height,
-      minWidth: 600,
-      minHeight: 400,
+      minWidth: VIEWER_MIN_WIDTH,
+      minHeight: VIEWER_MIN_HEIGHT,
       visible: true,
     });
     webview.once("tauri://error", (e) => {
@@ -113,10 +119,11 @@ function App() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!columnsRef.current) return;
       const columnsRect = columnsRef.current.getBoundingClientRect();
-      // Subtract favorites sidebar width (180px)
-      const newWidth = e.clientX - columnsRect.left - 180;
-      // Clamp between min and max
-      const clampedWidth = Math.max(150, Math.min(newWidth, columnsRect.width - 180 - 150));
+      const newWidth = e.clientX - columnsRect.left - FAVORITES_SIDEBAR_WIDTH;
+      const clampedWidth = Math.max(
+        MIN_COLUMN_WIDTH,
+        Math.min(newWidth, columnsRect.width - FAVORITES_SIDEBAR_WIDTH - MIN_COLUMN_WIDTH),
+      );
       currentWidth = clampedWidth;
       setTreeColumnWidth(clampedWidth);
     };

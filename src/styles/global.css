@@ -19,6 +19,14 @@
   --color-border-input: #d1d5db;
   --color-border-hover: #9ca3af;
   --color-accent: #3b82f6;
+
+  /* Icon colors */
+  --icon-folder-fill: #fbbf24;
+  --icon-folder-fill-light: #fcd34d;
+  --icon-folder-stroke: #d97706;
+  --icon-archive-fill: #dbeafe;
+  --icon-archive-fill-accent: #3b82f6;
+  --icon-archive-fill-light: #60a5fa;
 }
 
 body {

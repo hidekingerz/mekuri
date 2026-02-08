@@ -1,7 +1,6 @@
+use crate::archive;
 use serde::Serialize;
 use std::path::PathBuf;
-
-const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr", "7z"];
 
 #[derive(Debug, Serialize)]
 pub struct DirectoryEntry {
@@ -33,7 +32,7 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
             let entry_path = entry.path();
             let path = entry_path.to_string_lossy().to_string();
             let is_dir = metadata.is_dir();
-            let is_archive = !is_dir && is_archive_file(&name);
+            let is_archive = !is_dir && archive::is_archive_file(&name);
 
             // Only show directories and archives
             if !is_dir && !is_archive {
@@ -67,13 +66,6 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
     });
 
     Ok(result)
-}
-
-fn is_archive_file(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    ARCHIVE_EXTENSIONS
-        .iter()
-        .any(|ext| lower.ends_with(&format!(".{ext}")))
 }
 
 fn has_subdirectories(path: &PathBuf) -> bool {

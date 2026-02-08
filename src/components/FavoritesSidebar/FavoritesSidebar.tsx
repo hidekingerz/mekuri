@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { getFavorites, removeFavorite } from "../../hooks/useFavorites";
+import { getFavorites, removeFavorite } from "../../api/favorites";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
 
-interface FavoritesSidebarProps {
+type FavoritesSidebarProps = {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   refreshTrigger?: number;
-}
+};
 
 export function FavoritesSidebar({
   selectedPath,
@@ -14,52 +16,25 @@ export function FavoritesSidebar({
   refreshTrigger,
 }: FavoritesSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    path: string;
-  } | null>(null);
+  const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
 
   const loadFavorites = useCallback(async () => {
     const favs = await getFavorites();
     setFavorites(favs);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTrigger is intentionally used to force re-fetch
   useEffect(() => {
-    // refreshTrigger is used to force reload when favorites are added/removed
-    void refreshTrigger;
     loadFavorites();
   }, [loadFavorites, refreshTrigger]);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent, path: string) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, path });
-  }, []);
 
   const handleRemove = useCallback(async () => {
     if (contextMenu) {
       await removeFavorite(contextMenu.path);
-      setContextMenu(null);
+      closeContextMenu();
       loadFavorites();
     }
-  }, [contextMenu, loadFavorites]);
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
-
-  useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => closeContextMenu();
-      window.addEventListener("click", handleClick);
-      return () => window.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu, closeContextMenu]);
-
-  const getDisplayName = (path: string) => {
-    const parts = path.split(/[/\\]/);
-    return parts[parts.length - 1] || path;
-  };
+  }, [contextMenu, closeContextMenu, loadFavorites]);
 
   return (
     <div className="favorites-sidebar">
@@ -74,11 +49,11 @@ export function FavoritesSidebar({
               type="button"
               className={`favorites-sidebar__item ${selectedPath === path ? "favorites-sidebar__item--selected" : ""}`}
               onClick={() => onSelect(path)}
-              onContextMenu={(e) => handleContextMenu(e, path)}
+              onContextMenu={(e) => openContextMenu(e, path)}
               title={path}
             >
               <FolderIcon size={14} />
-              <span className="favorites-sidebar__name">{getDisplayName(path)}</span>
+              <span className="favorites-sidebar__name">{fileNameFromPath(path)}</span>
             </button>
           ))
         )}

@@ -55,7 +55,8 @@ src/                    # フロントエンド (React/TypeScript)
     FileList/           #   アーカイブファイル一覧
     SpreadViewer/       #   見開きビューワーUI
     Icons/              #   カスタム SVG アイコン
-  hooks/                #   カスタムフック (useDirectory, useArchive, useFavorites, useSettings)
+  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, settings, store)
+  hooks/                #   React カスタムフック (useContextMenu, useWindowResize)
   utils/                #   ユーティリティ (spreadLayout, windowLabel)
   types/                #   型定義
 
@@ -83,7 +84,8 @@ src-tauri/              # バックエンド (Rust)
 
 - Biome に準拠（リント + フォーマット）
 - コンポーネントは関数コンポーネント + hooks で実装
-- Tauri IPC 呼び出しはカスタムフック（`hooks/`）に集約する
+- Tauri IPC 呼び出しは `api/` に集約する（React Hook ではないため `hooks/` には置かない）
+- React カスタムフック（`useState` 等を使うもの）は `hooks/` に集約する
 - 型定義は `types/` に集約する
 
 ### 共通

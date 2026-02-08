@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { readDirectoryFiles } from "../../hooks/useDirectory";
+import { readDirectoryFiles } from "../../api/directory";
 import type { DirectoryEntry } from "../../types";
+import { errorToString } from "../../utils/errorToString";
 import { ArchiveIcon } from "../Icons/Icons";
 
-interface FileListProps {
+type FileListProps = {
   folderPath: string | null;
   onArchiveSelect: (path: string) => void;
-}
+};
 
 export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
@@ -32,7 +33,7 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(String(err));
+          setError(errorToString(err));
         }
       } finally {
         if (!cancelled) {

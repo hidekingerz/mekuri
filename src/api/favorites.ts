@@ -1,23 +1,15 @@
-import { load } from "@tauri-apps/plugin-store";
+import { getStore } from "./store";
 
-const STORE_NAME = "settings.json";
 const FAVORITES_KEY = "favorites";
 
-async function getStore() {
-  return load(STORE_NAME, {
-    defaults: { [FAVORITES_KEY]: [] },
-    autoSave: true,
-  });
-}
-
 export async function getFavorites(): Promise<string[]> {
-  const store = await getStore();
+  const store = await getStore({ [FAVORITES_KEY]: [] });
   const favorites = await store.get<string[]>(FAVORITES_KEY);
   return favorites ?? [];
 }
 
 export async function addFavorite(path: string): Promise<void> {
-  const store = await getStore();
+  const store = await getStore({ [FAVORITES_KEY]: [] });
   const favorites = (await store.get<string[]>(FAVORITES_KEY)) ?? [];
   if (!favorites.includes(path)) {
     favorites.push(path);
@@ -26,7 +18,7 @@ export async function addFavorite(path: string): Promise<void> {
 }
 
 export async function removeFavorite(path: string): Promise<void> {
-  const store = await getStore();
+  const store = await getStore({ [FAVORITES_KEY]: [] });
   const favorites = (await store.get<string[]>(FAVORITES_KEY)) ?? [];
   const index = favorites.indexOf(path);
   if (index !== -1) {

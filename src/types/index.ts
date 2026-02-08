@@ -5,3 +5,9 @@ export interface DirectoryEntry {
   is_archive: boolean;
   has_subfolders: boolean;
 }
+
+export interface TreeNodeData {
+  entry: DirectoryEntry;
+  children: TreeNodeData[] | null;
+  isOpen: boolean;
+}

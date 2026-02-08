@@ -2,14 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { readDirectoryFolders } from "../../api/directory";
 import { addFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
-import type { DirectoryEntry } from "../../types";
+import type { TreeNodeData } from "../../types";
 import { TreeNode } from "./TreeNode";
-
-interface TreeNodeData {
-  entry: DirectoryEntry;
-  children: TreeNodeData[] | null;
-  isOpen: boolean;
-}
 
 interface FolderTreeProps {
   rootPath: string;

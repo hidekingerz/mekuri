@@ -23,9 +23,8 @@ export function FavoritesSidebar({
     setFavorites(favs);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTrigger is intentionally used to force re-fetch
   useEffect(() => {
-    // refreshTrigger is used to force reload when favorites are added/removed
-    void refreshTrigger;
     loadFavorites();
   }, [loadFavorites, refreshTrigger]);
 

@@ -1,16 +1,4 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
+@import "./reset.css";
 
 body {
   font-family: system-ui, -apple-system, sans-serif;

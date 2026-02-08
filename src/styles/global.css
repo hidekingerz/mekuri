@@ -1,3 +1,5 @@
+@import "./reset.css";
+
 :root {
   --color-text: #1f2937;
   --color-text-secondary: #374151;
@@ -17,20 +19,6 @@
   --color-border-input: #d1d5db;
   --color-border-hover: #9ca3af;
   --color-accent: #3b82f6;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body,
-#root {
-  height: 100%;
 }
 
 body {

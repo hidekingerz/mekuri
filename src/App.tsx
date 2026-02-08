@@ -9,7 +9,7 @@ import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
-import { VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
+import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -18,7 +18,10 @@ function App() {
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
-  const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(300, columnsRef);
+  const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
+    DEFAULT_TREE_COLUMN_WIDTH,
+    columnsRef,
+  );
 
   // Load settings on mount
   useEffect(() => {

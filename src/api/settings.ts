@@ -1,3 +1,10 @@
+import {
+  DEFAULT_MAIN_HEIGHT,
+  DEFAULT_MAIN_WIDTH,
+  DEFAULT_TREE_COLUMN_WIDTH,
+  DEFAULT_VIEWER_HEIGHT,
+  DEFAULT_VIEWER_WIDTH,
+} from "../utils/constants";
 import { getStore } from "./store";
 
 type MainWindowSettings = {
@@ -12,14 +19,14 @@ type ViewerWindowSettings = {
 };
 
 const DEFAULT_MAIN_SETTINGS: MainWindowSettings = {
-  width: 1000,
-  height: 700,
-  treeColumnWidth: 300,
+  width: DEFAULT_MAIN_WIDTH,
+  height: DEFAULT_MAIN_HEIGHT,
+  treeColumnWidth: DEFAULT_TREE_COLUMN_WIDTH,
 };
 
 const DEFAULT_VIEWER_SETTINGS: ViewerWindowSettings = {
-  width: 1200,
-  height: 900,
+  width: DEFAULT_VIEWER_WIDTH,
+  height: DEFAULT_VIEWER_HEIGHT,
 };
 
 const STORE_DEFAULTS = {

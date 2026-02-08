@@ -7,23 +7,18 @@ import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
+import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
-import {
-  FAVORITES_SIDEBAR_WIDTH,
-  MIN_COLUMN_WIDTH,
-  VIEWER_MIN_HEIGHT,
-  VIEWER_MIN_WIDTH,
-} from "./utils/constants";
+import { VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
   const [selectedFavorite, setSelectedFavorite] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
-  const [treeColumnWidth, setTreeColumnWidth] = useState(300);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
+  const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(300, columnsRef);
 
   // Load settings on mount
   useEffect(() => {
@@ -31,7 +26,7 @@ function App() {
       const win = getCurrentWindow();
       try {
         const settings = await getWindowSettings();
-        setTreeColumnWidth(settings.treeColumnWidth);
+        setWidth(settings.treeColumnWidth);
         await win.setSize(new LogicalSize(settings.width, settings.height));
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -42,7 +37,7 @@ function App() {
       }
     }
     loadSettings();
-  }, []);
+  }, [setWidth]);
 
   const handleWindowResize = useCallback(async (size: { width: number; height: number }) => {
     await saveWindowSettings(size);
@@ -106,43 +101,6 @@ function App() {
     });
   }, []);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    let currentWidth = treeColumnWidth;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!columnsRef.current) return;
-      const columnsRect = columnsRef.current.getBoundingClientRect();
-      const newWidth = e.clientX - columnsRect.left - FAVORITES_SIDEBAR_WIDTH;
-      const clampedWidth = Math.max(
-        MIN_COLUMN_WIDTH,
-        Math.min(newWidth, columnsRect.width - FAVORITES_SIDEBAR_WIDTH - MIN_COLUMN_WIDTH),
-      );
-      currentWidth = clampedWidth;
-      setTreeColumnWidth(clampedWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      // Save column width
-      saveWindowSettings({ treeColumnWidth: currentWidth });
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizing, treeColumnWidth]);
-
   return (
     <div className="app">
       <div className="toolbar">
@@ -174,7 +132,7 @@ function App() {
           )}
         </div>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: resize handle is mouse-only UI */}
-        <div className="app__resize-handle" onMouseDown={handleResizeStart} />
+        <div className="app__resize-handle" onMouseDown={startResize} />
         <div className="app__file-column">
           <FileList
             folderPath={selectedFolder || selectedFavorite}

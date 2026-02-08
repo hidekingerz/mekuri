@@ -1,25 +1,14 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useState } from "react";
-import {
-  type ArchiveContents,
-  analyzeArchiveContents,
-  extractNestedArchive,
-  listArchiveImages,
-} from "./api/archive";
-import { getSiblingArchives } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
+import { useArchiveLoader } from "./hooks/useArchiveLoader";
+import { useSiblingNavigation } from "./hooks/useSiblingNavigation";
 import { useWindowResize } from "./hooks/useWindowResize";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
-  const [effectivePath, setEffectivePath] = useState<string | null>(null);
-  const [imageNames, setImageNames] = useState<string[]>([]);
-  const [nestedArchives, setNestedArchives] = useState<string[] | null>(null);
-  const [cachedNestedArchives, setCachedNestedArchives] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Read archive path from URL query parameter
   useEffect(() => {
@@ -35,106 +24,18 @@ function Viewer() {
   }, []);
   useWindowResize(handleWindowResize);
 
-  // Navigate to sibling archive with Alt+Arrow keys
-  useEffect(() => {
-    if (!archivePath) return;
+  useSiblingNavigation(archivePath, setArchivePath);
 
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-
-      e.preventDefault();
-
-      try {
-        const { archives, currentIndex } = await getSiblingArchives(archivePath);
-        if (currentIndex === -1 || archives.length <= 1) return;
-
-        let newIndex: number;
-        if (e.key === "ArrowUp") {
-          newIndex = currentIndex + 1;
-          if (newIndex >= archives.length) return;
-        } else {
-          newIndex = currentIndex - 1;
-          if (newIndex < 0) return;
-        }
-
-        const newPath = archives[newIndex];
-        setArchivePath(newPath);
-
-        const fileName = fileNameFromPath(newPath);
-        await getCurrentWindow().setTitle(`${fileName} - mekuri`);
-      } catch (err) {
-        console.error("Failed to navigate to sibling archive:", err);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [archivePath]);
-
-  // Analyze archive contents when archive path is set
-  useEffect(() => {
-    if (!archivePath) return;
-    const path = archivePath;
-
-    let cancelled = false;
-    setLoading(true);
-    setNestedArchives(null);
-    setImageNames([]);
-    setEffectivePath(null);
-
-    async function analyze() {
-      try {
-        const contents: ArchiveContents = await analyzeArchiveContents(path);
-        if (cancelled) return;
-
-        if (contents.type === "Images") {
-          setImageNames(contents.names);
-          setEffectivePath(path);
-          setCachedNestedArchives(null);
-        } else if (contents.type === "NestedArchives") {
-          setNestedArchives(contents.names);
-          setCachedNestedArchives(contents.names);
-        } else {
-          setError("No images found in this archive");
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(String(err));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    analyze();
-    return () => {
-      cancelled = true;
-    };
-  }, [archivePath]);
-
-  // Handle nested archive selection
-  const handleNestedSelect = useCallback(
-    async (nestedName: string) => {
-      if (!archivePath) return;
-      setLoading(true);
-      setError(null);
-
-      try {
-        const extractedPath = await extractNestedArchive(archivePath, nestedName);
-        const names = await listArchiveImages(extractedPath);
-        setImageNames(names);
-        setEffectivePath(extractedPath);
-        setNestedArchives(null);
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [archivePath],
-  );
+  const {
+    effectivePath,
+    imageNames,
+    nestedArchives,
+    loading,
+    error,
+    hasNestedCache,
+    selectNestedArchive,
+    backToNestedList,
+  } = useArchiveLoader(archivePath);
 
   const handleSpreadChange = useCallback(
     (spreadIndex: number, totalSpreads: number) => {
@@ -145,15 +46,6 @@ function Viewer() {
     },
     [archivePath],
   );
-
-  // Go back to nested archive selection
-  const handleBackToList = useCallback(() => {
-    if (cachedNestedArchives) {
-      setNestedArchives(cachedNestedArchives);
-      setImageNames([]);
-      setEffectivePath(null);
-    }
-  }, [cachedNestedArchives]);
 
   if (error) {
     return (
@@ -185,7 +77,7 @@ function Viewer() {
                 <button
                   type="button"
                   className="nested-selector__item"
-                  onClick={() => handleNestedSelect(name)}
+                  onClick={() => selectNestedArchive(name)}
                 >
                   {name.split("/").pop() || name}
                 </button>
@@ -211,7 +103,7 @@ function Viewer() {
         archivePath={effectivePath || archivePath}
         imageNames={imageNames}
         onSpreadChange={handleSpreadChange}
-        onBack={cachedNestedArchives ? handleBackToList : undefined}
+        onBack={hasNestedCache ? backToNestedList : undefined}
       />
     </div>
   );

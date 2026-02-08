@@ -3,6 +3,7 @@ import { readDirectoryFolders } from "../../api/directory";
 import { addFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { TreeNodeData } from "../../types";
+import { errorToString } from "../../utils/errorToString";
 import { TreeNode } from "./TreeNode";
 
 type FolderTreeProps = {
@@ -33,7 +34,7 @@ export function FolderTree({
       setNodes(entries.map((entry) => ({ entry, children: null, isOpen: false })));
       setLoaded(true);
     } catch (err) {
-      setError(String(err));
+      setError(errorToString(err));
     } finally {
       setLoading(false);
     }

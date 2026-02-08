@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { readDirectoryFiles } from "../../api/directory";
 import type { DirectoryEntry } from "../../types";
+import { errorToString } from "../../utils/errorToString";
 import { ArchiveIcon } from "../Icons/Icons";
 
 type FileListProps = {
@@ -32,7 +33,7 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(String(err));
+          setError(errorToString(err));
         }
       } finally {
         if (!cancelled) {

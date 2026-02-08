@@ -5,6 +5,7 @@ import {
   extractNestedArchive,
   listArchiveImages,
 } from "../api/archive";
+import { errorToString } from "../utils/errorToString";
 
 type ArchiveLoaderState = {
   effectivePath: string | null;
@@ -51,7 +52,7 @@ export function useArchiveLoader(archivePath: string | null) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(String(err));
+          setError(errorToString(err));
         }
       } finally {
         if (!cancelled) {
@@ -79,7 +80,7 @@ export function useArchiveLoader(archivePath: string | null) {
         setEffectivePath(extractedPath);
         setNestedArchives(null);
       } catch (err) {
-        setError(String(err));
+        setError(errorToString(err));
       } finally {
         setLoading(false);
       }

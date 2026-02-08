@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getArchiveImage } from "../../api/archive";
+import { errorToString } from "../../utils/errorToString";
 import type { Spread } from "../../utils/spreadLayout";
 import { buildSpreads } from "../../utils/spreadLayout";
 import { PageImage } from "./PageImage";
@@ -56,7 +57,7 @@ export function SpreadViewer({
         }
       } catch (err) {
         if (!cancelled) {
-          setLoadError(String(err));
+          setLoadError(errorToString(err));
         }
       }
     }

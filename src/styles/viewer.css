@@ -81,6 +81,15 @@ body {
   object-fit: contain;
 }
 
+/* Align images toward the spine so extra horizontal space appears on the outer edges */
+.spread-viewer__half:first-child .page-image {
+  object-position: right center;
+}
+
+.spread-viewer__half:last-child .page-image {
+  object-position: left center;
+}
+
 .page-image--empty {
   width: 100%;
   height: 100%;

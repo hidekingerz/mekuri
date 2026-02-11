@@ -84,7 +84,7 @@ describe("buildSpreads (single mode)", () => {
   });
 });
 
-describe("spreadIndexForPage", () => {
+describe("spreadIndexForPage (spread mode)", () => {
   const spreads = buildSpreads(5);
 
   it("finds cover page at index 0", () => {
@@ -97,6 +97,26 @@ describe("spreadIndexForPage", () => {
 
   it("finds page 2 (left side of spread 1)", () => {
     expect(spreadIndexForPage(spreads, 2)).toBe(1);
+  });
+
+  it("returns -1 for non-existent page", () => {
+    expect(spreadIndexForPage(spreads, 99)).toBe(-1);
+  });
+});
+
+describe("spreadIndexForPage (single mode)", () => {
+  const spreads = buildSpreads(5, "single");
+
+  it("finds page 0 at index 0", () => {
+    expect(spreadIndexForPage(spreads, 0)).toBe(0);
+  });
+
+  it("finds page 2 at index 2", () => {
+    expect(spreadIndexForPage(spreads, 2)).toBe(2);
+  });
+
+  it("finds page 4 at index 4", () => {
+    expect(spreadIndexForPage(spreads, 4)).toBe(4);
   });
 
   it("returns -1 for non-existent page", () => {

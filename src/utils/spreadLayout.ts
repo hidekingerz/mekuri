@@ -1,12 +1,17 @@
 /**
  * Spread (two-page) layout calculation for right-to-left (RTL) reading.
  *
- * Rules:
+ * Rules (spread mode):
  * - First page (index 0) is displayed alone (cover page)
  * - Subsequent pages are displayed in pairs
  * - RTL: right side = earlier page, left side = later page
  * - Last page may be displayed alone if total count is even
+ *
+ * Rules (single mode):
+ * - Each page is displayed alone (one page per view)
  */
+
+export type ViewMode = "spread" | "single";
 
 export type Spread = {
   /** Page index for the right side (null if single-page spread on left) */
@@ -16,10 +21,14 @@ export type Spread = {
 };
 
 /**
- * Build the list of spreads for a given total page count.
+ * Build the list of spreads for a given total page count and view mode.
  */
-export function buildSpreads(totalPages: number): Spread[] {
+export function buildSpreads(totalPages: number, mode: ViewMode = "spread"): Spread[] {
   if (totalPages <= 0) return [];
+
+  if (mode === "single") {
+    return Array.from({ length: totalPages }, (_, i) => ({ right: i, left: null }));
+  }
 
   const spreads: Spread[] = [];
 

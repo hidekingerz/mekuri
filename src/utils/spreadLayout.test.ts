@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ViewMode } from "./spreadLayout";
 import { buildSpreads, spreadIndexForPage } from "./spreadLayout";
 
 describe("buildSpreads", () => {
@@ -48,6 +49,38 @@ describe("buildSpreads", () => {
 
   it("handles negative input", () => {
     expect(buildSpreads(-1)).toEqual([]);
+  });
+});
+
+describe("buildSpreads (single mode)", () => {
+  const mode: ViewMode = "single";
+
+  it("returns empty array for 0 pages", () => {
+    expect(buildSpreads(0, mode)).toEqual([]);
+  });
+
+  it("returns 1 single-page spread for 1 page", () => {
+    expect(buildSpreads(1, mode)).toEqual([{ right: 0, left: null }]);
+  });
+
+  it("returns 3 single-page spreads for 3 pages", () => {
+    expect(buildSpreads(3, mode)).toEqual([
+      { right: 0, left: null },
+      { right: 1, left: null },
+      { right: 2, left: null },
+    ]);
+  });
+
+  it("returns 5 single-page spreads for 5 pages", () => {
+    const spreads = buildSpreads(5, mode);
+    expect(spreads).toHaveLength(5);
+    for (let i = 0; i < 5; i++) {
+      expect(spreads[i]).toEqual({ right: i, left: null });
+    }
+  });
+
+  it("handles negative input", () => {
+    expect(buildSpreads(-1, mode)).toEqual([]);
   });
 });
 

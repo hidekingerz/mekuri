@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { readDirectoryFiles, trashFile } from "../../api/directory";
@@ -63,6 +64,18 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
       cancelled = true;
     };
   }, [folderPath]);
+
+  // Reload file list when a file is trashed from the viewer window
+  useEffect(() => {
+    if (!folderPath) return;
+    const path = folderPath;
+    const unlisten = listen("file-trashed", () => {
+      loadFiles(path);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [folderPath, loadFiles]);
 
   const handleTrashFile = useCallback(async () => {
     if (!contextMenu || !folderPath) return;

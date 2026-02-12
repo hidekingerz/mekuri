@@ -53,6 +53,8 @@ function Viewer() {
 
           try {
             await trashFile(currentPath);
+            const { emit } = await import("@tauri-apps/api/event");
+            await emit("file-trashed");
             await getCurrentWindow().close();
           } catch (err) {
             setTrashError(errorToString(err));

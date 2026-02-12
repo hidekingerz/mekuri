@@ -252,3 +252,21 @@ body {
 .nested-selector__item:active {
   background: var(--viewer-color-bg-active);
 }
+
+/* Context menu (dark theme override) */
+.viewer-context-menu {
+  background-color: var(--viewer-color-bg-surface);
+  border-color: var(--viewer-color-border);
+}
+
+.viewer-context-menu .context-menu__item {
+  color: var(--viewer-color-text);
+}
+
+.viewer-context-menu .context-menu__item:hover {
+  background-color: var(--viewer-color-bg-hover);
+}
+
+.viewer-context-menu .context-menu__item--danger {
+  color: #ef4444;
+}

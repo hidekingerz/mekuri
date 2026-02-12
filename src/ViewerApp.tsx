@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
@@ -10,15 +10,9 @@ import { useWindowResize } from "./hooks/useWindowResize";
 import { errorToString } from "./utils/errorToString";
 import { fileNameFromPath } from "./utils/windowLabel";
 
-type ViewerContextMenu = {
-  x: number;
-  y: number;
-} | null;
-
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
   const [trashError, setTrashError] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<ViewerContextMenu>(null);
 
   // Read archive path from URL query parameter
   useEffect(() => {
@@ -36,41 +30,43 @@ function Viewer() {
 
   useSiblingNavigation(archivePath, setArchivePath);
 
-  // Window-level context menu
+  // Native OS context menu with "Move to Trash"
+  const archivePathRef = useRef(archivePath);
+  archivePathRef.current = archivePath;
+
   useEffect(() => {
-    function handleContextMenu(e: MouseEvent) {
+    async function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
-      setContextMenu({ x: e.clientX, y: e.clientY });
+      const currentPath = archivePathRef.current;
+      if (!currentPath) return;
+
+      const { Menu, MenuItem } = await import("@tauri-apps/api/menu");
+
+      const trashItem = await MenuItem.new({
+        text: "Move to Trash",
+        action: async () => {
+          const confirmed = await ask(
+            `Are you sure you want to move this file to the trash?\n\n${currentPath}`,
+            { title: "Move to Trash", kind: "warning" },
+          );
+          if (!confirmed) return;
+
+          try {
+            await trashFile(currentPath);
+            await getCurrentWindow().close();
+          } catch (err) {
+            setTrashError(errorToString(err));
+          }
+        },
+      });
+
+      const menu = await Menu.new({ items: [trashItem] });
+      await menu.popup();
     }
+
     window.addEventListener("contextmenu", handleContextMenu);
     return () => window.removeEventListener("contextmenu", handleContextMenu);
   }, []);
-
-  useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => setContextMenu(null);
-      window.addEventListener("click", handleClick);
-      return () => window.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu]);
-
-  const handleTrashFile = useCallback(async () => {
-    if (!archivePath) return;
-    setContextMenu(null);
-
-    const confirmed = await ask(
-      `Are you sure you want to move this file to the trash?\n\n${archivePath}`,
-      { title: "Move to Trash", kind: "warning" },
-    );
-    if (!confirmed) return;
-
-    try {
-      await trashFile(archivePath);
-      await getCurrentWindow().close();
-    } catch (err) {
-      setTrashError(errorToString(err));
-    }
-  }, [archivePath]);
 
   const {
     effectivePath,
@@ -93,27 +89,11 @@ function Viewer() {
     [archivePath],
   );
 
-  const contextMenuOverlay = contextMenu && archivePath && (
-    <div
-      className="context-menu viewer-context-menu"
-      style={{ left: contextMenu.x, top: contextMenu.y }}
-    >
-      <button
-        type="button"
-        className="context-menu__item context-menu__item--danger"
-        onClick={handleTrashFile}
-      >
-        Move to Trash
-      </button>
-    </div>
-  );
-
   if (error || trashError) {
     return (
       <div className="viewer viewer--error">
         <p>Failed to open archive</p>
         <p className="viewer__error-detail">{error || trashError}</p>
-        {contextMenuOverlay}
       </div>
     );
   }
@@ -147,7 +127,6 @@ function Viewer() {
             ))}
           </ul>
         </div>
-        {contextMenuOverlay}
       </div>
     );
   }
@@ -156,7 +135,6 @@ function Viewer() {
     return (
       <div className="viewer viewer--empty">
         <p>No images found in this archive</p>
-        {contextMenuOverlay}
       </div>
     );
   }
@@ -169,7 +147,6 @@ function Viewer() {
         onSpreadChange={handleSpreadChange}
         onBack={hasNestedCache ? backToNestedList : undefined}
       />
-      {contextMenuOverlay}
     </div>
   );
 }

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getArchiveImage } from "../../api/archive";
+import { getViewerSettings, saveViewerSettings } from "../../api/settings";
 import { errorToString } from "../../utils/errorToString";
-import type { Spread } from "../../utils/spreadLayout";
-import { buildSpreads } from "../../utils/spreadLayout";
+import type { Spread, ViewMode } from "../../utils/spreadLayout";
+import { buildSpreads, spreadIndexForPage } from "../../utils/spreadLayout";
+import { SinglePageIcon, SpreadViewIcon } from "../Icons/Icons";
 import { PageImage } from "./PageImage";
 
 type SpreadViewerProps = {
@@ -22,10 +24,38 @@ export function SpreadViewer({
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("spread");
+  const viewModeLoaded = useRef(false);
 
-  const spreads: Spread[] = useMemo(() => buildSpreads(imageNames.length), [imageNames.length]);
+  // Load saved view mode on mount
+  useEffect(() => {
+    getViewerSettings().then((settings) => {
+      if (settings.viewMode) {
+        setViewMode(settings.viewMode);
+      }
+      viewModeLoaded.current = true;
+    });
+  }, []);
+
+  const spreads: Spread[] = useMemo(
+    () => buildSpreads(imageNames.length, viewMode),
+    [imageNames.length, viewMode],
+  );
 
   const currentSpread = spreads[spreadIndex] ?? { right: null, left: null };
+
+  const toggleViewMode = useCallback(() => {
+    setViewMode((prev) => {
+      const next: ViewMode = prev === "spread" ? "single" : "spread";
+      // Preserve current page position
+      const currentPageIndex = spreads[spreadIndex]?.right ?? 0;
+      const newSpreads = buildSpreads(imageNames.length, next);
+      const newIndex = spreadIndexForPage(newSpreads, currentPageIndex);
+      setSpreadIndex(Math.max(0, newIndex));
+      saveViewerSettings({ viewMode: next });
+      return next;
+    });
+  }, [spreads, spreadIndex, imageNames.length]);
 
   // Notify parent of spread change
   useEffect(() => {
@@ -135,6 +165,8 @@ export function SpreadViewer({
     [spreads.length],
   );
 
+  const isSingle = viewMode === "single";
+
   return (
     <div className="spread-viewer">
       {loadError && (
@@ -143,22 +175,35 @@ export function SpreadViewer({
         </div>
       )}
       <div className="spread-viewer__pages">
-        {/* RTL: left side = later page, click to go next */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-        <div className="spread-viewer__half" onClick={goNext}>
-          <PageImage
-            src={leftSrc}
-            alt={currentSpread.left !== null ? imageNames[currentSpread.left] : ""}
-          />
-        </div>
-        {/* RTL: right side = earlier page, click to go prev */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-        <div className="spread-viewer__half" onClick={goPrev}>
-          <PageImage
-            src={rightSrc}
-            alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
-          />
-        </div>
+        {isSingle ? (
+          // Single page mode: one full-width page
+          // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level
+          <div className="spread-viewer__half spread-viewer__half--single" onClick={goNext}>
+            <PageImage
+              src={rightSrc}
+              alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
+            />
+          </div>
+        ) : (
+          <>
+            {/* RTL: left side = later page, click to go next */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
+            <div className="spread-viewer__half" onClick={goNext}>
+              <PageImage
+                src={leftSrc}
+                alt={currentSpread.left !== null ? imageNames[currentSpread.left] : ""}
+              />
+            </div>
+            {/* RTL: right side = earlier page, click to go prev */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
+            <div className="spread-viewer__half" onClick={goPrev}>
+              <PageImage
+                src={rightSrc}
+                alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
+              />
+            </div>
+          </>
+        )}
       </div>
       <div className="spread-viewer__footer">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: mouse interaction for progress bar */}
@@ -180,6 +225,14 @@ export function SpreadViewer({
           </span>
           <button type="button" disabled={isFirst} onClick={goPrev}>
             →
+          </button>
+          <button
+            type="button"
+            className="spread-viewer__mode-toggle"
+            onClick={toggleViewMode}
+            title={isSingle ? "見開き表示" : "単ページ表示"}
+          >
+            {isSingle ? <SpreadViewIcon size={16} /> : <SinglePageIcon size={16} />}
           </button>
         </div>
       </div>

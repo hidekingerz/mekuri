@@ -90,6 +90,15 @@ body {
   object-position: left center;
 }
 
+/* Single page mode: center the image */
+.spread-viewer__half--single {
+  justify-content: center;
+}
+
+.spread-viewer__half--single .page-image {
+  object-position: center;
+}
+
 .page-image--empty {
   width: 100%;
   height: 100%;
@@ -178,6 +187,15 @@ body {
   left: 12px;
   padding: 4px 10px;
   font-size: 16px;
+}
+
+.spread-viewer__mode-toggle {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
 }
 
 /* Nested archive selector */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ViewMode } from "./spreadLayout";
 import { buildSpreads, spreadIndexForPage } from "./spreadLayout";
 
 describe("buildSpreads", () => {
@@ -51,7 +52,39 @@ describe("buildSpreads", () => {
   });
 });
 
-describe("spreadIndexForPage", () => {
+describe("buildSpreads (single mode)", () => {
+  const mode: ViewMode = "single";
+
+  it("returns empty array for 0 pages", () => {
+    expect(buildSpreads(0, mode)).toEqual([]);
+  });
+
+  it("returns 1 single-page spread for 1 page", () => {
+    expect(buildSpreads(1, mode)).toEqual([{ right: 0, left: null }]);
+  });
+
+  it("returns 3 single-page spreads for 3 pages", () => {
+    expect(buildSpreads(3, mode)).toEqual([
+      { right: 0, left: null },
+      { right: 1, left: null },
+      { right: 2, left: null },
+    ]);
+  });
+
+  it("returns 5 single-page spreads for 5 pages", () => {
+    const spreads = buildSpreads(5, mode);
+    expect(spreads).toHaveLength(5);
+    for (let i = 0; i < 5; i++) {
+      expect(spreads[i]).toEqual({ right: i, left: null });
+    }
+  });
+
+  it("handles negative input", () => {
+    expect(buildSpreads(-1, mode)).toEqual([]);
+  });
+});
+
+describe("spreadIndexForPage (spread mode)", () => {
   const spreads = buildSpreads(5);
 
   it("finds cover page at index 0", () => {
@@ -64,6 +97,26 @@ describe("spreadIndexForPage", () => {
 
   it("finds page 2 (left side of spread 1)", () => {
     expect(spreadIndexForPage(spreads, 2)).toBe(1);
+  });
+
+  it("returns -1 for non-existent page", () => {
+    expect(spreadIndexForPage(spreads, 99)).toBe(-1);
+  });
+});
+
+describe("spreadIndexForPage (single mode)", () => {
+  const spreads = buildSpreads(5, "single");
+
+  it("finds page 0 at index 0", () => {
+    expect(spreadIndexForPage(spreads, 0)).toBe(0);
+  });
+
+  it("finds page 2 at index 2", () => {
+    expect(spreadIndexForPage(spreads, 2)).toBe(2);
+  });
+
+  it("finds page 4 at index 4", () => {
+    expect(spreadIndexForPage(spreads, 4)).toBe(4);
   });
 
   it("returns -1 for non-existent page", () => {

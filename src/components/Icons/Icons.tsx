@@ -88,6 +88,37 @@ export function FolderOpenIcon({ size = 16, className }: IconProps) {
   );
 }
 
+export function SpreadViewIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="1" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="9" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+export function SinglePageIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
 export function ArchiveIcon({ size = 16, className }: IconProps) {
   return (
     <svg

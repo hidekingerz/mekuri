@@ -23,6 +23,7 @@ unrar = "0.5"
 natord = "1"
 base64 = "0.22"
 tempfile = "3"
+trash = "5"
 
 [dev-dependencies]
 

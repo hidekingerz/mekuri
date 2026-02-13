@@ -22,6 +22,10 @@ export function getParentDirectory(filePath: string): string {
   return filePath.substring(0, lastSlash);
 }
 
+export async function trashFile(path: string): Promise<void> {
+  return invoke<void>("trash_file", { path });
+}
+
 export async function getSiblingArchives(
   currentPath: string,
 ): Promise<{ archives: string[]; currentIndex: number }> {

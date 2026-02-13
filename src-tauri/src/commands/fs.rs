@@ -68,6 +68,18 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
     Ok(result)
 }
 
+#[tauri::command]
+pub fn trash_file(path: String) -> Result<(), String> {
+    let file_path = PathBuf::from(&path);
+    if !file_path.exists() {
+        return Err(format!("File does not exist: {path}"));
+    }
+    if !file_path.is_file() {
+        return Err(format!("Path is not a file: {path}"));
+    }
+    trash::delete(&file_path).map_err(|e| format!("Failed to move file to trash: {e}"))
+}
+
 fn has_subdirectories(path: &PathBuf) -> bool {
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
@@ -83,4 +95,39 @@ fn has_subdirectories(path: &PathBuf) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn trash_file_nonexistent_path() {
+        let result = trash_file("/tmp/nonexistent_file_mekuri_test_12345.zip".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("File does not exist"));
+    }
+
+    #[test]
+    fn trash_file_directory_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_path = dir.path().to_string_lossy().to_string();
+        let result = trash_file(dir_path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Path is not a file"));
+    }
+
+    #[test]
+    #[ignore] // Requires Finder interaction on macOS; run manually with `cargo test -- --ignored`
+    fn trash_file_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test_trash.txt");
+        fs::write(&file_path, "test content").unwrap();
+        assert!(file_path.exists());
+
+        let result = trash_file(file_path.to_string_lossy().to_string());
+        assert!(result.is_ok(), "trash_file failed: {:?}", result);
+        assert!(!file_path.exists());
+    }
 }

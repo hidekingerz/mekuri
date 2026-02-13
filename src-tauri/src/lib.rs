@@ -8,6 +8,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             commands::fs::read_directory,
+            commands::fs::trash_file,
             commands::archive::list_archive_images,
             commands::archive::get_archive_image,
             commands::archive::analyze_archive_contents,

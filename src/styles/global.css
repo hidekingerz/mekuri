@@ -287,6 +287,10 @@ body {
   background-color: var(--color-bg-hover);
 }
 
+.context-menu__item--danger {
+  color: var(--color-text-error);
+}
+
 /* Tree nodes */
 .folder-tree {
   padding: 4px 0;

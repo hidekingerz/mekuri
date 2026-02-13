@@ -1,14 +1,18 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useCallback, useEffect, useState } from "react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer } from "./components/SpreadViewer/SpreadViewer";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { useSiblingNavigation } from "./hooks/useSiblingNavigation";
 import { useWindowResize } from "./hooks/useWindowResize";
+import { errorToString } from "./utils/errorToString";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
+  const [trashError, setTrashError] = useState<string | null>(null);
 
   // Read archive path from URL query parameter
   useEffect(() => {
@@ -25,6 +29,46 @@ function Viewer() {
   useWindowResize(handleWindowResize);
 
   useSiblingNavigation(archivePath, setArchivePath);
+
+  // Native OS context menu with "Move to Trash"
+  const archivePathRef = useRef(archivePath);
+  archivePathRef.current = archivePath;
+
+  useEffect(() => {
+    async function handleContextMenu(e: MouseEvent) {
+      e.preventDefault();
+      const currentPath = archivePathRef.current;
+      if (!currentPath) return;
+
+      const { Menu, MenuItem } = await import("@tauri-apps/api/menu");
+
+      const trashItem = await MenuItem.new({
+        text: "Move to Trash",
+        action: async () => {
+          const confirmed = await ask(
+            `Are you sure you want to move this file to the trash?\n\n${currentPath}`,
+            { title: "Move to Trash", kind: "warning" },
+          );
+          if (!confirmed) return;
+
+          try {
+            await trashFile(currentPath);
+            const { emit } = await import("@tauri-apps/api/event");
+            await emit("file-trashed");
+            await getCurrentWindow().close();
+          } catch (err) {
+            setTrashError(errorToString(err));
+          }
+        },
+      });
+
+      const menu = await Menu.new({ items: [trashItem] });
+      await menu.popup();
+    }
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    return () => window.removeEventListener("contextmenu", handleContextMenu);
+  }, []);
 
   const {
     effectivePath,
@@ -47,11 +91,11 @@ function Viewer() {
     [archivePath],
   );
 
-  if (error) {
+  if (error || trashError) {
     return (
       <div className="viewer viewer--error">
         <p>Failed to open archive</p>
-        <p className="viewer__error-detail">{error}</p>
+        <p className="viewer__error-detail">{error || trashError}</p>
       </div>
     );
   }

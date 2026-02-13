@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
-import { readDirectoryFiles } from "../../api/directory";
+import { listen } from "@tauri-apps/api/event";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { useCallback, useEffect, useState } from "react";
+import { readDirectoryFiles, trashFile } from "../../api/directory";
+import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
 import { errorToString } from "../../utils/errorToString";
 import { ArchiveIcon } from "../Icons/Icons";
@@ -13,6 +16,20 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
+
+  const loadFiles = useCallback(async (path: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const entries = await readDirectoryFiles(path);
+      setFiles(entries);
+    } catch (err) {
+      setError(errorToString(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!folderPath) {
@@ -22,8 +39,6 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
 
     const path = folderPath;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     async function load() {
       try {
@@ -42,11 +57,44 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
       }
     }
 
+    setLoading(true);
+    setError(null);
     load();
     return () => {
       cancelled = true;
     };
   }, [folderPath]);
+
+  // Reload file list when a file is trashed from the viewer window
+  useEffect(() => {
+    if (!folderPath) return;
+    const path = folderPath;
+    const unlisten = listen("file-trashed", () => {
+      loadFiles(path);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [folderPath, loadFiles]);
+
+  const handleTrashFile = useCallback(async () => {
+    if (!contextMenu || !folderPath) return;
+    const filePath = contextMenu.path;
+    closeContextMenu();
+
+    const confirmed = await ask(
+      `Are you sure you want to move this file to the trash?\n\n${filePath}`,
+      { title: "Move to Trash", kind: "warning" },
+    );
+    if (!confirmed) return;
+
+    try {
+      await trashFile(filePath);
+      await loadFiles(folderPath);
+    } catch (err) {
+      setError(errorToString(err));
+    }
+  }, [contextMenu, folderPath, closeContextMenu, loadFiles]);
 
   if (!folderPath) {
     return (
@@ -90,6 +138,7 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
             type="button"
             className="file-list__item"
             onClick={() => onArchiveSelect(file.path)}
+            onContextMenu={(e) => openContextMenu(e, file.path)}
             title={file.path}
           >
             <ArchiveIcon size={14} />
@@ -97,6 +146,18 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
           </button>
         ))}
       </div>
+
+      {contextMenu && (
+        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <button
+            type="button"
+            className="context-menu__item context-menu__item--danger"
+            onClick={handleTrashFile}
+          >
+            Move to Trash
+          </button>
+        </div>
+      )}
     </div>
   );
 }

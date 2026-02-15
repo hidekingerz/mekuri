@@ -1,4 +1,5 @@
 use crate::archive;
+use base64::Engine;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -8,6 +9,7 @@ pub struct DirectoryEntry {
     pub path: String,
     pub is_dir: bool,
     pub is_archive: bool,
+    pub is_pdf: bool,
     pub has_subfolders: bool,
 }
 
@@ -33,9 +35,10 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
             let path = entry_path.to_string_lossy().to_string();
             let is_dir = metadata.is_dir();
             let is_archive = !is_dir && archive::is_archive_file(&name);
+            let is_pdf = !is_dir && !is_archive && archive::is_pdf_file(&name);
 
-            // Only show directories and archives
-            if !is_dir && !is_archive {
+            // Only show directories, archives, and PDFs
+            if !is_dir && !is_archive && !is_pdf {
                 return None;
             }
 
@@ -51,6 +54,7 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
                 path,
                 is_dir,
                 is_archive,
+                is_pdf,
                 has_subfolders,
             })
         })
@@ -66,6 +70,13 @@ pub fn read_directory(path: String) -> Result<Vec<DirectoryEntry>, String> {
     });
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn read_file_base64(path: String) -> Result<String, String> {
+    let file_path = PathBuf::from(&path);
+    let data = std::fs::read(&file_path).map_err(|e| format!("Failed to read file: {e}"))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data))
 }
 
 #[tauri::command]

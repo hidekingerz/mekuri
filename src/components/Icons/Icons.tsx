@@ -119,6 +119,93 @@ export function SinglePageIcon({ size = 16, className }: IconProps) {
   );
 }
 
+export function PdfIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M4 2C3.44772 2 3 2.44772 3 3V13C3 13.5523 3.44772 14 4 14H12C12.5523 14 13 13.5523 13 13V6L9 2H4Z"
+        style={{ fill: "var(--icon-pdf-fill, #e74c3c)", stroke: "var(--icon-pdf-stroke, #c0392b)" }}
+        strokeWidth="1"
+      />
+      <path d="M9 2V6H13" style={{ stroke: "var(--icon-pdf-stroke, #c0392b)" }} strokeWidth="1" />
+      <text
+        x="8"
+        y="12"
+        textAnchor="middle"
+        style={{ fill: "var(--icon-pdf-text, #fff)" }}
+        fontSize="5"
+        fontWeight="bold"
+        fontFamily="sans-serif"
+      >
+        PDF
+      </text>
+    </svg>
+  );
+}
+
+export function RtlIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M12 4L8 8L12 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4L4 8L8 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function LtrIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M4 4L8 8L4 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4L12 8L8 12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ArchiveIcon({ size = 16, className }: IconProps) {
   return (
     <svg

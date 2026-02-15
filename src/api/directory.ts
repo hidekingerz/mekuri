@@ -12,7 +12,11 @@ export async function readDirectoryFolders(path: string): Promise<DirectoryEntry
 
 export async function readDirectoryFiles(path: string): Promise<DirectoryEntry[]> {
   const entries = await readDirectory(path);
-  return entries.filter((entry) => !entry.is_dir && entry.is_archive);
+  return entries.filter((entry) => !entry.is_dir && (entry.is_archive || entry.is_pdf));
+}
+
+export async function readFileBase64(path: string): Promise<string> {
+  return invoke<string>("read_file_base64", { path });
 }
 
 export function getParentDirectory(filePath: string): string {

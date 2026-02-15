@@ -1,45 +1,72 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getArchiveImage } from "../../api/archive";
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getViewerSettings, saveViewerSettings } from "../../api/settings";
 import { errorToString } from "../../utils/errorToString";
-import type { Spread, ViewMode } from "../../utils/spreadLayout";
-import { buildSpreads, spreadIndexForPage } from "../../utils/spreadLayout";
-import { SinglePageIcon, SpreadViewIcon } from "../Icons/Icons";
+import type { ReadingDirection, Spread, ViewMode } from "../../utils/spreadLayout";
+import { buildSpreads, currentPageFromSpread, spreadIndexForPage } from "../../utils/spreadLayout";
+import { LtrIcon, RtlIcon, SinglePageIcon, SpreadViewIcon } from "../Icons/Icons";
 import { PageImage } from "./PageImage";
 
+export type SpreadViewerHandle = {
+  viewMode: ViewMode;
+  readingDirection: ReadingDirection;
+  toggleViewMode: () => void;
+  toggleReadingDirection: () => void;
+};
+
 type SpreadViewerProps = {
-  archivePath: string;
-  imageNames: string[];
+  pageCount: number;
+  pageNames: string[];
+  getPageDataUrl: (pageIndex: number) => Promise<string>;
   onSpreadChange?: (spreadIndex: number, totalSpreads: number) => void;
   onBack?: () => void;
+  defaultReadingDirection?: ReadingDirection;
+  ref?: Ref<SpreadViewerHandle>;
 };
 
 export function SpreadViewer({
-  archivePath,
-  imageNames,
+  pageCount,
+  pageNames,
+  getPageDataUrl,
   onSpreadChange,
   onBack,
+  defaultReadingDirection = "rtl",
+  ref,
 }: SpreadViewerProps) {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [rightSrc, setRightSrc] = useState<string | null>(null);
   const [leftSrc, setLeftSrc] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("spread");
-  const viewModeLoaded = useRef(false);
+  const [readingDirection, setReadingDirection] =
+    useState<ReadingDirection>(defaultReadingDirection);
+  const settingsLoaded = useRef(false);
 
-  // Load saved view mode on mount
+  // Load saved settings on mount
   useEffect(() => {
     getViewerSettings().then((settings) => {
       if (settings.viewMode) {
         setViewMode(settings.viewMode);
       }
-      viewModeLoaded.current = true;
+      if (settings.readingDirection) {
+        setReadingDirection(settings.readingDirection);
+      }
+      settingsLoaded.current = true;
     });
   }, []);
 
+  const isRtl = readingDirection === "rtl";
+
   const spreads: Spread[] = useMemo(
-    () => buildSpreads(imageNames.length, viewMode),
-    [imageNames.length, viewMode],
+    () => buildSpreads(pageCount, viewMode, readingDirection),
+    [pageCount, viewMode, readingDirection],
   );
 
   const currentSpread = spreads[spreadIndex] ?? { right: null, left: null };
@@ -48,14 +75,40 @@ export function SpreadViewer({
     setViewMode((prev) => {
       const next: ViewMode = prev === "spread" ? "single" : "spread";
       // Preserve current page position
-      const currentPageIndex = spreads[spreadIndex]?.right ?? 0;
-      const newSpreads = buildSpreads(imageNames.length, next);
+      const currentPageIndex = currentPageFromSpread(
+        spreads[spreadIndex] ?? { right: null, left: null },
+        readingDirection,
+      );
+      const newSpreads = buildSpreads(pageCount, next, readingDirection);
       const newIndex = spreadIndexForPage(newSpreads, currentPageIndex);
       setSpreadIndex(Math.max(0, newIndex));
       saveViewerSettings({ viewMode: next });
       return next;
     });
-  }, [spreads, spreadIndex, imageNames.length]);
+  }, [spreads, spreadIndex, pageCount, readingDirection]);
+
+  const toggleReadingDirection = useCallback(() => {
+    setReadingDirection((prev) => {
+      const next: ReadingDirection = prev === "rtl" ? "ltr" : "rtl";
+      // Preserve current page position
+      const currentPageIndex = currentPageFromSpread(
+        spreads[spreadIndex] ?? { right: null, left: null },
+        prev,
+      );
+      const newSpreads = buildSpreads(pageCount, viewMode, next);
+      const newIndex = spreadIndexForPage(newSpreads, currentPageIndex);
+      setSpreadIndex(Math.max(0, newIndex));
+      saveViewerSettings({ readingDirection: next });
+      return next;
+    });
+  }, [spreads, spreadIndex, pageCount, viewMode]);
+
+  useImperativeHandle(ref, () => ({
+    viewMode,
+    readingDirection,
+    toggleViewMode,
+    toggleReadingDirection,
+  }));
 
   // Notify parent of spread change
   useEffect(() => {
@@ -74,11 +127,9 @@ export function SpreadViewer({
       try {
         const [right, left] = await Promise.all([
           currentSpread.right !== null
-            ? getArchiveImage(archivePath, imageNames[currentSpread.right])
+            ? getPageDataUrl(currentSpread.right)
             : Promise.resolve(null),
-          currentSpread.left !== null
-            ? getArchiveImage(archivePath, imageNames[currentSpread.left])
-            : Promise.resolve(null),
+          currentSpread.left !== null ? getPageDataUrl(currentSpread.left) : Promise.resolve(null),
         ]);
 
         if (!cancelled) {
@@ -96,7 +147,7 @@ export function SpreadViewer({
     return () => {
       cancelled = true;
     };
-  }, [archivePath, imageNames, currentSpread.right, currentSpread.left]);
+  }, [getPageDataUrl, currentSpread.right, currentSpread.left]);
 
   const goNext = useCallback(() => {
     setSpreadIndex((prev) => Math.min(prev + 1, spreads.length - 1));
@@ -106,15 +157,18 @@ export function SpreadViewer({
     setSpreadIndex((prev) => Math.max(prev - 1, 0));
   }, []);
 
-  // Keyboard navigation
+  // Keyboard navigation (direction-aware)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft" || e.key === " ") {
+      if (e.key === " ") {
         e.preventDefault();
         goNext();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        isRtl ? goNext() : goPrev();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        goPrev();
+        isRtl ? goPrev() : goNext();
       } else if (e.key === "Home") {
         e.preventDefault();
         setSpreadIndex(0);
@@ -126,7 +180,7 @@ export function SpreadViewer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goNext, goPrev, spreads.length]);
+  }, [goNext, goPrev, spreads.length, isRtl]);
 
   // Mouse wheel navigation
   useEffect(() => {
@@ -157,12 +211,13 @@ export function SpreadViewer({
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
-      const clickX = rect.right - e.clientX;
-      const ratio = clickX / rect.width;
+      const ratio = isRtl
+        ? (rect.right - e.clientX) / rect.width
+        : (e.clientX - rect.left) / rect.width;
       const newIndex = Math.round(ratio * (spreads.length - 1));
       setSpreadIndex(Math.max(0, Math.min(newIndex, spreads.length - 1)));
     },
-    [spreads.length],
+    [spreads.length, isRtl],
   );
 
   const isSingle = viewMode === "single";
@@ -181,25 +236,25 @@ export function SpreadViewer({
           <div className="spread-viewer__half spread-viewer__half--single" onClick={goNext}>
             <PageImage
               src={rightSrc}
-              alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
+              alt={currentSpread.right !== null ? pageNames[currentSpread.right] : ""}
             />
           </div>
         ) : (
           <>
-            {/* RTL: left side = later page, click to go next */}
+            {/* Left half of screen: next in RTL, prev in LTR */}
             {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-            <div className="spread-viewer__half" onClick={goNext}>
+            <div className="spread-viewer__half" onClick={isRtl ? goNext : goPrev}>
               <PageImage
                 src={leftSrc}
-                alt={currentSpread.left !== null ? imageNames[currentSpread.left] : ""}
+                alt={currentSpread.left !== null ? pageNames[currentSpread.left] : ""}
               />
             </div>
-            {/* RTL: right side = earlier page, click to go prev */}
+            {/* Right half of screen: prev in RTL, next in LTR */}
             {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-            <div className="spread-viewer__half" onClick={goPrev}>
+            <div className="spread-viewer__half" onClick={isRtl ? goPrev : goNext}>
               <PageImage
                 src={rightSrc}
-                alt={currentSpread.right !== null ? imageNames[currentSpread.right] : ""}
+                alt={currentSpread.right !== null ? pageNames[currentSpread.right] : ""}
               />
             </div>
           </>
@@ -208,8 +263,22 @@ export function SpreadViewer({
       <div className="spread-viewer__footer">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: mouse interaction for progress bar */}
         <div className="spread-viewer__progress" onClick={handleProgressClick}>
-          <div className="spread-viewer__progress-fill" style={{ width: `${progressPercent}%` }} />
-          <div className="spread-viewer__progress-thumb" style={{ right: `${progressPercent}%` }} />
+          <div
+            className="spread-viewer__progress-fill"
+            style={
+              isRtl
+                ? { width: `${progressPercent}%`, right: 0, left: "auto" }
+                : { width: `${progressPercent}%`, left: 0, right: "auto" }
+            }
+          />
+          <div
+            className="spread-viewer__progress-thumb"
+            style={
+              isRtl
+                ? { right: `${progressPercent}%`, left: "auto", transform: "translate(50%, -50%)" }
+                : { left: `${progressPercent}%`, right: "auto", transform: "translate(-50%, -50%)" }
+            }
+          />
         </div>
         <div className="spread-viewer__nav">
           {onBack && (
@@ -217,23 +286,41 @@ export function SpreadViewer({
               ≡
             </button>
           )}
-          <button type="button" disabled={isLast} onClick={goNext}>
+          <button
+            type="button"
+            disabled={isRtl ? isLast : isFirst}
+            onClick={isRtl ? goNext : goPrev}
+          >
             ←
           </button>
           <span className="spread-viewer__info">
             {spreadIndex + 1} / {spreads.length}
           </span>
-          <button type="button" disabled={isFirst} onClick={goPrev}>
-            →
-          </button>
           <button
             type="button"
-            className="spread-viewer__mode-toggle"
-            onClick={toggleViewMode}
-            title={isSingle ? "見開き表示" : "単ページ表示"}
+            disabled={isRtl ? isFirst : isLast}
+            onClick={isRtl ? goPrev : goNext}
           >
-            {isSingle ? <SpreadViewIcon size={16} /> : <SinglePageIcon size={16} />}
+            →
           </button>
+          <div className="spread-viewer__toggles">
+            <button
+              type="button"
+              className="spread-viewer__mode-toggle"
+              onClick={toggleViewMode}
+              title={isSingle ? "見開き表示" : "単ページ表示"}
+            >
+              {isSingle ? <SpreadViewIcon size={16} /> : <SinglePageIcon size={16} />}
+            </button>
+            <button
+              type="button"
+              className="spread-viewer__mode-toggle"
+              onClick={toggleReadingDirection}
+              title={isRtl ? "右→左 (RTL)" : "左→右 (LTR)"}
+            >
+              {isRtl ? <RtlIcon size={16} /> : <LtrIcon size={16} />}
+            </button>
+          </div>
         </div>
       </div>
     </div>

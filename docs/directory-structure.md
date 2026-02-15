@@ -29,13 +29,17 @@ mekuri/
 │   │   └── Icons/                 #     カスタム SVG アイコン
 │   │       └── Icons.tsx
 │   ├── hooks/                     #   カスタムフック
-│   │   ├── useDirectory.ts        #     ディレクトリ読み込み・兄弟アーカイブ取得
-│   │   ├── useArchive.ts          #     アーカイブ操作（一覧・画像取得・内容分析・ネスト展開）
-│   │   ├── useFavorites.ts        #     お気に入りフォルダ管理
-│   │   └── useSettings.ts         #     ウィンドウ設定の永続化
+│   │   ├── useArchiveLoader.ts    #     アーカイブ読み込み・内容分析・ネスト展開
+│   │   ├── usePdfLoader.ts        #     PDF 読み込み・ページレンダリング
+│   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
+│   │   ├── useContextMenu.ts      #     コンテキストメニュー
+│   │   └── useWindowResize.ts     #     ウィンドウリサイズ検知
 │   ├── utils/                     #   ユーティリティ
-│   │   ├── spreadLayout.ts        #     見開きレイアウト計算
+│   │   ├── spreadLayout.ts        #     見開きレイアウト計算（RTL/LTR 対応）
 │   │   ├── spreadLayout.test.ts   #     spreadLayout テスト
+│   │   ├── pdf.ts                 #     PDF 読み込み・レンダリング（pdfjs-dist）
+│   │   ├── fileType.ts            #     ファイル種別判定
+│   │   ├── fileType.test.ts       #     fileType テスト
 │   │   ├── windowLabel.ts         #     ウィンドウラベル生成
 │   │   └── windowLabel.test.ts    #     windowLabel テスト
 │   ├── types/                     #   型定義

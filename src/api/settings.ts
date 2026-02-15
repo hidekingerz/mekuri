@@ -5,7 +5,7 @@ import {
   DEFAULT_VIEWER_HEIGHT,
   DEFAULT_VIEWER_WIDTH,
 } from "../utils/constants";
-import type { ViewMode } from "../utils/spreadLayout";
+import type { ReadingDirection, ViewMode } from "../utils/spreadLayout";
 import { getStore } from "./store";
 
 type MainWindowSettings = {
@@ -18,6 +18,7 @@ type ViewerWindowSettings = {
   width: number;
   height: number;
   viewMode: ViewMode;
+  readingDirection?: ReadingDirection;
 };
 
 const DEFAULT_MAIN_SETTINGS: MainWindowSettings = {

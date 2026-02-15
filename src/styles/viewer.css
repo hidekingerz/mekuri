@@ -189,9 +189,15 @@ body {
   font-size: 16px;
 }
 
-.spread-viewer__mode-toggle {
+.spread-viewer__toggles {
   position: absolute;
   right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spread-viewer__mode-toggle {
   display: flex;
   align-items: center;
   justify-content: center;

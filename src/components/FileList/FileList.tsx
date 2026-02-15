@@ -5,7 +5,7 @@ import { readDirectoryFiles, trashFile } from "../../api/directory";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
 import { errorToString } from "../../utils/errorToString";
-import { ArchiveIcon } from "../Icons/Icons";
+import { ArchiveIcon, PdfIcon } from "../Icons/Icons";
 
 type FileListProps = {
   folderPath: string | null;
@@ -123,14 +123,14 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
   if (files.length === 0) {
     return (
       <div className="file-list file-list--empty">
-        <p>No archives in this folder</p>
+        <p>No archives or PDFs in this folder</p>
       </div>
     );
   }
 
   return (
     <div className="file-list">
-      <div className="file-list__header">Archives</div>
+      <div className="file-list__header">Files</div>
       <div className="file-list__items">
         {files.map((file) => (
           <button
@@ -141,7 +141,7 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
             onContextMenu={(e) => openContextMenu(e, file.path)}
             title={file.path}
           >
-            <ArchiveIcon size={14} />
+            {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
             <span className="file-list__name">{file.name}</span>
           </button>
         ))}

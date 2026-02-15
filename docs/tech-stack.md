@@ -16,9 +16,18 @@
 | `@tauri-apps/api` | Tauri IPC 呼び出し（invoke, event, window） |
 | `@tauri-apps/plugin-dialog` | フォルダ選択ダイアログ |
 | `@tauri-apps/plugin-store` | 設定・お気に入りの永続化 |
+| `pdfjs-dist` | PDF のページレンダリング（CMap/標準フォント対応で CJK 文字表示可能） |
 | `react`, `react-dom` | UI コンポーネント |
 
 最小限の依存で構成する方針とする。アイコンは外部ライブラリを使わず、カスタム SVG コンポーネントで実装している。
+
+### pdfjs-dist の静的アセット配信
+
+pdfjs-dist が必要とする CMap ファイルと標準フォントファイルは、Vite カスタムプラグイン（`pdfjsStaticPlugin`）で配信する。
+
+- **開発時**: dev サーバーのミドルウェアで `node_modules/pdfjs-dist/` から直接配信
+- **ビルド時**: `generateBundle` フックで出力ディレクトリにコピー
+- **URL パス**: `/pdfjs/cmaps/`, `/pdfjs/standard_fonts/`
 
 ## Rust 依存クレート
 

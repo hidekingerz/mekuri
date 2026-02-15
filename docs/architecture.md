@@ -39,9 +39,9 @@ UI の描画とユーザー操作を担当する。Tauri の IPC（`invoke`）�
 | `FolderTree` | ディレクトリ階層のツリー表示・操作 |
 | `TreeNode` | ツリーノード描画・展開/折りたたみ・コンテキストメニュー（お気に入り追加） |
 | `FileList` | 選択中フォルダ内のアーカイブファイル一覧表示 |
-| `SpreadViewer` | 見開き画像表示・ページ送り・プログレスバー |
+| `SpreadViewer` | 見開き/単ページ画像表示・ページ送り・プログレスバー・読み方向切替。`SpreadViewerHandle` を `useImperativeHandle` で公開し、外部からモード切替が可能 |
 | `PageImage` | 個別の画像表示 |
-| `Icons` | カスタム SVG アイコン（ChevronRight, FolderIcon, ArchiveIcon 等） |
+| `Icons` | カスタム SVG アイコン（ChevronRight, FolderIcon, ArchiveIcon, PdfIcon, RtlIcon, LtrIcon 等） |
 
 ### 2. バックエンド（Rust）
 
@@ -69,6 +69,7 @@ DirectoryEntry {
   path: string
   is_dir: boolean
   is_archive: boolean
+  is_pdf: boolean
   has_subfolders: boolean
 }
 ```
@@ -193,10 +194,24 @@ Tauri のマルチウィンドウ機能を使用する。
   → Rust: archive::get_image_base64 → data URL 返却
   → React (ビューワー): <img src={dataUrl}> で表示
 
-ユーザー操作: Alt+矢印で兄弟アーカイブ移動
+ユーザー操作: Alt+矢印で兄弟ファイル移動
   → React: invoke("read_directory", { path: 親フォルダ })
-  → React: 兄弟アーカイブリストから次/前のアーカイブを特定
-  → React: 新しいアーカイブで analyze_archive_contents を再実行
+  → React: 兄弟ファイルリストから次/前のファイルを特定
+  → React: 新しいファイルで閲覧を再開
+```
+
+### PDF 閲覧
+
+```
+ユーザー操作: PDF ファイルをクリック
+  → React (メイン): ビューワーウィンドウを生成
+  → React (ビューワー): invoke("read_file_base64", { path }) で PDF バイナリを取得
+  → React (ビューワー): pdfjs-dist で PDF をロード（CMap/標準フォント設定付き）
+  → React (ビューワー): ページ数を取得し SpreadViewer に渡す（デフォルト LTR）
+
+ユーザー操作: ページ送り
+  → React (ビューワー): pdfjs-dist でページを Canvas にレンダリング → data URL 変換
+  → React (ビューワー): <img src={dataUrl}> で表示
 ```
 
 ### 設定の永続化
@@ -235,14 +250,17 @@ Tauri のマルチウィンドウ機能を使用する。
 
 | フック / モジュール | 責務 |
 |-------------------|------|
-| `useDirectory` | `read_directory` の呼び出し、フォルダ/ファイルのフィルタリング、兄弟アーカイブ取得 |
-| `useArchive` | アーカイブ関連の IPC 呼び出し（一覧取得、画像取得、内容分析、ネスト展開） |
+| `useDirectory` | `read_directory` の呼び出し、フォルダ/ファイルのフィルタリング、兄弟ファイル取得 |
+| `useArchiveLoader` | アーカイブの読み込み・内容分析・ネストアーカイブ展開 |
+| `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
 | `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
-| `useSettings` | ウィンドウサイズ・カラム幅の保存/復元（`tauri-plugin-store` 経由） |
+| `useSiblingNavigation` | Alt+矢印キーによる兄弟ファイル間のナビゲーション |
 
 ## ユーティリティ
 
 | モジュール | 責務 |
 |-----------|------|
-| `spreadLayout` | 見開きレイアウトの計算（先頭単ページ、以降ペア、末尾が奇数なら単ページ） |
+| `spreadLayout` | 見開きレイアウトの計算（RTL/LTR 対応。先頭単ページ、以降ペア、末尾が奇数なら単ページ） |
 | `windowLabel` | アーカイブパスからウィンドウラベルのハッシュ生成、ファイル名抽出 |
+| `pdf` | PDF ファイルの読み込みとページレンダリング（pdfjs-dist 使用、CMap/標準フォント対応） |
+| `fileType` | ファイルパスの拡張子からファイル種別（archive/pdf/unknown）を判定 |

@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
 const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr", "7z"];
+const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
 /// Supported archive format categories.
 enum ArchiveFormat {
@@ -93,6 +94,14 @@ pub fn is_image_file(name: &str) -> bool {
         .any(|ext| lower.ends_with(&format!(".{ext}")))
 }
 
+/// Check if a filename has a PDF extension.
+pub fn is_pdf_file(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    PDF_EXTENSIONS
+        .iter()
+        .any(|ext| lower.ends_with(&format!(".{ext}")))
+}
+
 /// Check if a filename has an archive extension.
 pub fn is_archive_file(name: &str) -> bool {
     let lower = name.to_lowercase();
@@ -140,6 +149,16 @@ mod tests {
         assert_eq!(mime_type_from_name("image.webp"), "image/webp");
         assert_eq!(mime_type_from_name("anim.gif"), "image/gif");
         assert_eq!(mime_type_from_name("unknown.bmp"), "image/jpeg");
+    }
+
+    #[test]
+    fn test_is_pdf_file() {
+        assert!(is_pdf_file("document.pdf"));
+        assert!(is_pdf_file("document.PDF"));
+        assert!(is_pdf_file("path/to/file.pdf"));
+        assert!(!is_pdf_file("readme.txt"));
+        assert!(!is_pdf_file("archive.zip"));
+        assert!(!is_pdf_file("noext"));
     }
 
     #[test]

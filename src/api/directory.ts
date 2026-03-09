@@ -15,6 +15,10 @@ export async function readDirectoryFiles(path: string): Promise<DirectoryEntry[]
   return entries.filter((entry) => !entry.is_dir && (entry.is_archive || entry.is_pdf));
 }
 
+export async function searchDirectory(path: string, query: string): Promise<DirectoryEntry[]> {
+  return invoke<DirectoryEntry[]>("search_directory", { path, query });
+}
+
 export async function readFileBase64(path: string): Promise<string> {
   return invoke<string>("read_file_base64", { path });
 }

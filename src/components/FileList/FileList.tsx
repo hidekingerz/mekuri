@@ -5,14 +5,21 @@ import { readDirectoryFiles, trashFile } from "../../api/directory";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
 import { errorToString } from "../../utils/errorToString";
-import { ArchiveIcon, PdfIcon } from "../Icons/Icons";
+import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
 type FileListProps = {
   folderPath: string | null;
   onArchiveSelect: (path: string) => void;
+  onFolderSelect: (path: string) => void;
+  searchResults: DirectoryEntry[] | null;
 };
 
-export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
+export function FileList({
+  folderPath,
+  onArchiveSelect,
+  onFolderSelect,
+  searchResults,
+}: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +102,65 @@ export function FileList({ folderPath, onArchiveSelect }: FileListProps) {
       setError(errorToString(err));
     }
   }, [contextMenu, folderPath, closeContextMenu, loadFiles]);
+
+  // 検索結果表示モード
+  if (searchResults !== null) {
+    if (searchResults.length === 0) {
+      return (
+        <div className="file-list file-list--empty">
+          <p>No matches found</p>
+        </div>
+      );
+    }
+
+    const resultFolders = searchResults.filter((e) => e.is_dir);
+    const resultFiles = searchResults.filter((e) => !e.is_dir);
+
+    return (
+      <div className="file-list">
+        <div className="file-list__header">Search Results</div>
+        <div className="file-list__items">
+          {resultFolders.map((folder) => (
+            <button
+              key={folder.path}
+              type="button"
+              className="file-list__item"
+              onClick={() => onFolderSelect(folder.path)}
+              title={folder.path}
+            >
+              <FolderIcon size={14} />
+              <span className="file-list__name">{folder.name}</span>
+            </button>
+          ))}
+          {resultFiles.map((file) => (
+            <button
+              key={file.path}
+              type="button"
+              className="file-list__item"
+              onClick={() => onArchiveSelect(file.path)}
+              onContextMenu={(e) => openContextMenu(e, file.path)}
+              title={file.path}
+            >
+              {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
+              <span className="file-list__name">{file.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {contextMenu && (
+          <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+            <button
+              type="button"
+              className="context-menu__item context-menu__item--danger"
+              onClick={handleTrashFile}
+            >
+              Move to Trash
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!folderPath) {
     return (

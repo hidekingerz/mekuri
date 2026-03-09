@@ -91,6 +91,82 @@ pub fn trash_file(path: String) -> Result<(), String> {
     trash::delete(&file_path).map_err(|e| format!("Failed to move file to trash: {e}"))
 }
 
+#[tauri::command]
+pub fn search_directory(path: String, query: String) -> Result<Vec<DirectoryEntry>, String> {
+    let dir_path = PathBuf::from(&path);
+    let query_lower = query.to_lowercase();
+    let mut result: Vec<DirectoryEntry> = Vec::new();
+
+    search_recursive(&dir_path, &query_lower, &mut result)
+        .map_err(|e| format!("Failed to search directory: {e}"))?;
+
+    result.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => natord::compare(&a.name, &b.name),
+    });
+
+    Ok(result)
+}
+
+fn search_recursive(
+    dir: &PathBuf,
+    query: &str,
+    result: &mut Vec<DirectoryEntry>,
+) -> std::io::Result<()> {
+    let entries = std::fs::read_dir(dir)?;
+
+    for entry in entries.flatten() {
+        let metadata = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip hidden files
+        if name.starts_with('.') {
+            continue;
+        }
+
+        let entry_path = entry.path();
+        let is_dir = metadata.is_dir();
+
+        if is_dir {
+            if name.to_lowercase().contains(query) {
+                let path_str = entry_path.to_string_lossy().to_string();
+                let has_subfolders = has_subdirectories(&entry_path);
+                result.push(DirectoryEntry {
+                    name,
+                    path: path_str,
+                    is_dir: true,
+                    is_archive: false,
+                    is_pdf: false,
+                    has_subfolders,
+                });
+            }
+            // 再帰的にサブディレクトリを検索
+            let _ = search_recursive(&entry_path, query, result);
+        } else {
+            let is_archive = archive::is_archive_file(&name);
+            let is_pdf = !is_archive && archive::is_pdf_file(&name);
+
+            if (is_archive || is_pdf) && name.to_lowercase().contains(query) {
+                let path_str = entry_path.to_string_lossy().to_string();
+                result.push(DirectoryEntry {
+                    name,
+                    path: path_str,
+                    is_dir: false,
+                    is_archive,
+                    is_pdf,
+                    has_subfolders: false,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn has_subdirectories(path: &PathBuf) -> bool {
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
@@ -127,6 +203,68 @@ mod tests {
         let result = trash_file(dir_path);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Path is not a file"));
+    }
+
+    #[test]
+    fn search_directory_finds_matching_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("subdir");
+        fs::create_dir(&sub).unwrap();
+        fs::write(dir.path().join("test.zip"), "").unwrap();
+        fs::write(sub.join("nested.zip"), "").unwrap();
+        fs::write(sub.join("other.txt"), "").unwrap();
+
+        let result =
+            search_directory(dir.path().to_string_lossy().to_string(), "zip".to_string()).unwrap();
+        let names: Vec<&str> = result.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.contains(&"test.zip"));
+        assert!(names.contains(&"nested.zip"));
+        assert!(!names.contains(&"other.txt"));
+    }
+
+    #[test]
+    fn search_directory_finds_matching_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("manga_vol1");
+        fs::create_dir(&sub).unwrap();
+        let other = dir.path().join("photos");
+        fs::create_dir(&other).unwrap();
+
+        let result = search_directory(
+            dir.path().to_string_lossy().to_string(),
+            "manga".to_string(),
+        )
+        .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "manga_vol1");
+        assert!(result[0].is_dir);
+    }
+
+    #[test]
+    fn search_directory_case_insensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("MyArchive.ZIP"), "").unwrap();
+
+        let result = search_directory(
+            dir.path().to_string_lossy().to_string(),
+            "myarchive".to_string(),
+        )
+        .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "MyArchive.ZIP");
+    }
+
+    #[test]
+    fn search_directory_no_results() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("test.zip"), "").unwrap();
+
+        let result = search_directory(
+            dir.path().to_string_lossy().to_string(),
+            "nonexistent".to_string(),
+        )
+        .unwrap();
+        assert!(result.is_empty());
     }
 
     #[test]

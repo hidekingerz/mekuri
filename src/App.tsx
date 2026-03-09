@@ -1,7 +1,8 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { searchDirectory } from "./api/directory";
 import { addFavorite } from "./api/favorites";
 import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
@@ -9,6 +10,7 @@ import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
+import type { DirectoryEntry } from "./types";
 import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
@@ -17,7 +19,11 @@ function App() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<DirectoryEntry[] | null>(null);
+  const [revealPath, setRevealPath] = useState<string | null>(null);
   const columnsRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
     DEFAULT_TREE_COLUMN_WIDTH,
     columnsRef,
@@ -57,6 +63,46 @@ function App() {
     }
   }, [selectedFavorite]);
 
+  // Debounced search
+  useEffect(() => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+
+    if (!searchQuery || !selectedFavorite) {
+      setSearchResults(null);
+      return;
+    }
+
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchDirectory(selectedFavorite, searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, [searchQuery, selectedFavorite]);
+
+  // Reset search when favorite changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: must reset search when selectedFavorite changes
+  useEffect(() => {
+    setSearchQuery("");
+    setSearchResults(null);
+  }, [selectedFavorite]);
+
+  const searchFolders = useMemo(() => {
+    if (searchResults === null) return null;
+    return searchResults.filter((e) => e.is_dir);
+  }, [searchResults]);
+
   const handleAddFolder = useCallback(async () => {
     const selected = await open({ directory: true });
     if (selected) {
@@ -72,8 +118,20 @@ function App() {
     setSelectedFolder(null);
   }, []);
 
-  const handleFolderSelect = useCallback((path: string) => {
-    setSelectedFolder(path);
+  const handleFolderSelect = useCallback(
+    (path: string) => {
+      setSelectedFolder(path);
+      if (searchResults !== null) {
+        setRevealPath(path);
+      }
+      setSearchQuery("");
+      setSearchResults(null);
+    },
+    [searchResults],
+  );
+
+  const handleRevealComplete = useCallback(() => {
+    setRevealPath(null);
   }, []);
 
   const handleFavoriteAdded = useCallback(() => {
@@ -110,6 +168,14 @@ function App() {
         <button type="button" className="toolbar__btn" onClick={handleAddFolder}>
           Add Folder
         </button>
+        <input
+          type="text"
+          className="toolbar__search"
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          disabled={!selectedFavorite}
+        />
       </div>
       <div
         className={`app__columns ${isResizing ? "app__columns--resizing" : ""}`}
@@ -127,6 +193,9 @@ function App() {
               selectedPath={selectedFolder}
               onFolderSelect={handleFolderSelect}
               onFavoriteAdded={handleFavoriteAdded}
+              searchFolders={searchFolders}
+              revealPath={revealPath}
+              onRevealComplete={handleRevealComplete}
             />
           ) : (
             <div className="column-empty">
@@ -140,6 +209,8 @@ function App() {
           <FileList
             folderPath={selectedFolder || selectedFavorite}
             onArchiveSelect={handleArchiveSelect}
+            onFolderSelect={handleFolderSelect}
+            searchResults={searchResults}
           />
         </div>
       </div>

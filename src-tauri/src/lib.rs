@@ -10,6 +10,7 @@ pub fn run() {
             commands::fs::read_directory,
             commands::fs::read_file_base64,
             commands::fs::trash_file,
+            commands::fs::search_directory,
             commands::archive::list_archive_images,
             commands::archive::get_archive_image,
             commands::archive::analyze_archive_contents,

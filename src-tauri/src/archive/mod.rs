@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::Mutex;
 
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "avif"];
 const ARCHIVE_EXTENSIONS: &[&str] = &["zip", "cbz", "rar", "cbr", "7z"];
 const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
@@ -119,6 +119,8 @@ pub fn mime_type_from_name(name: &str) -> &'static str {
         "image/webp"
     } else if lower.ends_with(".gif") {
         "image/gif"
+    } else if lower.ends_with(".avif") {
+        "image/avif"
     } else {
         "image/jpeg"
     }
@@ -135,6 +137,7 @@ mod tests {
         assert!(is_image_file("image.png"));
         assert!(is_image_file("image.webp"));
         assert!(is_image_file("anim.gif"));
+        assert!(is_image_file("photo.avif"));
         assert!(!is_image_file("readme.txt"));
         assert!(!is_image_file("archive.zip"));
         assert!(!is_image_file("noext"));
@@ -148,6 +151,7 @@ mod tests {
         assert_eq!(mime_type_from_name("image.PNG"), "image/png");
         assert_eq!(mime_type_from_name("image.webp"), "image/webp");
         assert_eq!(mime_type_from_name("anim.gif"), "image/gif");
+        assert_eq!(mime_type_from_name("photo.avif"), "image/avif");
         assert_eq!(mime_type_from_name("unknown.bmp"), "image/jpeg");
     }
 

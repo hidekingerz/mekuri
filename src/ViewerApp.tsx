@@ -2,7 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
-import { trashFile } from "./api/directory";
+import { getSiblingArchives, trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
@@ -42,6 +42,53 @@ function Viewer() {
   const archivePathRef = useRef(archivePath);
   archivePathRef.current = archivePath;
 
+  const handleTrash = useCallback(async () => {
+    const currentPath = archivePathRef.current;
+    if (!currentPath) return;
+
+    const confirmed = await ask(
+      `Are you sure you want to move this file to the trash?\n\n${currentPath}`,
+      { title: "Move to Trash", kind: "warning" },
+    );
+    if (!confirmed) return;
+
+    try {
+      // Resolve next sibling before trashing so the deleted file is still listed.
+      const { archives, currentIndex } = await getSiblingArchives(currentPath);
+      const nextPath =
+        currentIndex >= 0
+          ? (archives[currentIndex + 1] ?? archives[currentIndex - 1] ?? null)
+          : null;
+
+      await trashFile(currentPath);
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("file-trashed");
+
+      if (nextPath) {
+        setArchivePath(nextPath);
+        await getCurrentWindow().setTitle(`${fileNameFromPath(nextPath)} - mekuri`);
+      } else {
+        await getCurrentWindow().close();
+      }
+    } catch (err) {
+      setTrashError(errorToString(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // macOS keyboards send "Backspace" for the main Delete key;
+      // "Delete" is fn+Delete (forward delete) on Mac and Del on other platforms.
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      void handleTrash();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleTrash]);
+
   useEffect(() => {
     async function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
@@ -66,22 +113,7 @@ function Viewer() {
 
       const trashItem = await MenuItem.new({
         text: "Move to Trash",
-        action: async () => {
-          const confirmed = await ask(
-            `Are you sure you want to move this file to the trash?\n\n${currentPath}`,
-            { title: "Move to Trash", kind: "warning" },
-          );
-          if (!confirmed) return;
-
-          try {
-            await trashFile(currentPath);
-            const { emit } = await import("@tauri-apps/api/event");
-            await emit("file-trashed");
-            await getCurrentWindow().close();
-          } catch (err) {
-            setTrashError(errorToString(err));
-          }
-        },
+        action: handleTrash,
       });
 
       const closeItem = await MenuItem.new({
@@ -97,7 +129,7 @@ function Viewer() {
 
     window.addEventListener("contextmenu", handleContextMenu);
     return () => window.removeEventListener("contextmenu", handleContextMenu);
-  }, []);
+  }, [handleTrash]);
 
   // Archive loader (only active for archive files)
   const archive = useArchiveLoader(isPdf ? null : archivePath);

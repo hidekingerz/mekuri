@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(jq -r '.tool_input.file_path // empty')\"; case \"$f\" in *src-tauri/*.rs) cd \"$CLAUDE_PROJECT_DIR/src-tauri\" && cargo fmt && cargo clippy --quiet -- -D warnings ;; *src/*.ts|*src/*.tsx) cd \"$CLAUDE_PROJECT_DIR\" && npx biome check --write \"$f\" ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

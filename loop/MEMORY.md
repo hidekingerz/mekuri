@@ -5,11 +5,12 @@
 
 ## Done（達成済み）
 
+- [m2:fs] `deno-app/backend/fs.ts` を `src-tauri/src/commands/fs.rs` から移植（`readDirectory` / `searchDirectory` / `readFileBase64`）。依存する拡張子判定を `backend/extensions.ts`（`isArchiveFile`/`isPdfFile`/`isImageFile`/`mimeTypeFromName`、archive/mod.rs 相当）に切り出し。`fs.test.ts`(9)・`extensions.test.ts`(4) 追加、`mod.ts` から re-export。VERIFY グリーン（18 tests passed）。commit bcd0f22。`DirectoryEntry` は React 互換のため snake_case フィールド維持。`trash_file` はネイティブ trash 依存のため未移植（マイルストーン3/別途検討）。
 - [setup] スキャフォールド作成。`deno-app/deno.json`（verify タスク）、`deno-app/backend/sort.ts`（自然順ソートの参照実装）+ `sort.test.ts`、`deno-app/backend/mod.ts`、`bindings/`・`archive/` ディレクトリを用意。`cd deno-app && deno task verify` がグリーンであることを確認済み。マイルストーン1完了・マイルストーン2の sort.ts 完了。
 
 ## Open（未解決 / 次周への申し送り）
 
-- [next] マイルストーン2の続き。次タスク候補: `deno-app/backend/fs.ts` を `src-tauri/src/commands/fs.rs` の `read_directory` 相当として移植し、`fs.test.ts` を追加する。`sort.ts` / `sort.test.ts` を実装パターンの手本にする。
+- [next] マイルストーン2の続き。次タスク候補: `deno-app/backend/archive/zip.ts` を `src-tauri/src/archive/zip.rs` から移植（ZIP/CBZ の画像一覧・内容分析・画像 Base64 取得・ネスト展開）し `zip.test.ts` を追加する。ライブラリ調査が必要（PLAN 段で npm/jsr の ZIP 展開ライブラリを `deno.json` の imports に追加。理由を MEMORY に記録）。拡張子判定は `backend/extensions.ts` を流用できる。`fs.ts` を実装パターンの手本にする。
 
 ## Notes（学び / 落とし穴）
 

@@ -4,3 +4,15 @@
  */
 
 export { naturalCompare, naturalSort } from "./sort.ts";
+export {
+  isArchiveFile,
+  isImageFile,
+  isPdfFile,
+  mimeTypeFromName,
+} from "./extensions.ts";
+export {
+  type DirectoryEntry,
+  readDirectory,
+  readFileBase64,
+  searchDirectory,
+} from "./fs.ts";

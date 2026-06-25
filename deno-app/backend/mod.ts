@@ -31,9 +31,11 @@ export {
 } from "./extensions.ts";
 export {
   type DirectoryEntry,
+  type FileDeleter,
   readDirectory,
   readFileBase64,
   searchDirectory,
+  trashFile,
 } from "./fs.ts";
 // アーカイブ操作は拡張子で ZIP/RAR を振り分ける統一ディスパッチ API を公開する。
 export {

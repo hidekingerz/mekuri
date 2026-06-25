@@ -1,5 +1,10 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { readDirectory, readFileBase64, searchDirectory } from "./fs.ts";
+import {
+  readDirectory,
+  readFileBase64,
+  searchDirectory,
+  trashFile,
+} from "./fs.ts";
 
 /** テスト用の一時ディレクトリを作り、関数実行後に必ず削除する。 */
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -116,4 +121,47 @@ Deno.test("readFileBase64: 存在しないファイルはエラー", async () =>
     Error,
     "Failed to read file",
   );
+});
+
+Deno.test("trashFile: 存在しないパスはエラー（deleter は呼ばれない）", async () => {
+  let called = false;
+  await assertRejects(
+    () =>
+      trashFile("/nonexistent_mekuri_file_12345.zip", () => {
+        called = true;
+        return Promise.resolve();
+      }),
+    Error,
+    "File does not exist",
+  );
+  assertEquals(called, false);
+});
+
+Deno.test("trashFile: ディレクトリはエラー（deleter は呼ばれない）", async () => {
+  await withTempDir(async (dir) => {
+    let called = false;
+    await assertRejects(
+      () =>
+        trashFile(dir, () => {
+          called = true;
+          return Promise.resolve();
+        }),
+      Error,
+      "Path is not a file",
+    );
+    assertEquals(called, false);
+  });
+});
+
+Deno.test("trashFile: 通常ファイルは deleter にパスを渡して成功", async () => {
+  await withTempDir(async (dir) => {
+    const path = `${dir}/to_trash.zip`;
+    await Deno.writeTextFile(path, "");
+    let received: string | null = null;
+    await trashFile(path, (p) => {
+      received = p;
+      return Promise.resolve();
+    });
+    assertEquals(received, path);
+  });
 });

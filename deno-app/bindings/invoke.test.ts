@@ -61,6 +61,14 @@ Deno.test("invoke: read_file_base64 dispatches to backend", async () => {
   }
 });
 
+Deno.test("invoke: trash_file dispatches to backend (validation error forwarded)", async () => {
+  await assertRejects(
+    () => invoke("trash_file", { path: "/nonexistent_mekuri_trash_12345.zip" }),
+    Error,
+    "File does not exist",
+  );
+});
+
 Deno.test("invoke: list_archive_images forwards format errors from backend", async () => {
   // 未対応拡張子は backend の detectFormat が拒否する。エラーが透過することで
   // archive 系コマンドが backend へ正しくディスパッチされたことを確認する。

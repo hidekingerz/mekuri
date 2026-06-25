@@ -18,6 +18,7 @@ import {
   readDirectory,
   readFileBase64,
   searchDirectory,
+  trashFile,
 } from "../backend/mod.ts";
 
 /** invoke に渡す引数オブジェクト。Tauri 版と同じく任意のキーを許す。 */
@@ -50,6 +51,8 @@ export async function invoke<T>(
       ) as T;
     case "read_file_base64":
       return await readFileBase64(requireString(args, "path")) as T;
+    case "trash_file":
+      return await trashFile(requireString(args, "path")) as T;
     case "list_archive_images":
       return await listImages(requireString(args, "archivePath")) as T;
     case "get_archive_image":

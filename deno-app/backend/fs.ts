@@ -164,6 +164,44 @@ export async function searchDirectory(
   return result;
 }
 
+/**
+ * ファイルをゴミ箱へ移動する（Tauri 版 `trash_file` 相当）。
+ *
+ * 検証（存在する・通常ファイルである）は純粋ロジックとして本体で行い、実際の
+ * ゴミ箱移動はネイティブ依存（`npm:trash`）になるため注入可能な `deleter` に分離する。
+ * これにより `backend/` を Deno Desktop 非依存に保ち、検証パスを単体テストできる。
+ */
+export type FileDeleter = (path: string) => Promise<void>;
+
+/** 既定の deleter。`npm:trash` を動的 import してゴミ箱へ移動する。 */
+async function defaultDeleter(path: string): Promise<void> {
+  const mod = await import("trash");
+  const trash = mod.default as (p: string) => Promise<void>;
+  try {
+    await trash(path);
+  } catch (e) {
+    throw new Error(
+      `Failed to move file to trash: ${e instanceof Error ? e.message : e}`,
+    );
+  }
+}
+
+export async function trashFile(
+  path: string,
+  deleter: FileDeleter = defaultDeleter,
+): Promise<void> {
+  let stat: Deno.FileInfo;
+  try {
+    stat = await Deno.stat(path);
+  } catch {
+    throw new Error(`File does not exist: ${path}`);
+  }
+  if (!stat.isFile) {
+    throw new Error(`Path is not a file: ${path}`);
+  }
+  await deleter(path);
+}
+
 /** ファイルを読み込み Base64 文字列で返す（Tauri 版 `read_file_base64` 相当）。 */
 export async function readFileBase64(path: string): Promise<string> {
   let data: Uint8Array;

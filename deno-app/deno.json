@@ -1,0 +1,19 @@
+{
+  "tasks": {
+    "verify": "deno fmt --check && deno lint && deno check backend/mod.ts && deno test -A backend/",
+    "check": "deno check backend/mod.ts",
+    "test": "deno test -A backend/",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "dev": "echo 'deno desktop は deno >= 2.9.0 (canary) が必要です。canary 導入後: deno desktop main.ts'"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@^1"
+  },
+  "fmt": {
+    "include": ["backend/", "bindings/", "main.ts"]
+  },
+  "lint": {
+    "include": ["backend/", "bindings/", "main.ts"]
+  }
+}

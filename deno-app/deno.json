@@ -9,7 +9,8 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1",
-    "@zip-js/zip-js": "jsr:@zip-js/zip-js@^2.7"
+    "@zip-js/zip-js": "jsr:@zip-js/zip-js@^2.7",
+    "node-unrar-js": "npm:node-unrar-js@^2.0.2"
   },
   "fmt": {
     "include": ["backend/", "bindings/", "main.ts"]

@@ -23,3 +23,6 @@ export {
   getImageBase64,
   listImages,
 } from "./archive/zip.ts";
+// RAR/CBR は zip と同名の関数を持つため名前空間付きで公開する。
+// 形式ごとのディスパッチ（archive/mod.ts 相当）は別タスクで実装する。
+export * as rar from "./archive/rar.ts";

@@ -16,3 +16,10 @@ export {
   readFileBase64,
   searchDirectory,
 } from "./fs.ts";
+export {
+  analyzeContents,
+  type ArchiveContents,
+  extractNestedArchive,
+  getImageBase64,
+  listImages,
+} from "./archive/zip.ts";

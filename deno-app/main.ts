@@ -19,7 +19,8 @@
 
 import { serveDir } from "@std/http/file-server";
 import { handleInvoke, mainWindowOptions, openViewer } from "./desktop/mod.ts";
-import { DEFAULT_VIEWER_SETTINGS } from "./backend/mod.ts";
+import { handleStoreCommand } from "./bindings/mod.ts";
+import { DEFAULT_VIEWER_SETTINGS, settingsPath, Store } from "./backend/mod.ts";
 
 /** ビルド済み Vite フロント（リポジトリルートの `dist/`）。M6 のビルドで生成される。 */
 const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
@@ -31,6 +32,11 @@ const server = Deno.serve((req) =>
 /** ビューワー窓を遷移させるための配信元 origin。 */
 const origin = `http://${server.addr.hostname}:${server.addr.port}`;
 
+// 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
+// app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
+// コマンドはこの 1 インスタンスへ集約される（M3/M5 の store 系 IPC 配線）。
+const store = await Store.load(settingsPath(), { autoSave: true });
+
 // 最初の `new Deno.BrowserWindow()` は自動で開いた初期ウィンドウを採用する。
 const win = new Deno.BrowserWindow(mainWindowOptions());
 
@@ -41,7 +47,12 @@ type BridgeReturn = Awaited<ReturnType<Parameters<typeof win.bind>[1]>>;
 function bindInvoke(target: Deno.BrowserWindow): void {
   target.bind(
     "invoke",
-    async (...args) => (await handleInvoke(args)) as BridgeReturn,
+    async (...args) =>
+      (await handleInvoke(
+        args,
+        undefined,
+        (command, storeArgs) => handleStoreCommand(store, command, storeArgs),
+      )) as BridgeReturn,
   );
 }
 

@@ -17,15 +17,31 @@ export type InvokeFn = (
 ) => Promise<unknown>;
 
 /**
+ * store コマンド（`store_*`）のディスパッチ関数。アプリ層が開いた `Store` インスタンスへ
+ * バインドした `handleStoreCommand` を渡す（`bindings/store.ts`）。省略時は store コマンドも
+ * 通常の invoke へ委譲される（`store_*` は `bindings/invoke.ts` 未対応のため Unknown command）。
+ */
+export type StoreFn = (
+  command: string,
+  args?: InvokeArgs,
+) => Promise<unknown>;
+
+/** store コマンドの接頭辞。これに一致するコマンドは `storeFn` へ振り分ける。 */
+const STORE_COMMAND_PREFIX = "store_";
+
+/**
  * `invoke` バインディング呼び出しを処理する。
  *
  * webview が `bindings.invoke(command, args)` を呼ぶため、ハンドラの可変長引数は
  * `[command, argsObject?]` の並びで届く。型を検証してから invoke へ委譲する。
- * 戻り値は JSON 値（`unknown`）で、`main.ts` 側で BrowserWindow の戻り値型へキャストする。
+ * `store_*` コマンドは（`storeFn` が与えられていれば）ステートフルな store ディスパッチャへ、
+ * それ以外はステートレスな `invokeFn` へ振り分ける。戻り値は JSON 値（`unknown`）で、
+ * `main.ts` 側で BrowserWindow の戻り値型へキャストする。
  */
 export async function handleInvoke(
   rawArgs: readonly unknown[],
   invokeFn: InvokeFn = defaultInvoke,
+  storeFn?: StoreFn,
 ): Promise<unknown> {
   const command = rawArgs[0];
   if (typeof command !== "string") {
@@ -35,5 +51,9 @@ export async function handleInvoke(
   if (args !== undefined && args !== null && typeof args !== "object") {
     throw new Error("invoke binding: args must be an object");
   }
-  return await invokeFn(command, (args ?? undefined) as InvokeArgs | undefined);
+  const normalised = (args ?? undefined) as InvokeArgs | undefined;
+  if (storeFn && command.startsWith(STORE_COMMAND_PREFIX)) {
+    return await storeFn(command, normalised);
+  }
+  return await invokeFn(command, normalised);
 }

@@ -10,3 +10,10 @@ export {
   invoke,
   type InvokeArgs,
 } from "./invoke.ts";
+
+export {
+  load,
+  type StoreInvoke,
+  type StoreLoadOptions,
+  WebviewStore,
+} from "./store.ts";

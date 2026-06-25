@@ -16,13 +16,11 @@ export {
   readFileBase64,
   searchDirectory,
 } from "./fs.ts";
+// アーカイブ操作は拡張子で ZIP/RAR を振り分ける統一ディスパッチ API を公開する。
 export {
   analyzeContents,
   type ArchiveContents,
   extractNestedArchive,
   getImageBase64,
   listImages,
-} from "./archive/zip.ts";
-// RAR/CBR は zip と同名の関数を持つため名前空間付きで公開する。
-// 形式ごとのディスパッチ（archive/mod.ts 相当）は別タスクで実装する。
-export * as rar from "./archive/rar.ts";
+} from "./archive/mod.ts";

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 
 export type ArchiveContents =
   | { type: "Images"; names: string[] }

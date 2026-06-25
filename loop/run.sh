@@ -53,14 +53,25 @@ if [[ "$branch" == "main" ]]; then
   exit 1
 fi
 
+consecutive_fail=0
+MAX_CONSEC_FAIL="${MAX_CONSEC_FAIL:-3}"
+
 for ((i = 1; i <= MAX_ITER; i++)); do
   echo "---- iteration $i / $MAX_ITER ($(date '+%H:%M:%S')) ----"
 
   # エージェントを毎周フレッシュなコンテキストで起動（記憶は loop/MEMORY.md / リポ状態が担う）
   if ! output="$($AGENT_CMD < "$PROMPT_FILE")"; then
-    echo "agent invocation failed on iteration $i — 次周で再挑戦します。"
+    consecutive_fail=$((consecutive_fail + 1))
+    echo "agent invocation failed on iteration $i (consecutive=$consecutive_fail/$MAX_CONSEC_FAIL)。"
+    # サーキットブレーカ: 連続失敗が続く場合は API/セッション制限や障害とみなして停止
+    # （MAX_ITER 分の空回りを防ぐ）
+    if [[ "$consecutive_fail" -ge "$MAX_CONSEC_FAIL" ]]; then
+      echo "== $consecutive_fail 連続でエージェント起動に失敗。停止します（API/セッション制限・障害の可能性）。 =="
+      exit 2
+    fi
     continue
   fi
+  consecutive_fail=0
   echo "$output"
 
   # 外部品質ゲート（closed loop の二重安全網）

@@ -30,6 +30,17 @@ deno task fmt      # フォーマット
 deno task lint     # リント
 ```
 
+## アプリの起動・ビルド（要 canary on PATH + `../dist/`）
+
+webview は `../dist/`（Vite ビルド成果物）を配信するため、先にリポジトリルートで `pnpm build` を実行して `dist/` を生成しておく。
+
+```bash
+deno task dev      # 開発起動（ウィンドウを開く）= deno desktop -A main.ts
+deno task build    # .app をビルド = deno desktop --output Mekuri.app -A main.ts
+```
+
+**権限**: 実行時に env（`HOME` 等の config dir 解決）・read/write（アーカイブ／settings.json／一時展開）・net（`Deno.serve`）・run（trash）が必要。`deno desktop` はビルド時に渡した権限をアプリへ焼き込むため、権限を指定しないと実行時に `Requires env access to "HOME"` 等で落ちる。現状は `-A`（全許可）で焼き込み。最小権限化する場合は deno.json に permission set を定義し `deno desktop -P <name> ...` を使う。
+
 ## 前提
 
 - バックエンドロジックの移植・検証は stable deno（2.7.12+）で可能。

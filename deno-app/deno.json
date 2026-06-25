@@ -5,7 +5,8 @@
     "test": "deno test -A backend/ bindings/ desktop/ frontend/",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "dev": "echo 'deno desktop は deno >= 2.9.0 (canary) が必要です。canary 導入後: deno desktop main.ts'"
+    "dev": "deno desktop -A main.ts",
+    "build": "deno desktop --output Mekuri.app -A main.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1",

@@ -10,3 +10,4 @@ export {
   invoke,
   type InvokeArgs,
 } from "./invoke.ts";
+export { handleStoreCommand } from "./store.ts";

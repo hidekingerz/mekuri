@@ -72,8 +72,9 @@ for ((i = 1; i <= MAX_ITER; i++)); do
     fi
   fi
 
-  # 停止サインの検出
-  if grep -q "$DONE_MARKER" <<< "$output"; then
+  # 停止サインの検出（行全体がマーカーと一致する場合のみ。
+  # エージェントが説明文中で marker に言及しただけで誤検出しないよう厳格化する）
+  if grep -qE "^[[:space:]]*${DONE_MARKER}[[:space:]]*$" <<< "$output"; then
     echo
     echo "== $DONE_MARKER detected on iteration $i. Loop complete. =="
     exit 0

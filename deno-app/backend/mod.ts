@@ -4,6 +4,7 @@
  */
 
 export { naturalCompare, naturalSort } from "./sort.ts";
+export { Store, type StoreOptions, type StoreState } from "./store.ts";
 export {
   isArchiveFile,
   isImageFile,

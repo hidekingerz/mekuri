@@ -11,3 +11,15 @@ export {
   type MainWindowOptions,
   mainWindowOptions,
 } from "./windowConfig.ts";
+export {
+  fileNameFromPath,
+  hashCode,
+  openViewer,
+  type OpenViewerDeps,
+  viewerLabel,
+  viewerUrl,
+  type ViewerWindowHandle,
+  type ViewerWindowOptions,
+  viewerWindowOptions,
+  viewerWindowTitle,
+} from "./viewer.ts";

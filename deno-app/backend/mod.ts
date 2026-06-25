@@ -4,6 +4,13 @@
  */
 
 export { naturalCompare, naturalSort } from "./sort.ts";
+export {
+  APP_IDENTIFIER,
+  appConfigDir,
+  type PathEnv,
+  SETTINGS_FILE_NAME,
+  settingsPath,
+} from "./paths.ts";
 export { Store, type StoreOptions, type StoreState } from "./store.ts";
 export {
   addFavorite,

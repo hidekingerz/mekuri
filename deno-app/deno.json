@@ -1,8 +1,8 @@
 {
   "tasks": {
-    "verify": "deno fmt --check && deno lint && deno check backend/mod.ts bindings/mod.ts desktop/mod.ts main.ts && deno test -A backend/ bindings/ desktop/",
-    "check": "deno check backend/mod.ts bindings/mod.ts desktop/mod.ts main.ts",
-    "test": "deno test -A backend/ bindings/ desktop/",
+    "verify": "deno fmt --check && deno lint && deno check backend/mod.ts bindings/mod.ts desktop/mod.ts frontend/mod.ts main.ts && deno test -A backend/ bindings/ desktop/ frontend/",
+    "check": "deno check backend/mod.ts bindings/mod.ts desktop/mod.ts frontend/mod.ts main.ts",
+    "test": "deno test -A backend/ bindings/ desktop/ frontend/",
     "fmt": "deno fmt",
     "lint": "deno lint",
     "dev": "echo 'deno desktop は deno >= 2.9.0 (canary) が必要です。canary 導入後: deno desktop main.ts'"
@@ -15,9 +15,9 @@
     "trash": "npm:trash@^9"
   },
   "fmt": {
-    "include": ["backend/", "bindings/", "desktop/", "main.ts"]
+    "include": ["backend/", "bindings/", "desktop/", "frontend/", "main.ts"]
   },
   "lint": {
-    "include": ["backend/", "bindings/", "desktop/", "main.ts"]
+    "include": ["backend/", "bindings/", "desktop/", "frontend/", "main.ts"]
   }
 }

@@ -19,6 +19,7 @@
 
 import { serveDir } from "@std/http/file-server";
 import {
+  errorForwarderScript,
   extractMenuClickId,
   handleEventCommand,
   handleInvoke,
@@ -42,10 +43,8 @@ const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
 // webview の未捕捉エラーを serve 経由でプロセス stderr（`[web]` 行）へ転送する小スクリプト。
 // GUI 無しでも実行時クラッシュ（例: 移行漏れの Tauri API が `__TAURI_INTERNALS__` を触る）を
 // 検知でき、smoke test（scripts/smoke.sh）の判定材料になる。表示には影響しない。
-const ERR_FORWARDER =
-  `<script>function L(m){try{fetch('/__log?m='+encodeURIComponent(String(m)))}catch(_){}}` +
-  `addEventListener('error',function(e){L('error: '+e.message+' '+((e.error&&e.error.stack)||''))});` +
-  `addEventListener('unhandledrejection',function(e){L('reject: '+((e.reason&&e.reason.stack)||e.reason))});</script>`;
+// ロジックは desktop/errorForwarder.ts（純粋・テスト可能）に置く。
+const ERR_FORWARDER = errorForwarderScript();
 
 // フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
 const server = Deno.serve(async (req) => {

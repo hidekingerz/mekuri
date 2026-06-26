@@ -13,6 +13,7 @@ export {
   type StoreFn,
   type WindowFn,
 } from "./bridge.ts";
+export { errorForwarderScript } from "./errorForwarder.ts";
 export {
   type BroadcastTarget,
   deliverScript,

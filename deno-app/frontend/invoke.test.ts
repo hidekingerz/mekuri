@@ -64,3 +64,54 @@ Deno.test("default resolver throws when globalThis.bindings is missing", async (
     "bindings.invoke is not available",
   );
 });
+
+Deno.test("invoke retries while the binding is not yet registered, then succeeds", async () => {
+  // 起動直後は main 側 bind が未登録で `No callback bound` を返す。bind 完了後に成功するはず。
+  let attempts = 0;
+  const delays: number[] = [];
+  const bindings: DesktopBindings = {
+    invoke(_command, _args) {
+      attempts++;
+      if (attempts < 3) {
+        return Promise.reject(new Error("No callback bound for: invoke"));
+      }
+      return Promise.resolve("ready");
+    },
+  };
+  const result = await invoke<string>(
+    "window_show",
+    undefined,
+    () => bindings,
+    (ms) => {
+      delays.push(ms);
+      return Promise.resolve();
+    },
+  );
+  assertEquals(result, "ready");
+  assertEquals(attempts, 3);
+  // 2 回 reject したので待機は 2 回（最後の成功前まで）。
+  assertEquals(delays.length, 2);
+});
+
+Deno.test("invoke does not retry on a real backend error", async () => {
+  // `No callback bound` 以外のエラーは即座に伝播する（リトライしない＝待機ゼロ）。
+  let attempts = 0;
+  const delays: number[] = [];
+  const bindings: DesktopBindings = {
+    invoke(_command, _args) {
+      attempts++;
+      return Promise.reject(new Error("File does not exist: /missing"));
+    },
+  };
+  await assertRejects(
+    () =>
+      invoke("read_file_base64", { path: "/missing" }, () => bindings, (ms) => {
+        delays.push(ms);
+        return Promise.resolve();
+      }),
+    Error,
+    "File does not exist",
+  );
+  assertEquals(attempts, 1);
+  assertEquals(delays.length, 0);
+});

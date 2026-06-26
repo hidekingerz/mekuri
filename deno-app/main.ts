@@ -46,34 +46,13 @@ const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
 // ロジックは desktop/errorForwarder.ts（純粋・テスト可能）に置く。
 const ERR_FORWARDER = errorForwarderScript();
 
-// フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
-const server = Deno.serve(async (req) => {
-  const url = new URL(req.url);
-  if (url.pathname === "/__log") {
-    console.error("[web]", url.searchParams.get("m"));
-    return new Response("ok");
-  }
-  if (url.pathname === "/" || url.pathname === "/index.html") {
-    const html = await Deno.readTextFile(FRONTEND_DIR + "index.html");
-    return new Response(html.replace("<head>", `<head>${ERR_FORWARDER}`), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  }
-  return serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true });
-});
-/**
- * 配信元 origin。webview がバインドされるのは常に 127.0.0.1（Deno.serve が
- * 0.0.0.0 を報告しても実際は 127.0.0.1 にバインドされる）。0.0.0.0 へ navigate すると
- * webview が接続できず "Not Found" になるため、必ず 127.0.0.1 を使う。
- */
-const origin = `http://127.0.0.1:${server.addr.port}`;
-
-// 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
-// app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
-// コマンドはこの 1 インスタンスへ集約される（M3/M5 の store 系 IPC 配線）。
-const store = await Store.load(settingsPath(), { autoSave: true });
-
-// 最初の `new Deno.BrowserWindow()` は自動で開いた初期ウィンドウを採用する。
+// メインウィンドウは「最初の同期処理」として構築する。`deno desktop` は起動時に初期
+// ウィンドウを自動で開き、`Deno.serve` のハンドラへ自動遷移させる。最初の
+// `new Deno.BrowserWindow()` がその初期ウィンドウを「採用」するが、採用は初回スクリプト
+// 評価の同期実行中に構築された場合に成立する。よって `await Store.load()` などのトップ
+// レベル await より前に構築し、`bindInvoke` で invoke を登録してから serve/await へ進む。
+// これにより、自動遷移したフロントが起動直後に呼ぶ `invoke` が確実にバインド済みウィンドウ
+// へ届く（白画面＝起動時 "No callback bound for: invoke" の根本対策）。
 const win = new Deno.BrowserWindow(mainWindowOptions());
 
 /** `win.bind` ハンドラが返すべき JSON 値型（lib から導出）。 */
@@ -81,6 +60,19 @@ type BridgeReturn = Awaited<ReturnType<Parameters<typeof win.bind>[1]>>;
 
 /** 開いているビューワー窓を label で管理し、同一アーカイブの二重オープンを防ぐ。 */
 const viewerWindows = new Map<string, Deno.BrowserWindow>();
+
+/**
+ * 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
+ * app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
+ * コマンドはこの 1 インスタンスへ集約される（M3/M5 の store 系 IPC 配線）。
+ *
+ * 採用＝bind を auto-navigation より先に確定させるため、ストアの読み込みは遅延する
+ * （初回の `store_*`/`open_viewer` 時に解決し、以降は同一インスタンスを共有）。
+ */
+let storePromise: Promise<Store> | undefined;
+function loadStore(): Promise<Store> {
+  return (storePromise ??= Store.load(settingsPath(), { autoSave: true }));
+}
 
 /**
  * 配信時点で開いている全窓（メイン窓＋未クローズのビューワー窓）を返す。窓間イベント
@@ -103,7 +95,8 @@ function bindInvoke(target: Deno.BrowserWindow): void {
       (await handleInvoke(
         args,
         undefined,
-        (command, storeArgs) => handleStoreCommand(store, command, storeArgs),
+        async (command, storeArgs) =>
+          handleStoreCommand(await loadStore(), command, storeArgs),
         (command, winArgs) => handleWindowCommand(target, command, winArgs),
         (command, eventArgs) =>
           handleEventCommand(liveWindows, command, eventArgs),
@@ -121,7 +114,30 @@ function bindInvoke(target: Deno.BrowserWindow): void {
 }
 
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
+// auto-navigation より前に同期で登録し、採用したメイン窓を確実にバインドする。
 bindInvoke(win);
+
+// フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
+const server = Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  if (url.pathname === "/__log") {
+    console.error("[web]", url.searchParams.get("m"));
+    return new Response("ok");
+  }
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    const html = await Deno.readTextFile(FRONTEND_DIR + "index.html");
+    return new Response(html.replace("<head>", `<head>${ERR_FORWARDER}`), {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+  return serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true });
+});
+/**
+ * 配信元 origin。webview がバインドされるのは常に 127.0.0.1（Deno.serve が
+ * 0.0.0.0 を報告しても実際は 127.0.0.1 にバインドされる）。0.0.0.0 へ navigate すると
+ * webview が接続できず "Not Found" になるため、必ず 127.0.0.1 を使う。
+ */
+const origin = `http://127.0.0.1:${server.addr.port}`;
 
 // ビューワー窓生成バインディング。webview は `bindings.open_viewer(archivePath)` を呼ぶ。
 win.bind("open_viewer", async (...args) => {
@@ -146,7 +162,7 @@ win.bind("open_viewer", async (...args) => {
       viewerWindows.set(label, viewer);
     },
     // 保存済みビューワーサイズ（settings.json）を読み出す（Tauri 版 `getViewerSettings` と等価）。
-    loadViewerSettings: () => getViewerSettings(store),
+    loadViewerSettings: async () => getViewerSettings(await loadStore()),
   });
   return null as BridgeReturn;
 });

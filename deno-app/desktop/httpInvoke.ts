@@ -20,15 +20,18 @@ export const INVOKE_PATH = "/__invoke";
 
 /**
  * invoke を処理するディスパッチ関数。`main.ts` が `handleInvoke` を束縛して渡す。
- * 窓非依存の data/store 系コマンドのみを対象とする（window/event/menu は別 transport）。
+ * 窓非依存の data/store 系に加え、`windowLabel`（呼び出し元の窓を示す label）を受け取れば
+ * window 系コマンドも扱える（`main.ts` が label→窓を解決して `handleWindowCommand` へ委譲する）。
  */
 export type InvokeDispatch = (
   command: string,
-  args?: InvokeArgs,
+  args: InvokeArgs | undefined,
+  windowLabel: string | undefined,
 ) => Promise<unknown>;
 
 /**
- * `POST /__invoke` を処理し JSON レスポンスを返す。
+ * `POST /__invoke`（body=`{command, args?, windowLabel?}`）を処理し JSON レスポンスを返す。
+ * `windowLabel` は window 系コマンドの呼び出し元の窓を示す（data/store 系では省略可）。
  *
  * 成功時は `{ ok: true, value }`（200）、リクエスト不正は `{ ok: false, error }`（400）、
  * dispatch 中のエラーは `{ ok: false, error }`（500）。`frontend/invoke.ts` はこの形を読み、
@@ -70,8 +73,18 @@ export async function handleInvokeRequest(
     );
   }
   const args = (rawArgs ?? undefined) as InvokeArgs | undefined;
+  const rawLabel = (body as Record<string, unknown>).windowLabel;
+  if (
+    rawLabel !== undefined && rawLabel !== null && typeof rawLabel !== "string"
+  ) {
+    return Response.json(
+      { ok: false, error: "invoke request: windowLabel must be a string" },
+      { status: 400 },
+    );
+  }
+  const windowLabel = (rawLabel ?? undefined) as string | undefined;
   try {
-    const value = await dispatch(command, args);
+    const value = await dispatch(command, args, windowLabel);
     return Response.json({ ok: true, value: value ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

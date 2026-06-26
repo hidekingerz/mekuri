@@ -11,31 +11,63 @@ function invokeRequest(body: string): Request {
 }
 
 Deno.test("handleInvokeRequest dispatches command/args and returns the value", async () => {
-  const calls: Array<[string, unknown]> = [];
+  const calls: Array<[string, unknown, unknown]> = [];
   const res = await handleInvokeRequest(
     invokeRequest(
       JSON.stringify({ command: "read_directory", args: { path: "/tmp" } }),
     ),
-    (command, args) => {
-      calls.push([command, args]);
+    (command, args, windowLabel) => {
+      calls.push([command, args, windowLabel]);
       return Promise.resolve(["a.zip"]);
     },
   );
   assertEquals(res.status, 200);
   assertEquals(await res.json(), { ok: true, value: ["a.zip"] });
-  assertEquals(calls, [["read_directory", { path: "/tmp" }]]);
+  assertEquals(calls, [["read_directory", { path: "/tmp" }, undefined]]);
 });
 
-Deno.test("handleInvokeRequest normalises missing args to undefined", async () => {
-  const calls: Array<[string, unknown]> = [];
-  await handleInvokeRequest(
-    invokeRequest(JSON.stringify({ command: "ping" })),
-    (command, args) => {
-      calls.push([command, args]);
+Deno.test("handleInvokeRequest forwards windowLabel to the dispatch", async () => {
+  const calls: Array<[string, unknown, unknown]> = [];
+  const res = await handleInvokeRequest(
+    invokeRequest(
+      JSON.stringify({
+        command: "window_set_title",
+        args: { title: "x" },
+        windowLabel: "viewer-nrc8jp",
+      }),
+    ),
+    (command, args, windowLabel) => {
+      calls.push([command, args, windowLabel]);
       return Promise.resolve(null);
     },
   );
-  assertEquals(calls, [["ping", undefined]]);
+  assertEquals(res.status, 200);
+  assertEquals(calls, [["window_set_title", { title: "x" }, "viewer-nrc8jp"]]);
+});
+
+Deno.test("handleInvokeRequest rejects a non-string windowLabel with 400", async () => {
+  const res = await handleInvokeRequest(
+    invokeRequest(
+      JSON.stringify({ command: "window_show", windowLabel: 42 }),
+    ),
+    () => {
+      throw new Error("should not dispatch");
+    },
+  );
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).ok, false);
+});
+
+Deno.test("handleInvokeRequest normalises missing args to undefined", async () => {
+  const calls: Array<[string, unknown, unknown]> = [];
+  await handleInvokeRequest(
+    invokeRequest(JSON.stringify({ command: "ping" })),
+    (command, args, windowLabel) => {
+      calls.push([command, args, windowLabel]);
+      return Promise.resolve(null);
+    },
+  );
+  assertEquals(calls, [["ping", undefined, undefined]]);
 });
 
 Deno.test("handleInvokeRequest returns null value for undefined results", async () => {

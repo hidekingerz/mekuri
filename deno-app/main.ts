@@ -26,6 +26,7 @@ import {
   handleInvokeRequest,
   handleMenuCommand,
   handleWindowCommand,
+  handleWindowCommandByLabel,
   INVOKE_PATH,
   mainWindowOptions,
   menuClickScript,
@@ -33,6 +34,7 @@ import {
 } from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
 import { getViewerSettings, settingsPath, Store } from "./backend/mod.ts";
+import { MAIN_WINDOW_LABEL } from "./frontend/windowLabel.ts";
 
 /**
  * ビルド済み Vite フロント。`deno desktop` は main.ts をコンパイルして自己完結アプリへ
@@ -89,6 +91,21 @@ function liveWindows(): Deno.BrowserWindow[] {
   return all;
 }
 
+/**
+ * 窓 label から実窓を解決する（HTTP transport の `window_*` コマンド用）。webview が自窓 label
+ * （`frontend/windowLabel.ts`）をリクエストに載せ、ここでメイン窓／ビューワー窓へ引き当てる。
+ * 閉じられたビューワー窓は registry から除いて undefined を返す。
+ */
+function resolveWindow(label: string): Deno.BrowserWindow | undefined {
+  if (label === MAIN_WINDOW_LABEL) return win;
+  const viewer = viewerWindows.get(label);
+  if (!viewer || viewer.isClosed()) {
+    viewerWindows.delete(label);
+    return undefined;
+  }
+  return viewer;
+}
+
 /** invoke ブリッジを窓に登録する（メイン窓・各ビューワー窓とも IPC が必要）。 */
 function bindInvoke(target: Deno.BrowserWindow): void {
   target.bind(
@@ -126,19 +143,27 @@ const server = Deno.serve(async (req) => {
     console.error("[web]", url.searchParams.get("m"));
     return new Response("ok");
   }
-  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は窓非依存の data/store 系
+  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は data/store/window 系
   // コマンドを `fetch("/__invoke")` で叩く。`win.bind` と違い HTTP は表示窓に確実に届くため、
-  // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window/event/menu は窓固有の
-  // ため引き続き `bindings.invoke`（別 transport）で扱う（HTTP では呼び出し元の窓を特定できない）。
+  // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window 系は webview が自窓
+  // label をリクエストに載せ、`resolveWindow` が label→窓を解決して `handleWindowCommand` へ
+  // 委譲する。event/menu は未移行のため引き続き `bindings.invoke`（別 transport）で扱う。
   if (req.method === "POST" && url.pathname === INVOKE_PATH) {
     return await handleInvokeRequest(
       req,
-      (command, args) =>
+      (command, args, windowLabel) =>
         handleInvoke(
           [command, args],
           undefined,
           async (cmd, storeArgs) =>
             handleStoreCommand(await loadStore(), cmd, storeArgs),
+          (cmd, winArgs) =>
+            handleWindowCommandByLabel(
+              resolveWindow,
+              windowLabel,
+              cmd,
+              winArgs,
+            ),
         ),
     );
   }

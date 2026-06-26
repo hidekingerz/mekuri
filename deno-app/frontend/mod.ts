@@ -12,6 +12,14 @@ export {
 } from "./invoke.ts";
 
 export {
+  currentWindowLabel,
+  hashCode,
+  MAIN_WINDOW_LABEL,
+  windowLabelFromLocation,
+  type WindowLocation,
+} from "./windowLabel.ts";
+
+export {
   load,
   type StoreInvoke,
   type StoreLoadOptions,

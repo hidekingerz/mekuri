@@ -46,7 +46,7 @@ function mockFetch(
 
 // --- HTTP transport（窓非依存の data/store 系コマンド） ---
 
-Deno.test("invoke posts command/args to /__invoke and returns the value", async () => {
+Deno.test("invoke posts command/args/windowLabel to /__invoke and returns the value", async () => {
   const { fetchFn, calls } = mockFetch({ ok: true, value: ["a.zip"] });
   const result = await invoke<string[]>(
     "read_directory",
@@ -54,6 +54,7 @@ Deno.test("invoke posts command/args to /__invoke and returns the value", async 
     undefined,
     undefined,
     fetchFn,
+    "main",
   );
   assertEquals(result, ["a.zip"]);
   assertEquals(calls.length, 1);
@@ -61,13 +62,36 @@ Deno.test("invoke posts command/args to /__invoke and returns the value", async 
   assertEquals(calls[0].body, {
     command: "read_directory",
     args: { path: "/tmp" },
+    windowLabel: "main",
   });
 });
 
 Deno.test("invoke sends null args over HTTP when args are undefined", async () => {
   const { fetchFn, calls } = mockFetch({ ok: true, value: null });
-  await invoke("ping", undefined, undefined, undefined, fetchFn);
-  assertEquals(calls[0].body, { command: "ping", args: null });
+  await invoke("ping", undefined, undefined, undefined, fetchFn, "main");
+  assertEquals(calls[0].body, {
+    command: "ping",
+    args: null,
+    windowLabel: "main",
+  });
+});
+
+Deno.test("invoke routes window_* commands over HTTP with the window label", async () => {
+  const { fetchFn, calls } = mockFetch({ ok: true, value: null });
+  await invoke(
+    "window_set_title",
+    { title: "comic" },
+    undefined,
+    undefined,
+    fetchFn,
+    "viewer-nrc8jp",
+  );
+  assertEquals(calls[0].input, "/__invoke");
+  assertEquals(calls[0].body, {
+    command: "window_set_title",
+    args: { title: "comic" },
+    windowLabel: "viewer-nrc8jp",
+  });
 });
 
 Deno.test("invoke returns the HTTP value typed as T", async () => {
@@ -111,23 +135,23 @@ Deno.test("invoke throws on a non-2xx HTTP response", async () => {
   );
 });
 
-// --- bindings transport（窓固有の window/event/menu 系コマンド） ---
+// --- bindings transport（未移行の event/menu 系コマンド） ---
 
-Deno.test("invoke routes window_* commands through bindings.invoke", async () => {
+Deno.test("invoke routes event_* commands through bindings.invoke", async () => {
   const { bindings, calls } = mockBindings("done");
   const result = await invoke<string>(
-    "window_set_title",
-    { title: "x" },
+    "event_emit",
+    { event: "file-trashed" },
     () => bindings,
   );
   assertEquals(result, "done");
-  assertEquals(calls, [["window_set_title", { title: "x" }]]);
+  assertEquals(calls, [["event_emit", { event: "file-trashed" }]]);
 });
 
-Deno.test("invoke throws when bindings are not available for a window command", async () => {
+Deno.test("invoke throws when bindings are not available for a menu command", async () => {
   await assertRejects(
     () =>
-      invoke("window_show", undefined, () => {
+      invoke("menu_popup", undefined, () => {
         throw new Error("Deno Desktop bindings.invoke is not available");
       }),
     Error,
@@ -135,7 +159,7 @@ Deno.test("invoke throws when bindings are not available for a window command", 
   );
 });
 
-Deno.test("invoke retries a window command while the binding is not yet registered", async () => {
+Deno.test("invoke retries an event command while the binding is not yet registered", async () => {
   // 起動直後は main 側 bind が未登録で `No callback bound` を返す。bind 完了後に成功するはず。
   let attempts = 0;
   const delays: number[] = [];
@@ -149,7 +173,7 @@ Deno.test("invoke retries a window command while the binding is not yet register
     },
   };
   const result = await invoke<string>(
-    "window_show",
+    "event_emit",
     undefined,
     () => bindings,
     (ms) => {
@@ -163,24 +187,24 @@ Deno.test("invoke retries a window command while the binding is not yet register
   assertEquals(delays.length, 2);
 });
 
-Deno.test("invoke does not retry a window command on a real backend error", async () => {
+Deno.test("invoke does not retry a menu command on a real backend error", async () => {
   // `No callback bound` 以外のエラーは即座に伝播する（リトライしない＝待機ゼロ）。
   let attempts = 0;
   const delays: number[] = [];
   const bindings: DesktopBindings = {
     invoke(_command, _args) {
       attempts++;
-      return Promise.reject(new Error("window error"));
+      return Promise.reject(new Error("menu error"));
     },
   };
   await assertRejects(
     () =>
-      invoke("window_set_size", { width: 1 }, () => bindings, (ms) => {
+      invoke("menu_popup", { x: 1 }, () => bindings, (ms) => {
         delays.push(ms);
         return Promise.resolve();
       }),
     Error,
-    "window error",
+    "menu error",
   );
   assertEquals(attempts, 1);
   assertEquals(delays.length, 0);

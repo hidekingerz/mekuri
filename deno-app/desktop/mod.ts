@@ -35,6 +35,10 @@ export {
 } from "./menu.ts";
 export { type ControllableWindow, handleWindowCommand } from "./window.ts";
 export {
+  handleWindowCommandByLabel,
+  type WindowResolver,
+} from "./windowRegistry.ts";
+export {
   MAIN_WINDOW_TITLE,
   type MainWindowOptions,
   mainWindowOptions,

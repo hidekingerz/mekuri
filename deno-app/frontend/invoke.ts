@@ -5,17 +5,20 @@
  * `invoke(command, args)` で Rust コマンドを呼んでいた。Deno Desktop では2つの
  * transport を使い分ける:
  *
- * 1. **HTTP transport（既定・窓非依存の data/store 系）**: `fetch("/__invoke")` で
+ * 1. **HTTP transport（既定・data/store/window 系）**: `fetch("/__invoke")` で
  *    `Deno.serve` のエンドポイント（`main.ts`）を叩く。`win.bind("invoke", ...)` は
  *    起動時に framework が表示する窓に届かない（計測で確定＝白画面の真因、
- *    [m7:denidian-http-pivot]）が、HTTP は窓に依存しないため確実に届く。
- * 2. **bindings transport（窓固有の window/event/menu 系）**: `globalThis.bindings.invoke`
- *    を呼ぶ。これらは「どの窓からの呼びか」が必要で HTTP では特定しにくいため、引き続き
- *    `win.bind` 経由で扱う（窓非依存化は別タスク）。
+ *    [m7:denidian-http-pivot]）が、HTTP は窓に依存しないため確実に届く。window 系は
+ *    「どの窓からの呼びか」が要るため、自窓 label（`windowLabel.ts`）をリクエストに載せ、
+ *    main 側が label→窓を解決する。
+ * 2. **bindings transport（窓固有の event/menu 系）**: `globalThis.bindings.invoke`
+ *    を呼ぶ。これらは未だ HTTP 化していないため、引き続き `win.bind` 経由で扱う。
  *
  * いずれも `backend/` を一切 import しないブラウザセーフなコードなので、`src/api/*.ts` の
  * import 先をこれへ差し替えれば Vite ビルドを壊さずにバックエンドへ橋渡しできる。
  */
+
+import { currentWindowLabel } from "./windowLabel.ts";
 
 /** Tauri の `InvokeArgs` 相当（コマンド引数オブジェクト）。 */
 export type InvokeArgs = Record<string, unknown>;
@@ -24,14 +27,14 @@ export type InvokeArgs = Record<string, unknown>;
 const INVOKE_PATH = "/__invoke";
 
 /**
- * 窓固有のため HTTP ではなく `bindings.invoke` で扱うコマンド接頭辞。
- * window/event/menu は呼び出し元の窓を特定する必要があり、HTTP transport では表現できない。
+ * 未だ HTTP 化しておらず `bindings.invoke` で扱うコマンド接頭辞（event/menu）。
+ * window 系は HTTP（自窓 label 付き）へ移行済み。
  */
-const WINDOW_SCOPED_PREFIXES = ["window_", "event_", "menu_"] as const;
+const BINDINGS_SCOPED_PREFIXES = ["event_", "menu_"] as const;
 
-/** コマンドが窓固有（bindings transport 対象）かを判定する。 */
-function isWindowScoped(command: string): boolean {
-  return WINDOW_SCOPED_PREFIXES.some((prefix) => command.startsWith(prefix));
+/** コマンドが bindings transport 対象（event/menu）かを判定する。 */
+function isBindingsScoped(command: string): boolean {
+  return BINDINGS_SCOPED_PREFIXES.some((prefix) => command.startsWith(prefix));
 }
 
 /** `fetch` 互換の関数（テストで差し替え可能）。既定は `globalThis.fetch`。 */
@@ -55,11 +58,12 @@ async function invokeViaHttp<T>(
   command: string,
   args: InvokeArgs | undefined,
   fetchFn: FetchFn,
+  windowLabel: string,
 ): Promise<T> {
   const res = await fetchFn(INVOKE_PATH, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ command, args: args ?? null }),
+    body: JSON.stringify({ command, args: args ?? null, windowLabel }),
   });
   const payload = await res.json() as InvokeResponseBody;
   if (!res.ok || payload.ok === false) {
@@ -142,15 +146,15 @@ async function invokeViaBindings<T>(
  * Tauri 互換の `invoke`。`command` と引数オブジェクトをメインプロセスへ転送し、
  * 結果（JSON 値）を `T` として返す。
  *
- * 窓非依存の data/store 系コマンドは HTTP transport（`fetch("/__invoke")`）で、
- * 窓固有の window/event/menu 系コマンドは bindings transport（`globalThis.bindings.invoke`）で
- * 処理する。前者は `win.bind` が表示窓へ届かない白画面問題を回避するため
- * （[m7:denidian-http-pivot]）。
+ * data/store/window 系コマンドは HTTP transport（`fetch("/__invoke")`）で、未移行の
+ * event/menu 系コマンドは bindings transport（`globalThis.bindings.invoke`）で処理する。
+ * HTTP は `win.bind` が表示窓へ届かない白画面問題を回避するため（[m7:denidian-http-pivot]）。
+ * window 系は自窓 label（`windowLabel`）を載せ、main 側が label→窓を解決する。
  *
- * テスト用の注入引数（`resolver`/`delay`/`fetchFn`）があり、`src/api/*.ts` は Tauri と同じ
- * 2引数で呼べる。bindings transport では `No callback bound`（bind 未登録）で reject した場合のみ
- * 短い間隔でリトライする（bind は登録されれば外れないため安全に再試行できる）。それ以外の
- * エラーは即座に伝播する。
+ * テスト用の注入引数（`resolver`/`delay`/`fetchFn`/`windowLabel`）があり、`src/api/*.ts` は
+ * Tauri と同じ2引数で呼べる。bindings transport では `No callback bound`（bind 未登録）で
+ * reject した場合のみ短い間隔でリトライする（bind は登録されれば外れないため安全に再試行
+ * できる）。それ以外のエラーは即座に伝播する。
  */
 export async function invoke<T = unknown>(
   command: string,
@@ -158,9 +162,10 @@ export async function invoke<T = unknown>(
   resolver: BindingsResolver = defaultResolver,
   delay: Delay = defaultDelay,
   fetchFn: FetchFn = defaultFetch,
+  windowLabel: string = currentWindowLabel(),
 ): Promise<T> {
-  if (isWindowScoped(command)) {
+  if (isBindingsScoped(command)) {
     return await invokeViaBindings<T>(command, args, resolver, delay);
   }
-  return await invokeViaHttp<T>(command, args, fetchFn);
+  return await invokeViaHttp<T>(command, args, fetchFn, windowLabel);
 }

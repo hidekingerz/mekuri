@@ -1,6 +1,6 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
+import { ask } from "./api/dialog";
 import { getSiblingArchives, trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { getCurrentWindow } from "./api/window";

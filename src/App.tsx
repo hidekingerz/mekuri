@@ -1,5 +1,5 @@
-import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { open } from "./api/dialog";
 import { searchDirectory } from "./api/directory";
 import { addFavorite } from "./api/favorites";
 import { getWindowSettings, saveWindowSettings } from "./api/settings";

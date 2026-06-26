@@ -36,7 +36,14 @@ export {
   type ViewerBindingsResolver,
 } from "./viewer.ts";
 
-export { ask, type AskOptions, type ConfirmFn } from "./dialog.ts";
+export {
+  ask,
+  type AskOptions,
+  type ConfirmFn,
+  open,
+  type OpenInvokeFn,
+  type OpenOptions,
+} from "./dialog.ts";
 
 export {
   emit,

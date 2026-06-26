@@ -5,6 +5,13 @@
 
 export { naturalCompare, naturalSort } from "./sort.ts";
 export {
+  buildFolderPickerCommand,
+  type CommandRunner,
+  parsePickerOutput,
+  type PickerCommand,
+  pickFolder,
+} from "./dialog.ts";
+export {
   APP_IDENTIFIER,
   appConfigDir,
   type PathEnv,

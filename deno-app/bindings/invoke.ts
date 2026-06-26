@@ -15,6 +15,7 @@ import {
   extractNestedArchive,
   getImageBase64,
   listImages,
+  pickFolder,
   readDirectory,
   readFileBase64,
   searchDirectory,
@@ -53,6 +54,8 @@ export async function invoke<T>(
       return await readFileBase64(requireString(args, "path")) as T;
     case "trash_file":
       return await trashFile(requireString(args, "path")) as T;
+    case "open_folder":
+      return await pickFolder() as T;
     case "list_archive_images":
       return await listImages(requireString(args, "archivePath")) as T;
     case "get_archive_image":

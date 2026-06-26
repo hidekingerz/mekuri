@@ -167,6 +167,8 @@ win.bind("open_viewer", async (...args) => {
   return null as BridgeReturn;
 });
 
-// メイン窓を配信元へ明示遷移（ビューワー窓と同様）。自動遷移に依存すると "Not Found" になる。
-win.navigate(`${origin}/`);
-win.show();
+// メイン窓は明示 navigate/show しない。`deno desktop` のリファレンス実装（denidian）に倣い、
+// 採用した初期ウィンドウへのフロント表示は **framework の自動遷移**（server readiness 時に
+// `Deno.serve` ハンドラへ自動 navigate）に委ねる。明示 `win.navigate(origin)` は採用窓とは別の
+// 表示窓を生み（白画面＝表示窓が未 bind＝`No callback bound for: invoke` の原因）得るため外す。
+// `origin` はビューワー窓（明示生成＝別窓）の navigate にのみ使う（open_viewer 内で参照）。

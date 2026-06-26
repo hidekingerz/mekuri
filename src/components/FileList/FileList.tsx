@@ -1,7 +1,7 @@
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { ask } from "../../api/dialog";
 import { readDirectoryFiles, trashFile } from "../../api/directory";
+import { listen } from "../../api/event";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
 import { errorToString } from "../../utils/errorToString";

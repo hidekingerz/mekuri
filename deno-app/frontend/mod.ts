@@ -37,3 +37,12 @@ export {
 } from "./viewer.ts";
 
 export { ask, type AskOptions, type ConfirmFn } from "./dialog.ts";
+
+export {
+  emit,
+  type EmitInvokeFn,
+  type EventCallback,
+  type EventHost,
+  listen,
+  type TauriEvent,
+} from "./event.ts";

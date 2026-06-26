@@ -19,6 +19,7 @@
 
 import { serveDir } from "@std/http/file-server";
 import {
+  handleEventCommand,
   handleInvoke,
   handleWindowCommand,
   mainWindowOptions,
@@ -76,6 +77,22 @@ const win = new Deno.BrowserWindow(mainWindowOptions());
 /** `win.bind` ハンドラが返すべき JSON 値型（lib から導出）。 */
 type BridgeReturn = Awaited<ReturnType<Parameters<typeof win.bind>[1]>>;
 
+/** 開いているビューワー窓を label で管理し、同一アーカイブの二重オープンを防ぐ。 */
+const viewerWindows = new Map<string, Deno.BrowserWindow>();
+
+/**
+ * 配信時点で開いている全窓（メイン窓＋未クローズのビューワー窓）を返す。窓間イベント
+ * （`@tauri-apps/api/event` の `emit`）のブロードキャスト対象。`handleEventCommand` が
+ * 各窓へ `executeJs` で delivery スニペットを実行する。
+ */
+function liveWindows(): Deno.BrowserWindow[] {
+  const all: Deno.BrowserWindow[] = [win];
+  for (const viewer of viewerWindows.values()) {
+    if (!viewer.isClosed()) all.push(viewer);
+  }
+  return all;
+}
+
 /** invoke ブリッジを窓に登録する（メイン窓・各ビューワー窓とも IPC が必要）。 */
 function bindInvoke(target: Deno.BrowserWindow): void {
   target.bind(
@@ -86,15 +103,14 @@ function bindInvoke(target: Deno.BrowserWindow): void {
         undefined,
         (command, storeArgs) => handleStoreCommand(store, command, storeArgs),
         (command, winArgs) => handleWindowCommand(target, command, winArgs),
+        (command, eventArgs) =>
+          handleEventCommand(liveWindows, command, eventArgs),
       )) as BridgeReturn,
   );
 }
 
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
 bindInvoke(win);
-
-/** 開いているビューワー窓を label で管理し、同一アーカイブの二重オープンを防ぐ。 */
-const viewerWindows = new Map<string, Deno.BrowserWindow>();
 
 // ビューワー窓生成バインディング。webview は `bindings.open_viewer(archivePath)` を呼ぶ。
 win.bind("open_viewer", async (...args) => {

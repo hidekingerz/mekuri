@@ -6,11 +6,17 @@
  */
 
 export {
+  type EventFn,
   handleInvoke,
   type InvokeFn,
   type StoreFn,
   type WindowFn,
 } from "./bridge.ts";
+export {
+  type BroadcastTarget,
+  deliverScript,
+  handleEventCommand,
+} from "./event.ts";
 export { type ControllableWindow, handleWindowCommand } from "./window.ts";
 export {
   MAIN_WINDOW_TITLE,

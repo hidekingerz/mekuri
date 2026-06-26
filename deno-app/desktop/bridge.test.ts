@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import {
+  type EventFn,
   handleInvoke,
   type InvokeFn,
   type StoreFn,
@@ -160,6 +161,46 @@ Deno.test("handleInvoke falls back to invoke for window_* when no window fn is g
   await handleInvoke(["window_show"], fakeInvoke);
 
   assertEquals(calls, ["window_show"]);
+});
+
+Deno.test("handleInvoke routes event_* commands to the event fn", async () => {
+  const invokeCalls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    invokeCalls.push(command);
+    return Promise.resolve(null);
+  };
+  const eventCalls: Array<{ command: string; args?: Record<string, unknown> }> =
+    [];
+  const fakeEvent: EventFn = (command, args) => {
+    eventCalls.push({ command, args });
+    return Promise.resolve(null);
+  };
+
+  await handleInvoke(
+    ["event_emit", { event: "file-trashed", payload: null }],
+    fakeInvoke,
+    undefined,
+    undefined,
+    fakeEvent,
+  );
+
+  assertEquals(eventCalls, [{
+    command: "event_emit",
+    args: { event: "file-trashed", payload: null },
+  }]);
+  assertEquals(invokeCalls, []);
+});
+
+Deno.test("handleInvoke falls back to invoke for event_* when no event fn is given", async () => {
+  const calls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    calls.push(command);
+    return Promise.resolve(null);
+  };
+
+  await handleInvoke(["event_emit", { event: "x" }], fakeInvoke);
+
+  assertEquals(calls, ["event_emit"]);
 });
 
 Deno.test("handleInvoke wires through to the real bindings invoke", async () => {

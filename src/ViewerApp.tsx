@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { ask } from "./api/dialog";
 import { getSiblingArchives, trashFile } from "./api/directory";
+import { emit } from "./api/event";
 import { saveViewerSettings } from "./api/settings";
 import { getCurrentWindow } from "./api/window";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
@@ -61,7 +62,6 @@ function Viewer() {
           : null;
 
       await trashFile(currentPath);
-      const { emit } = await import("@tauri-apps/api/event");
       await emit("file-trashed");
 
       if (nextPath) {

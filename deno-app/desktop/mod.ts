@@ -9,6 +9,7 @@ export {
   type EventFn,
   handleInvoke,
   type InvokeFn,
+  type MenuFn,
   type StoreFn,
   type WindowFn,
 } from "./bridge.ts";
@@ -17,6 +18,15 @@ export {
   deliverScript,
   handleEventCommand,
 } from "./event.ts";
+export {
+  type ContextMenuWindow,
+  extractMenuClickId,
+  handleMenuCommand,
+  menuClickScript,
+  type NativeMenuItem,
+  type SerializedMenuItem,
+  toNativeMenuItems,
+} from "./menu.ts";
 export { type ControllableWindow, handleWindowCommand } from "./window.ts";
 export {
   MAIN_WINDOW_TITLE,

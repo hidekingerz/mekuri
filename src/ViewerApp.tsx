@@ -3,6 +3,7 @@ import { getArchiveImage } from "./api/archive";
 import { ask } from "./api/dialog";
 import { getSiblingArchives, trashFile } from "./api/directory";
 import { emit } from "./api/event";
+import { Menu, MenuItem, PredefinedMenuItem } from "./api/menu";
 import { saveViewerSettings } from "./api/settings";
 import { getCurrentWindow } from "./api/window";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
@@ -95,7 +96,6 @@ function Viewer() {
       const currentPath = archivePathRef.current;
       if (!currentPath) return;
 
-      const { Menu, MenuItem, PredefinedMenuItem } = await import("@tauri-apps/api/menu");
       const handle = spreadViewerRef.current;
 
       const viewModeItem = await MenuItem.new({
@@ -124,7 +124,7 @@ function Viewer() {
       const menu = await Menu.new({
         items: [viewModeItem, directionItem, separator1, trashItem, separator2, closeItem],
       });
-      await menu.popup();
+      await menu.popup({ x: e.clientX, y: e.clientY });
     }
 
     window.addEventListener("contextmenu", handleContextMenu);

@@ -3,6 +3,7 @@ import {
   type EventFn,
   handleInvoke,
   type InvokeFn,
+  type MenuFn,
   type StoreFn,
   type WindowFn,
 } from "./bridge.ts";
@@ -201,6 +202,47 @@ Deno.test("handleInvoke falls back to invoke for event_* when no event fn is giv
   await handleInvoke(["event_emit", { event: "x" }], fakeInvoke);
 
   assertEquals(calls, ["event_emit"]);
+});
+
+Deno.test("handleInvoke routes menu_* commands to the menu fn", async () => {
+  const invokeCalls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    invokeCalls.push(command);
+    return Promise.resolve(null);
+  };
+  const menuCalls: Array<{ command: string; args?: Record<string, unknown> }> =
+    [];
+  const fakeMenu: MenuFn = (command, args) => {
+    menuCalls.push({ command, args });
+    return Promise.resolve(null);
+  };
+
+  await handleInvoke(
+    ["menu_popup", { x: 1, y: 2, items: [] }],
+    fakeInvoke,
+    undefined,
+    undefined,
+    undefined,
+    fakeMenu,
+  );
+
+  assertEquals(menuCalls, [{
+    command: "menu_popup",
+    args: { x: 1, y: 2, items: [] },
+  }]);
+  assertEquals(invokeCalls, []);
+});
+
+Deno.test("handleInvoke falls back to invoke for menu_* when no menu fn is given", async () => {
+  const calls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    calls.push(command);
+    return Promise.resolve(null);
+  };
+
+  await handleInvoke(["menu_popup", { x: 0, y: 0, items: [] }], fakeInvoke);
+
+  assertEquals(calls, ["menu_popup"]);
 });
 
 Deno.test("handleInvoke wires through to the real bindings invoke", async () => {

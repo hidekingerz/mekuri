@@ -19,10 +19,13 @@
 
 import { serveDir } from "@std/http/file-server";
 import {
+  extractMenuClickId,
   handleEventCommand,
   handleInvoke,
+  handleMenuCommand,
   handleWindowCommand,
   mainWindowOptions,
+  menuClickScript,
   openViewer,
 } from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
@@ -105,8 +108,17 @@ function bindInvoke(target: Deno.BrowserWindow): void {
         (command, winArgs) => handleWindowCommand(target, command, winArgs),
         (command, eventArgs) =>
           handleEventCommand(liveWindows, command, eventArgs),
+        (command, menuArgs) => handleMenuCommand(target, command, menuArgs),
       )) as BridgeReturn,
   );
+  // ネイティブコンテキストメニューのクリックを webview の click hook へ配送する。
+  // `showContextMenu` のクリックは `contextMenuClick` イベントとしてメインへ返るため、
+  // クリックされた項目 id を `executeJs` で `globalThis.__mekuriMenuClick(id)` に渡し、
+  // webview 側（`frontend/menu.ts`）で対応する action を実行させる。
+  target.addEventListener("contextMenuClick", (ev) => {
+    const id = extractMenuClickId((ev as CustomEvent).detail);
+    if (id !== null) target.executeJs(menuClickScript(id));
+  });
 }
 
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。

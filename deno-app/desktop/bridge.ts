@@ -46,6 +46,16 @@ export type EventFn = (
   args?: InvokeArgs,
 ) => Promise<unknown>;
 
+/**
+ * menu コマンド（`menu_*`）のディスパッチ関数。アプリ層が各ウィンドウ自身を束縛した
+ * `handleMenuCommand` を渡す（`desktop/menu.ts`）。省略時は menu コマンドも通常の
+ * invoke へ委譲される（`bindings/invoke.ts` 未対応のため Unknown command）。
+ */
+export type MenuFn = (
+  command: string,
+  args?: InvokeArgs,
+) => Promise<unknown>;
+
 /** store コマンドの接頭辞。これに一致するコマンドは `storeFn` へ振り分ける。 */
 const STORE_COMMAND_PREFIX = "store_";
 
@@ -55,6 +65,9 @@ const WINDOW_COMMAND_PREFIX = "window_";
 /** event コマンドの接頭辞。これに一致するコマンドは `eventFn` へ振り分ける。 */
 const EVENT_COMMAND_PREFIX = "event_";
 
+/** menu コマンドの接頭辞。これに一致するコマンドは `menuFn` へ振り分ける。 */
+const MENU_COMMAND_PREFIX = "menu_";
+
 /**
  * `invoke` バインディング呼び出しを処理する。
  *
@@ -63,8 +76,9 @@ const EVENT_COMMAND_PREFIX = "event_";
  * `window_*` コマンドは（`windowFn` が与えられていれば）その窓を操作する window ディスパッチャへ、
  * `store_*` コマンドは（`storeFn` が与えられていれば）ステートフルな store ディスパッチャへ、
  * `event_*` コマンドは（`eventFn` が与えられていれば）全窓へ配信する event ディスパッチャへ、
- * それ以外はステートレスな `invokeFn` へ振り分ける。戻り値は JSON 値（`unknown`）で、
- * `main.ts` 側で BrowserWindow の戻り値型へキャストする。
+ * `menu_*` コマンドは（`menuFn` が与えられていれば）その窓のコンテキストメニュー
+ * ディスパッチャへ、それ以外はステートレスな `invokeFn` へ振り分ける。戻り値は JSON 値
+ * （`unknown`）で、`main.ts` 側で BrowserWindow の戻り値型へキャストする。
  */
 export async function handleInvoke(
   rawArgs: readonly unknown[],
@@ -72,6 +86,7 @@ export async function handleInvoke(
   storeFn?: StoreFn,
   windowFn?: WindowFn,
   eventFn?: EventFn,
+  menuFn?: MenuFn,
 ): Promise<unknown> {
   const command = rawArgs[0];
   if (typeof command !== "string") {
@@ -90,6 +105,9 @@ export async function handleInvoke(
   }
   if (eventFn && command.startsWith(EVENT_COMMAND_PREFIX)) {
     return await eventFn(command, normalised);
+  }
+  if (menuFn && command.startsWith(MENU_COMMAND_PREFIX)) {
+    return await menuFn(command, normalised);
   }
   return await invokeFn(command, normalised);
 }

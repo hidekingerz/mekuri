@@ -46,3 +46,17 @@ export {
   listen,
   type TauriEvent,
 } from "./event.ts";
+
+export {
+  Menu,
+  type MenuAction,
+  MenuHandle,
+  type MenuHost,
+  type MenuInvokeFn,
+  MenuItem,
+  type MenuItemNode,
+  type MenuNode,
+  type MenuPosition,
+  PredefinedMenuItem,
+  type SeparatorNode,
+} from "./menu.ts";

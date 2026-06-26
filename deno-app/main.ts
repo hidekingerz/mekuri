@@ -22,15 +22,24 @@ import { handleInvoke, mainWindowOptions, openViewer } from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
 import { DEFAULT_VIEWER_SETTINGS, settingsPath, Store } from "./backend/mod.ts";
 
-/** ビルド済み Vite フロント（リポジトリルートの `dist/`）。M6 のビルドで生成される。 */
+/**
+ * ビルド済み Vite フロント。`deno desktop` は main.ts をコンパイルして自己完結アプリへ
+ * バンドルし、`--include ../dist` で dist を埋め込む。展開後の仮想 FS はリポジトリルートを
+ * 基準に構造を保つ（main.ts は `deno-app/main.ts`、dist は `dist/`）ため、main.ts から見た
+ * 配信元は `../dist/`。`--include ../dist` とこのパスは必ずセットで合わせること。
+ */
 const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
 
 // フロント配信。webview はこの Deno.serve のアドレスへ自動遷移する。
 const server = Deno.serve((req) =>
   serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true })
 );
-/** ビューワー窓を遷移させるための配信元 origin。 */
-const origin = `http://${server.addr.hostname}:${server.addr.port}`;
+/**
+ * 配信元 origin。webview がバインドされるのは常に 127.0.0.1（Deno.serve が
+ * 0.0.0.0 を報告しても実際は 127.0.0.1 にバインドされる）。0.0.0.0 へ navigate すると
+ * webview が接続できず "Not Found" になるため、必ず 127.0.0.1 を使う。
+ */
+const origin = `http://127.0.0.1:${server.addr.port}`;
 
 // 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
 // app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
@@ -90,4 +99,6 @@ win.bind("open_viewer", async (...args) => {
   return null as BridgeReturn;
 });
 
+// メイン窓を配信元へ明示遷移（ビューワー窓と同様）。自動遷移に依存すると "Not Found" になる。
+win.navigate(`${origin}/`);
 win.show();

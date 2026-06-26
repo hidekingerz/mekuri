@@ -5,8 +5,8 @@
     "test": "deno test -A backend/ bindings/ desktop/ frontend/",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "dev": "deno desktop -A main.ts",
-    "build": "deno desktop --output Mekuri.app -A main.ts"
+    "dev": "deno desktop --include ../dist -A main.ts",
+    "build": "deno desktop --output Mekuri.app --include ../dist -A main.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1",

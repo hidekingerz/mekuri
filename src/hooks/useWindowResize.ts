@@ -1,5 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
+import { getCurrentWindow } from "../api/window";
 
 const DEBOUNCE_MS = 500;
 

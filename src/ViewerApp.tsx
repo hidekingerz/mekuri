@@ -1,9 +1,9 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { getSiblingArchives, trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
+import { getCurrentWindow } from "./api/window";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { usePdfLoader } from "./hooks/usePdfLoader";

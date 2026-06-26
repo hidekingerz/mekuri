@@ -17,3 +17,15 @@ export {
   type StoreLoadOptions,
   WebviewStore,
 } from "./store.ts";
+
+export {
+  AppWindow,
+  getCurrentWindow,
+  LogicalSize,
+  type PhysicalSize,
+  type ResizedEvent,
+  type ResizeHandler,
+  type ResizeTarget,
+  type UnlistenFn,
+  type WindowDeps,
+} from "./window.ts";

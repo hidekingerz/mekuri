@@ -1,5 +1,10 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { handleInvoke, type InvokeFn, type StoreFn } from "./bridge.ts";
+import {
+  handleInvoke,
+  type InvokeFn,
+  type StoreFn,
+  type WindowFn,
+} from "./bridge.ts";
 
 Deno.test("handleInvoke dispatches command and args to the invoke fn", async () => {
   const calls: Array<{ command: string; args?: Record<string, unknown> }> = [];
@@ -117,6 +122,44 @@ Deno.test("handleInvoke falls back to invoke for store_* when no store fn is giv
   await handleInvoke(["store_get", { key: "x" }], fakeInvoke);
 
   assertEquals(calls, ["store_get"]);
+});
+
+Deno.test("handleInvoke routes window_* commands to the window fn", async () => {
+  const invokeCalls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    invokeCalls.push(command);
+    return Promise.resolve(null);
+  };
+  const windowCalls: Array<
+    { command: string; args?: Record<string, unknown> }
+  > = [];
+  const fakeWindow: WindowFn = (command, args) => {
+    windowCalls.push({ command, args });
+    return Promise.resolve({ width: 800, height: 600 });
+  };
+
+  const result = await handleInvoke(
+    ["window_get_size"],
+    fakeInvoke,
+    undefined,
+    fakeWindow,
+  );
+
+  assertEquals(result, { width: 800, height: 600 });
+  assertEquals(windowCalls, [{ command: "window_get_size", args: undefined }]);
+  assertEquals(invokeCalls, []);
+});
+
+Deno.test("handleInvoke falls back to invoke for window_* when no window fn is given", async () => {
+  const calls: string[] = [];
+  const fakeInvoke: InvokeFn = (command) => {
+    calls.push(command);
+    return Promise.resolve(null);
+  };
+
+  await handleInvoke(["window_show"], fakeInvoke);
+
+  assertEquals(calls, ["window_show"]);
 });
 
 Deno.test("handleInvoke wires through to the real bindings invoke", async () => {

@@ -18,7 +18,12 @@
  */
 
 import { serveDir } from "@std/http/file-server";
-import { handleInvoke, mainWindowOptions, openViewer } from "./desktop/mod.ts";
+import {
+  handleInvoke,
+  handleWindowCommand,
+  mainWindowOptions,
+  openViewer,
+} from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
 import { DEFAULT_VIEWER_SETTINGS, settingsPath, Store } from "./backend/mod.ts";
 
@@ -80,6 +85,7 @@ function bindInvoke(target: Deno.BrowserWindow): void {
         args,
         undefined,
         (command, storeArgs) => handleStoreCommand(store, command, storeArgs),
+        (command, winArgs) => handleWindowCommand(target, command, winArgs),
       )) as BridgeReturn,
   );
 }

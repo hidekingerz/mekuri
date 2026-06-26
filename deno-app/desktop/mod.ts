@@ -5,7 +5,13 @@
  * で型検査される状態を保つ。
  */
 
-export { handleInvoke, type InvokeFn, type StoreFn } from "./bridge.ts";
+export {
+  handleInvoke,
+  type InvokeFn,
+  type StoreFn,
+  type WindowFn,
+} from "./bridge.ts";
+export { type ControllableWindow, handleWindowCommand } from "./window.ts";
 export {
   MAIN_WINDOW_TITLE,
   type MainWindowOptions,

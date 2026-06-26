@@ -25,7 +25,7 @@ import {
   openViewer,
 } from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
-import { DEFAULT_VIEWER_SETTINGS, settingsPath, Store } from "./backend/mod.ts";
+import { getViewerSettings, settingsPath, Store } from "./backend/mod.ts";
 
 /**
  * ビルド済み Vite フロント。`deno desktop` は main.ts をコンパイルして自己完結アプリへ
@@ -118,8 +118,8 @@ win.bind("open_viewer", async (...args) => {
       viewer.show();
       viewerWindows.set(label, viewer);
     },
-    // 保存済みサイズの読み出し（settings.json）はアプリ層配線（M5）まで既定値を使う。
-    loadViewerSettings: () => DEFAULT_VIEWER_SETTINGS,
+    // 保存済みビューワーサイズ（settings.json）を読み出す（Tauri 版 `getViewerSettings` と等価）。
+    loadViewerSettings: () => getViewerSettings(store),
   });
   return null as BridgeReturn;
 });

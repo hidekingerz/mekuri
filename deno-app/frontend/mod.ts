@@ -29,3 +29,9 @@ export {
   type UnlistenFn,
   type WindowDeps,
 } from "./window.ts";
+
+export {
+  openViewer,
+  type ViewerBindings,
+  type ViewerBindingsResolver,
+} from "./viewer.ts";

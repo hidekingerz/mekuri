@@ -30,10 +30,29 @@ import { DEFAULT_VIEWER_SETTINGS, settingsPath, Store } from "./backend/mod.ts";
  */
 const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
 
-// フロント配信。webview はこの Deno.serve のアドレスへ自動遷移する。
-const server = Deno.serve((req) =>
-  serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true })
-);
+// webview の未捕捉エラーを serve 経由でプロセス stderr（`[web]` 行）へ転送する小スクリプト。
+// GUI 無しでも実行時クラッシュ（例: 移行漏れの Tauri API が `__TAURI_INTERNALS__` を触る）を
+// 検知でき、smoke test（scripts/smoke.sh）の判定材料になる。表示には影響しない。
+const ERR_FORWARDER =
+  `<script>function L(m){try{fetch('/__log?m='+encodeURIComponent(String(m)))}catch(_){}}` +
+  `addEventListener('error',function(e){L('error: '+e.message+' '+((e.error&&e.error.stack)||''))});` +
+  `addEventListener('unhandledrejection',function(e){L('reject: '+((e.reason&&e.reason.stack)||e.reason))});</script>`;
+
+// フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
+const server = Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  if (url.pathname === "/__log") {
+    console.error("[web]", url.searchParams.get("m"));
+    return new Response("ok");
+  }
+  if (url.pathname === "/" || url.pathname === "/index.html") {
+    const html = await Deno.readTextFile(FRONTEND_DIR + "index.html");
+    return new Response(html.replace("<head>", `<head>${ERR_FORWARDER}`), {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+  return serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true });
+});
 /**
  * 配信元 origin。webview がバインドされるのは常に 127.0.0.1（Deno.serve が
  * 0.0.0.0 を報告しても実際は 127.0.0.1 にバインドされる）。0.0.0.0 へ navigate すると

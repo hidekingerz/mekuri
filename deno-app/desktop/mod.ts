@@ -15,6 +15,11 @@ export {
 } from "./bridge.ts";
 export { errorForwarderScript } from "./errorForwarder.ts";
 export {
+  handleInvokeRequest,
+  INVOKE_PATH,
+  type InvokeDispatch,
+} from "./httpInvoke.ts";
+export {
   type BroadcastTarget,
   deliverScript,
   handleEventCommand,

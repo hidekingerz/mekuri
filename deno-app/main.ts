@@ -23,8 +23,10 @@ import {
   extractMenuClickId,
   handleEventCommand,
   handleInvoke,
+  handleInvokeRequest,
   handleMenuCommand,
   handleWindowCommand,
+  INVOKE_PATH,
   mainWindowOptions,
   menuClickScript,
   openViewer,
@@ -123,6 +125,22 @@ const server = Deno.serve(async (req) => {
   if (url.pathname === "/__log") {
     console.error("[web]", url.searchParams.get("m"));
     return new Response("ok");
+  }
+  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は窓非依存の data/store 系
+  // コマンドを `fetch("/__invoke")` で叩く。`win.bind` と違い HTTP は表示窓に確実に届くため、
+  // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window/event/menu は窓固有の
+  // ため引き続き `bindings.invoke`（別 transport）で扱う（HTTP では呼び出し元の窓を特定できない）。
+  if (req.method === "POST" && url.pathname === INVOKE_PATH) {
+    return await handleInvokeRequest(
+      req,
+      (command, args) =>
+        handleInvoke(
+          [command, args],
+          undefined,
+          async (cmd, storeArgs) =>
+            handleStoreCommand(await loadStore(), cmd, storeArgs),
+        ),
+    );
   }
   if (url.pathname === "/" || url.pathname === "/index.html") {
     const html = await Deno.readTextFile(FRONTEND_DIR + "index.html");

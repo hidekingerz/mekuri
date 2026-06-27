@@ -33,6 +33,16 @@ export {
   type SerializedMenuItem,
   toNativeMenuItems,
 } from "./menu.ts";
+export {
+  EVENT_CHANNEL,
+  EVENTS_PATH,
+  formatSse,
+  handleEventsRequest,
+  MENU_CLICK_CHANNEL,
+  PushHub,
+  type PushMessage,
+  type PushSink,
+} from "./pushHub.ts";
 export { type ControllableWindow, handleWindowCommand } from "./window.ts";
 export {
   handleWindowCommandByLabel,

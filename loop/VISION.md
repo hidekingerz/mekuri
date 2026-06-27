@@ -13,8 +13,9 @@ React フロント（`src/`）は流用し、Rust バックエンド（`src-taur
 
 ## 完了の定義（Definition of Done）— 上から順に進める
 
-> 状態（2026-06-26）: M1〜M5 と M6 のビルドは完了済み（詳細は `MEMORY.md` の Done 参照）。
-> ただし **M6「アプリが実際に描画される」は未達**（起動すると白画面）で、原因の **M7 が残っている**。
+> 状態（2026-06-27）: **M1〜M7 完了**。アプリは起動・描画し、フォルダツリー/書庫一覧/ビューワー起動/
+> フォルダ選択ダイアログが動作（`deno task smoke` 緑＝メイン窓＋ビューワー窓の描画を検証）。
+> 残るは **M8（ビューワー実用化: 画像取得の効率化と右クリックメニュー）**。
 > 完了判定は cd deno-app で `deno task verify`・`deno task check-no-tauri`・`deno task smoke`、および `pnpm test`（リポジトリルート）が**すべてグリーン**であること。
 
 ### マイルストーン1: スキャフォールド
@@ -55,6 +56,27 @@ React フロント（`src/`）は流用し、Rust バックエンド（`src-taur
 - [ ] `cd deno-app && deno task check-no-tauri` がグリーン（`src/` に `@tauri-apps` の import 無し）
 - [ ] `cd deno-app && deno task smoke` がグリーン（pnpm build → desktop build → 起動 → webview 実行時エラーゼロ＝白画面解消）
 - [ ] フロントの挙動は Tauri 版と等価（機能を削らない）。`package.json` からも `@tauri-apps/*` 依存を除去
+
+### マイルストーン8: ビューワー実用化（画像取得効率 + コンテキストメニュー）
+
+起動・描画は達成済みだが、(a) 画像取得が非効率で連続ページ送り時に `Entry not found`/遅延が出る、(b) ビューワーの右クリックメニューが未動作（main→webview の push チャネルが無い）。
+
+**8a: 画像取得の効率化（`Entry not found`/遅延の解消）**
+現状 `getImageBase64` は画像1枚ごとに `Deno.readFile(archivePath)` で**書庫全体をメモリへ再読込＋再パース**している（Rust 版は `ZipArchive::by_name` で中央ディレクトリ＋該当エントリのみストリーム読み＝軽い）。大きな CBZ/CBR で連続要求が詰まる主因。
+- [ ] `deno-app/backend/archive/zip.ts`・`rar.ts` に**書庫データ/エントリのキャッシュ**を入れ、同一 `archivePath` の連続画像取得で `Deno.readFile`＋全再パースを繰り返さない（path 別 LRU、サイズ 1〜2 書庫で可。別書庫を開いたら退避）。`listImages`/`analyzeContents`/`getImageBase64` で共有
+- [ ] 並行・連続の画像取得で `Entry not found` を出さず、`Deno.readFile` が書庫あたり1回に抑えられることをスパイで検証する回帰テスト（`Deno.test`）を追加
+- [ ] `cd deno-app && deno task verify` グリーン
+
+**8b: ビューワーのコンテキストメニュー（main→webview push チャネル）**
+`menu_` だけ未だ bindings transport（不達）。メニュー表示要求（webview→main）は HTTP 化できるが、**クリック結果を main→webview へ届ける push が `win.bind`/`executeJs` と同じく採用窓に届かない**のが核心。
+- [ ] main→webview の push チャネルを実装（`Deno.serve` に SSE か long-poll を足し webview が購読。窓間イベント delivery（`handleEventCommand`）と menu クリック配送をこのチャネルへ移し、`executeJs` push は廃止）
+- [ ] `menu_` を HTTP transport へ移行（`frontend/invoke.ts` の `BINDINGS_SCOPED_PREFIXES` を空にし bindings transport を撤去）
+- [ ] ビューワーの右クリックで見開き/単ページ切替・読み方向・ゴミ箱・閉じるが動作（Tauri 版と等価）
+
+**M8 完了ゲート**
+- [ ] `deno task verify`・`deno task check-no-tauri`・`pnpm test` グリーン
+- [ ] `deno task smoke` グリーン（メイン窓＋ビューワー窓の描画。viewer フェーズ込み）
+- [ ] 連続ページ送りで `Entry not found`/白画像が出ない（8a の回帰テストで担保。体感はユーザー目視）
 
 ## スコープ外（やらないこと）
 

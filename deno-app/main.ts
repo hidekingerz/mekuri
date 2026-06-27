@@ -181,8 +181,14 @@ const server = Deno.serve(async (req) => {
       },
     );
   }
-  if (url.pathname === "/" || url.pathname === "/index.html") {
-    const html = await Deno.readTextFile(FRONTEND_DIR + "index.html");
+  // index.html / viewer.html には ERR_FORWARDER を注入し、メイン窓・ビューワー窓の
+  // どちらの webview 実行時エラーも `[web]` 行として stderr へ転送する（smoke の判定材料）。
+  if (
+    url.pathname === "/" || url.pathname === "/index.html" ||
+    url.pathname === "/viewer.html"
+  ) {
+    const file = url.pathname === "/viewer.html" ? "viewer.html" : "index.html";
+    const html = await Deno.readTextFile(FRONTEND_DIR + file);
     return new Response(html.replace("<head>", `<head>${ERR_FORWARDER}`), {
       headers: { "content-type": "text/html; charset=utf-8" },
     });

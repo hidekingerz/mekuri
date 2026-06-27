@@ -127,7 +127,9 @@ function Viewer() {
       const menu = await Menu.new({
         items: [viewModeItem, directionItem, separator1, trashItem, separator2, closeItem],
       });
-      await menu.popup({ x: e.clientX, y: e.clientY });
+      // showContextMenu は macOS Cocoa 座標系（原点 左下・Y は上方向）で解釈するため、
+      // web の clientY（上→下）を Y 反転（innerHeight - clientY）して渡す。
+      await menu.popup({ x: e.clientX, y: window.innerHeight - e.clientY });
     }
 
     window.addEventListener("contextmenu", handleContextMenu);

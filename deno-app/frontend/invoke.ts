@@ -11,8 +11,9 @@
  *    [m7:denidian-http-pivot]）が、HTTP は窓に依存しないため確実に届く。window 系は
  *    「どの窓からの呼びか」が要るため、自窓 label（`windowLabel.ts`）をリクエストに載せ、
  *    main 側が label→窓を解決する。
- * 2. **bindings transport（窓固有の event/menu 系）**: `globalThis.bindings.invoke`
- *    を呼ぶ。これらは未だ HTTP 化していないため、引き続き `win.bind` 経由で扱う。
+ * 2. **bindings transport（窓固有の menu 系）**: `globalThis.bindings.invoke`
+ *    を呼ぶ。menu は未だ HTTP 化していないため、引き続き `win.bind` 経由で扱う。
+ *    event は全窓ブロードキャストで「どの窓からの呼びか」が不要なため HTTP へ移行済み。
  *
  * いずれも `backend/` を一切 import しないブラウザセーフなコードなので、`src/api/*.ts` の
  * import 先をこれへ差し替えれば Vite ビルドを壊さずにバックエンドへ橋渡しできる。
@@ -27,12 +28,12 @@ export type InvokeArgs = Record<string, unknown>;
 const INVOKE_PATH = "/__invoke";
 
 /**
- * 未だ HTTP 化しておらず `bindings.invoke` で扱うコマンド接頭辞（event/menu）。
- * window 系は HTTP（自窓 label 付き）へ移行済み。
+ * 未だ HTTP 化しておらず `bindings.invoke` で扱うコマンド接頭辞（menu のみ）。
+ * window/event 系は HTTP へ移行済み（window は自窓 label 付き、event は全窓ブロードキャスト）。
  */
-const BINDINGS_SCOPED_PREFIXES = ["event_", "menu_"] as const;
+const BINDINGS_SCOPED_PREFIXES = ["menu_"] as const;
 
-/** コマンドが bindings transport 対象（event/menu）かを判定する。 */
+/** コマンドが bindings transport 対象（menu）かを判定する。 */
 function isBindingsScoped(command: string): boolean {
   return BINDINGS_SCOPED_PREFIXES.some((prefix) => command.startsWith(prefix));
 }
@@ -146,8 +147,8 @@ async function invokeViaBindings<T>(
  * Tauri 互換の `invoke`。`command` と引数オブジェクトをメインプロセスへ転送し、
  * 結果（JSON 値）を `T` として返す。
  *
- * data/store/window 系コマンドは HTTP transport（`fetch("/__invoke")`）で、未移行の
- * event/menu 系コマンドは bindings transport（`globalThis.bindings.invoke`）で処理する。
+ * data/store/window/event 系コマンドは HTTP transport（`fetch("/__invoke")`）で、未移行の
+ * menu 系コマンドは bindings transport（`globalThis.bindings.invoke`）で処理する。
  * HTTP は `win.bind` が表示窓へ届かない白画面問題を回避するため（[m7:denidian-http-pivot]）。
  * window 系は自窓 label（`windowLabel`）を載せ、main 側が label→窓を解決する。
  *

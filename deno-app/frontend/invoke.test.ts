@@ -94,6 +94,24 @@ Deno.test("invoke routes window_* commands over HTTP with the window label", asy
   });
 });
 
+Deno.test("invoke routes event_* commands over HTTP", async () => {
+  const { fetchFn, calls } = mockFetch({ ok: true, value: null });
+  await invoke(
+    "event_emit",
+    { event: "file-trashed", payload: null },
+    undefined,
+    undefined,
+    fetchFn,
+    "main",
+  );
+  assertEquals(calls[0].input, "/__invoke");
+  assertEquals(calls[0].body, {
+    command: "event_emit",
+    args: { event: "file-trashed", payload: null },
+    windowLabel: "main",
+  });
+});
+
 Deno.test("invoke returns the HTTP value typed as T", async () => {
   const { fetchFn } = mockFetch({ ok: true, value: { type: "Empty" } });
   const contents = await invoke<{ type: string }>(
@@ -135,17 +153,17 @@ Deno.test("invoke throws on a non-2xx HTTP response", async () => {
   );
 });
 
-// --- bindings transport（未移行の event/menu 系コマンド） ---
+// --- bindings transport（未移行の menu 系コマンド） ---
 
-Deno.test("invoke routes event_* commands through bindings.invoke", async () => {
+Deno.test("invoke routes menu_* commands through bindings.invoke", async () => {
   const { bindings, calls } = mockBindings("done");
   const result = await invoke<string>(
-    "event_emit",
-    { event: "file-trashed" },
+    "menu_popup",
+    { x: 1, y: 2 },
     () => bindings,
   );
   assertEquals(result, "done");
-  assertEquals(calls, [["event_emit", { event: "file-trashed" }]]);
+  assertEquals(calls, [["menu_popup", { x: 1, y: 2 }]]);
 });
 
 Deno.test("invoke throws when bindings are not available for a menu command", async () => {
@@ -159,7 +177,7 @@ Deno.test("invoke throws when bindings are not available for a menu command", as
   );
 });
 
-Deno.test("invoke retries an event command while the binding is not yet registered", async () => {
+Deno.test("invoke retries a menu command while the binding is not yet registered", async () => {
   // 起動直後は main 側 bind が未登録で `No callback bound` を返す。bind 完了後に成功するはず。
   let attempts = 0;
   const delays: number[] = [];
@@ -173,7 +191,7 @@ Deno.test("invoke retries an event command while the binding is not yet register
     },
   };
   const result = await invoke<string>(
-    "event_emit",
+    "menu_popup",
     undefined,
     () => bindings,
     (ms) => {

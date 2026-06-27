@@ -143,11 +143,12 @@ const server = Deno.serve(async (req) => {
     console.error("[web]", url.searchParams.get("m"));
     return new Response("ok");
   }
-  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は data/store/window 系
+  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は data/store/window/event 系
   // コマンドを `fetch("/__invoke")` で叩く。`win.bind` と違い HTTP は表示窓に確実に届くため、
   // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window 系は webview が自窓
   // label をリクエストに載せ、`resolveWindow` が label→窓を解決して `handleWindowCommand` へ
-  // 委譲する。event/menu は未移行のため引き続き `bindings.invoke`（別 transport）で扱う。
+  // 委譲する。event 系は全窓ブロードキャスト（`handleEventCommand(liveWindows, ...)`）なので
+  // label 不要。menu は未移行のため引き続き `bindings.invoke`（別 transport）で扱う。
   if (req.method === "POST" && url.pathname === INVOKE_PATH) {
     return await handleInvokeRequest(
       req,
@@ -164,6 +165,7 @@ const server = Deno.serve(async (req) => {
               cmd,
               winArgs,
             ),
+          (cmd, eventArgs) => handleEventCommand(liveWindows, cmd, eventArgs),
         ),
     );
   }

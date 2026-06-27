@@ -38,11 +38,7 @@ export {
   type WindowDeps,
 } from "./window.ts";
 
-export {
-  openViewer,
-  type ViewerBindings,
-  type ViewerBindingsResolver,
-} from "./viewer.ts";
+export { openViewer, type OpenViewerInvokeFn } from "./viewer.ts";
 
 export {
   ask,

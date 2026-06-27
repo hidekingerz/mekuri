@@ -152,8 +152,19 @@ const server = Deno.serve(async (req) => {
   if (req.method === "POST" && url.pathname === INVOKE_PATH) {
     return await handleInvokeRequest(
       req,
-      (command, args, windowLabel) =>
-        handleInvoke(
+      async (command, args, windowLabel) => {
+        // ビューワー窓生成。`open_viewer` は invoke ディスパッチ外（窓生成＝メイン操作）なので
+        // ここで直接処理する。HTTP transport なので表示窓から確実に届く（`win.bind` だと届かず
+        // ダブルクリックしても窓が開かない）。
+        if (command === "open_viewer") {
+          const archivePath = (args as Record<string, unknown> | null)
+            ?.archivePath;
+          if (typeof archivePath !== "string") {
+            throw new Error("open_viewer: archivePath must be a string");
+          }
+          return await doOpenViewer(archivePath);
+        }
+        return await handleInvoke(
           [command, args],
           undefined,
           async (cmd, storeArgs) =>
@@ -166,7 +177,8 @@ const server = Deno.serve(async (req) => {
               winArgs,
             ),
           (cmd, eventArgs) => handleEventCommand(liveWindows, cmd, eventArgs),
-        ),
+        );
+      },
     );
   }
   if (url.pathname === "/" || url.pathname === "/index.html") {
@@ -184,12 +196,9 @@ const server = Deno.serve(async (req) => {
  */
 const origin = `http://127.0.0.1:${server.addr.port}`;
 
-// ビューワー窓生成バインディング。webview は `bindings.open_viewer(archivePath)` を呼ぶ。
-win.bind("open_viewer", async (...args) => {
-  const archivePath = args[0];
-  if (typeof archivePath !== "string") {
-    throw new Error("open_viewer: archivePath must be a string");
-  }
+// ビューワー窓生成。HTTP invoke transport（`/__invoke` の `open_viewer` コマンド）から呼ばれる。
+// `win.bind` だと採用窓に届かず窓が開かないため、HTTP 経路に乗せている（[m7:open-viewer-http]）。
+async function doOpenViewer(archivePath: string): Promise<null> {
   await openViewer(archivePath, {
     findWindow: (label) => {
       const existing = viewerWindows.get(label);
@@ -209,8 +218,8 @@ win.bind("open_viewer", async (...args) => {
     // 保存済みビューワーサイズ（settings.json）を読み出す（Tauri 版 `getViewerSettings` と等価）。
     loadViewerSettings: async () => getViewerSettings(await loadStore()),
   });
-  return null as BridgeReturn;
-});
+  return null;
+}
 
 // メイン窓は明示 navigate/show しない。`deno desktop` のリファレンス実装（denidian）に倣い、
 // 採用した初期ウィンドウへのフロント表示は **framework の自動遷移**（server readiness 時に

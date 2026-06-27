@@ -4,6 +4,7 @@ import {
   deliverMenuClick,
   extractMenuClickId,
   handleMenuCommand,
+  handleMenuCommandByLabel,
   type NativeMenuItem,
   type SerializedMenuItem,
   toNativeMenuItems,
@@ -124,5 +125,56 @@ Deno.test("handleMenuCommand rejects a non-array items argument", async () => {
       }),
     Error,
     "must be an array",
+  );
+});
+
+Deno.test("handleMenuCommandByLabel resolves the window and shows the menu", async () => {
+  const calls: Array<{ x: number; y: number; items: NativeMenuItem[] }> = [];
+  const win: ContextMenuWindow = {
+    showContextMenu: (x, y, items) => {
+      calls.push({ x, y, items });
+    },
+  };
+
+  const result = await handleMenuCommandByLabel(
+    (label) => (label === "viewer-1" ? win : undefined),
+    "viewer-1",
+    "menu_popup",
+    { x: 5, y: 6, items: [{ type: "item", id: "a", label: "Open" }] },
+  );
+
+  assertEquals(result, null);
+  assertEquals(calls, [{
+    x: 5,
+    y: 6,
+    items: [{ item: { label: "Open", id: "a", enabled: true } }],
+  }]);
+});
+
+Deno.test("handleMenuCommandByLabel rejects a missing window label", async () => {
+  await assertRejects(
+    () =>
+      handleMenuCommandByLabel(
+        () => ({ showContextMenu: () => {} }),
+        undefined,
+        "menu_popup",
+        { x: 0, y: 0, items: [] },
+      ),
+    Error,
+    "windowLabel is required",
+  );
+});
+
+Deno.test("handleMenuCommandByLabel rejects when no window matches the label", async () => {
+  await assertRejects(
+    () =>
+      handleMenuCommandByLabel(
+        () => undefined,
+        "viewer-gone",
+        "menu_popup",
+        { x: 0, y: 0, items: [] },
+      ),
+    Error,
+    "no window for label 'viewer-gone'",
   );
 });

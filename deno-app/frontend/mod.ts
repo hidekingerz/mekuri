@@ -4,12 +4,7 @@
  * 引数はそのまま Deno Desktop の IPC ブリッジ経由でバックエンドへ届く。
  */
 
-export {
-  type BindingsResolver,
-  type DesktopBindings,
-  invoke,
-  type InvokeArgs,
-} from "./invoke.ts";
+export { type FetchFn, invoke, type InvokeArgs } from "./invoke.ts";
 
 export {
   currentWindowLabel,

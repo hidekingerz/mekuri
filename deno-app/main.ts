@@ -27,6 +27,7 @@ import {
   handleInvoke,
   handleInvokeRequest,
   handleMenuCommand,
+  handleMenuCommandByLabel,
   handleWindowCommand,
   handleWindowCommandByLabel,
   INVOKE_PATH,
@@ -149,7 +150,8 @@ const server = Deno.serve(async (req) => {
   // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window 系は webview が自窓
   // label をリクエストに載せ、`resolveWindow` が label→窓を解決して `handleWindowCommand` へ
   // 委譲する。event 系は全窓ブロードキャスト（`handleEventCommand(pushHub, ...)`＝SSE push）なので
-  // label 不要。menu は未移行のため引き続き `bindings.invoke`（別 transport）で扱う。
+  // label 不要。menu 系（`menu_popup`）も window と同様 webview が自窓 label を載せ、
+  // `resolveWindow` が label→窓を解決して `handleMenuCommandByLabel` へ委譲する（HTTP へ移行済み）。
   if (req.method === "POST" && url.pathname === INVOKE_PATH) {
     return await handleInvokeRequest(
       req,
@@ -178,6 +180,13 @@ const server = Deno.serve(async (req) => {
               winArgs,
             ),
           (cmd, eventArgs) => handleEventCommand(pushHub, cmd, eventArgs),
+          (cmd, menuArgs) =>
+            handleMenuCommandByLabel(
+              resolveWindow,
+              windowLabel,
+              cmd,
+              menuArgs,
+            ),
         );
       },
     );

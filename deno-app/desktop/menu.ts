@@ -128,3 +128,34 @@ export async function handleMenuCommand(
   win.showContextMenu(x, y, toNativeMenuItems(items as SerializedMenuItem[]));
   return await null;
 }
+
+/** label から実窓（`ContextMenuWindow`）を解決する関数。`main.ts` が registry を束縛して渡す。 */
+export type ContextMenuWindowResolver = (
+  label: string,
+) => ContextMenuWindow | undefined;
+
+/**
+ * HTTP transport（`/__invoke`）で届く `menu_*` コマンドを、呼び出し元の窓 label から実窓へ
+ * 解決して実行する（`windowRegistry.ts` の `handleWindowCommandByLabel` と同型）。
+ *
+ * コンテキストメニュー表示（`menu_popup`）は呼び出した窓の上に出す必要があるため、frontend が
+ * 自窓 label をリクエストに載せ（`frontend/windowLabel.ts`）、main 側が label→窓を解決する。
+ * label が欠落、または該当窓が見つからない場合はエラーにする。
+ */
+export async function handleMenuCommandByLabel(
+  resolve: ContextMenuWindowResolver,
+  windowLabel: string | undefined,
+  command: string,
+  args?: InvokeArgs,
+): Promise<unknown> {
+  if (typeof windowLabel !== "string" || windowLabel.length === 0) {
+    throw new Error(`menu command '${command}': windowLabel is required`);
+  }
+  const win = resolve(windowLabel);
+  if (!win) {
+    throw new Error(
+      `menu command '${command}': no window for label '${windowLabel}'`,
+    );
+  }
+  return await handleMenuCommand(win, command, args);
+}

@@ -1,13 +1,14 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import {
   type ContextMenuWindow,
+  deliverMenuClick,
   extractMenuClickId,
   handleMenuCommand,
-  menuClickScript,
   type NativeMenuItem,
   type SerializedMenuItem,
   toNativeMenuItems,
 } from "./menu.ts";
+import { MENU_CLICK_CHANNEL, type PushMessage } from "./pushHub.ts";
 
 Deno.test("toNativeMenuItems converts items and separators", () => {
   const input: SerializedMenuItem[] = [
@@ -36,11 +37,35 @@ Deno.test("extractMenuClickId returns null for unusable detail", () => {
   assertEquals(extractMenuClickId({ other: "x" }), null);
 });
 
-Deno.test("menuClickScript embeds the id and guards the hook", () => {
-  assertEquals(
-    menuClickScript("item-1"),
-    'globalThis.__mekuriMenuClick&&globalThis.__mekuriMenuClick("item-1")',
-  );
+Deno.test("deliverMenuClick sends the click to the target window", () => {
+  const sent: Array<{ windowLabel: string; message: PushMessage }> = [];
+  const sender = {
+    sendTo: (windowLabel: string, message: PushMessage) => {
+      sent.push({ windowLabel, message });
+    },
+  };
+
+  const id = deliverMenuClick(sender, "viewer-1", { id: "item-1" });
+
+  assertEquals(id, "item-1");
+  assertEquals(sent, [{
+    windowLabel: "viewer-1",
+    message: { channel: MENU_CLICK_CHANNEL, data: { id: "item-1" } },
+  }]);
+});
+
+Deno.test("deliverMenuClick ignores an unusable detail", () => {
+  const sent: PushMessage[] = [];
+  const sender = {
+    sendTo: (_windowLabel: string, message: PushMessage) => {
+      sent.push(message);
+    },
+  };
+
+  const id = deliverMenuClick(sender, "main", { other: "x" });
+
+  assertEquals(id, null);
+  assertEquals(sent, []);
 });
 
 Deno.test("handleMenuCommand shows the native context menu", async () => {

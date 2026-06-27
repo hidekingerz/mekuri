@@ -22,9 +22,10 @@ export {
 export { type EventBroadcaster, handleEventCommand } from "./event.ts";
 export {
   type ContextMenuWindow,
+  deliverMenuClick,
   extractMenuClickId,
   handleMenuCommand,
-  menuClickScript,
+  type MenuClickSender,
   type NativeMenuItem,
   type SerializedMenuItem,
   toNativeMenuItems,

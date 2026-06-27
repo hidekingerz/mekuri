@@ -8,8 +8,10 @@
  * Deno Desktop ではコンテキストメニュー表示はメインプロセスの
  * `BrowserWindow.showContextMenu(x, y, items)`（canary 2.9.0）で行う。クリックは
  * メインプロセスへ `contextMenuClick` イベントとして返るため、クリックされた項目 id を
- * webview の click hook（`frontend/menu.ts` の `globalThis.__mekuriMenuClick`）へ
- * `executeJs` で配送し、対応する `action` を webview 側で実行する。
+ * webview の click hook（`frontend/menu.ts` の `globalThis.__mekuriMenuClick`）へ配送し、
+ * 対応する `action` を webview 側で実行する。配送は `PushHub` の SSE チャネル
+ * （`MENU_CLICK_CHANNEL`）で特定窓へ送る（`executeJs` push は framework の採用窓に
+ * 届かないため＝白画面と同じ真因、[m8b:pushhub]）。
  *
  * 本ファイルは `ContextMenuWindow`（`Deno.BrowserWindow` のサブセット）を注入する
  * 純粋関数群で、`Deno.BrowserWindow` には依存しない（`main.ts` が実窓を注入する）ため
@@ -17,6 +19,7 @@
  */
 
 import type { InvokeArgs } from "../bindings/mod.ts";
+import { MENU_CLICK_CHANNEL, type PushMessage } from "./pushHub.ts";
 
 /**
  * webview から `invoke("menu_popup", ...)` で届く各メニュー項目のシリアライズ形。
@@ -73,13 +76,31 @@ export function extractMenuClickId(detail: unknown): string | null {
 }
 
 /**
- * クリックされた項目 id を webview の click hook（`globalThis.__mekuriMenuClick`）へ
- * 渡す JS スニペットを組み立てる。hook 未設置でも安全に no-op になるよう存在チェック付き。
+ * コンテキストメニューのクリック結果を main → webview の push チャネルへ送れる送信器。
+ * `PushHub` が構造的にこれを満たす（`main.ts` が実 hub を注入する）。
  */
-export function menuClickScript(id: string): string {
-  return `globalThis.__mekuriMenuClick&&globalThis.__mekuriMenuClick(${
-    JSON.stringify(id)
-  })`;
+export interface MenuClickSender {
+  sendTo(windowLabel: string, message: PushMessage): void;
+}
+
+/**
+ * `contextMenuClick` イベントの detail からクリック id を取り出し、対象窓（`windowLabel`）へ
+ * `MENU_CLICK_CHANNEL` の push メッセージとして配送する。id を取り出せなければ送らない。
+ * 配送した（または無視した）id を返す（テスト・診断用）。
+ *
+ * webview 側は SSE 購読 shim（`frontend`）でこのチャネルを受け、`globalThis.__mekuriMenuClick`
+ * へ渡して対応する action を実行する。`executeJs` push は採用窓に届かないため使わない。
+ */
+export function deliverMenuClick(
+  sender: MenuClickSender,
+  windowLabel: string,
+  detail: unknown,
+): string | null {
+  const id = extractMenuClickId(detail);
+  if (id !== null) {
+    sender.sendTo(windowLabel, { channel: MENU_CLICK_CHANNEL, data: { id } });
+  }
+  return id;
 }
 
 /**

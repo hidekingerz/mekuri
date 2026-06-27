@@ -19,9 +19,9 @@
 
 import { serveDir } from "@std/http/file-server";
 import {
+  deliverMenuClick,
   errorForwarderScript,
   EVENTS_PATH,
-  extractMenuClickId,
   handleEventCommand,
   handleEventsRequest,
   handleInvoke,
@@ -31,7 +31,6 @@ import {
   handleWindowCommandByLabel,
   INVOKE_PATH,
   mainWindowOptions,
-  menuClickScript,
   openViewer,
   PushHub,
 } from "./desktop/mod.ts";
@@ -105,7 +104,7 @@ function resolveWindow(label: string): Deno.BrowserWindow | undefined {
 }
 
 /** invoke ブリッジを窓に登録する（メイン窓・各ビューワー窓とも IPC が必要）。 */
-function bindInvoke(target: Deno.BrowserWindow): void {
+function bindInvoke(target: Deno.BrowserWindow, windowLabel: string): void {
   target.bind(
     "invoke",
     async (...args) =>
@@ -121,17 +120,17 @@ function bindInvoke(target: Deno.BrowserWindow): void {
   );
   // ネイティブコンテキストメニューのクリックを webview の click hook へ配送する。
   // `showContextMenu` のクリックは `contextMenuClick` イベントとしてメインへ返るため、
-  // クリックされた項目 id を `executeJs` で `globalThis.__mekuriMenuClick(id)` に渡し、
-  // webview 側（`frontend/menu.ts`）で対応する action を実行させる。
+  // クリックされた項目 id を push チャネル（SSE）でこの窓へ送り、webview 側
+  // （`frontend/menu.ts` の `globalThis.__mekuriMenuClick`）で対応する action を実行させる。
+  // `executeJs` push は framework の採用窓に届かないため SSE で配送する（[m8b:pushhub]）。
   target.addEventListener("contextMenuClick", (ev) => {
-    const id = extractMenuClickId((ev as CustomEvent).detail);
-    if (id !== null) target.executeJs(menuClickScript(id));
+    deliverMenuClick(pushHub, windowLabel, (ev as CustomEvent).detail);
   });
 }
 
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
 // auto-navigation より前に同期で登録し、採用したメイン窓を確実にバインドする。
-bindInvoke(win);
+bindInvoke(win, MAIN_WINDOW_LABEL);
 
 // フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
 const server = Deno.serve(async (req) => {
@@ -218,7 +217,7 @@ async function doOpenViewer(archivePath: string): Promise<null> {
     },
     createWindow: (label, options, url) => {
       const viewer = new Deno.BrowserWindow(options);
-      bindInvoke(viewer);
+      bindInvoke(viewer, label);
       viewer.navigate(`${origin}/${url}`);
       viewer.show();
       viewerWindows.set(label, viewer);

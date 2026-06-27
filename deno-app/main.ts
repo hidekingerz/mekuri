@@ -20,8 +20,10 @@
 import { serveDir } from "@std/http/file-server";
 import {
   errorForwarderScript,
+  EVENTS_PATH,
   extractMenuClickId,
   handleEventCommand,
+  handleEventsRequest,
   handleInvoke,
   handleInvokeRequest,
   handleMenuCommand,
@@ -31,6 +33,7 @@ import {
   mainWindowOptions,
   menuClickScript,
   openViewer,
+  PushHub,
 } from "./desktop/mod.ts";
 import { handleStoreCommand } from "./bindings/mod.ts";
 import { getViewerSettings, settingsPath, Store } from "./backend/mod.ts";
@@ -66,6 +69,14 @@ type BridgeReturn = Awaited<ReturnType<Parameters<typeof win.bind>[1]>>;
 const viewerWindows = new Map<string, Deno.BrowserWindow>();
 
 /**
+ * main → webview の push チャネル（SSE）。窓間イベント（`event_emit` のブロードキャスト）と
+ * 将来の menu クリック配送をここへ流す。`win.executeJs` push は framework の採用窓に届かない
+ * （白画面の真因）が、`Deno.serve` 上の SSE は窓に依存せず確実に届く（[m8b:pushhub]）。
+ * webview は `GET /__events?windowLabel=<label>` で購読する（購読 shim は `frontend`）。
+ */
+const pushHub = new PushHub();
+
+/**
  * 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
  * app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
  * コマンドはこの 1 インスタンスへ集約される（M3/M5 の store 系 IPC 配線）。
@@ -76,19 +87,6 @@ const viewerWindows = new Map<string, Deno.BrowserWindow>();
 let storePromise: Promise<Store> | undefined;
 function loadStore(): Promise<Store> {
   return (storePromise ??= Store.load(settingsPath(), { autoSave: true }));
-}
-
-/**
- * 配信時点で開いている全窓（メイン窓＋未クローズのビューワー窓）を返す。窓間イベント
- * （`@tauri-apps/api/event` の `emit`）のブロードキャスト対象。`handleEventCommand` が
- * 各窓へ `executeJs` で delivery スニペットを実行する。
- */
-function liveWindows(): Deno.BrowserWindow[] {
-  const all: Deno.BrowserWindow[] = [win];
-  for (const viewer of viewerWindows.values()) {
-    if (!viewer.isClosed()) all.push(viewer);
-  }
-  return all;
 }
 
 /**
@@ -117,8 +115,7 @@ function bindInvoke(target: Deno.BrowserWindow): void {
         async (command, storeArgs) =>
           handleStoreCommand(await loadStore(), command, storeArgs),
         (command, winArgs) => handleWindowCommand(target, command, winArgs),
-        (command, eventArgs) =>
-          handleEventCommand(liveWindows, command, eventArgs),
+        (command, eventArgs) => handleEventCommand(pushHub, command, eventArgs),
         (command, menuArgs) => handleMenuCommand(target, command, menuArgs),
       )) as BridgeReturn,
   );
@@ -143,11 +140,16 @@ const server = Deno.serve(async (req) => {
     console.error("[web]", url.searchParams.get("m"));
     return new Response("ok");
   }
+  // main → webview の push チャネル（SSE）。webview が自窓 label を載せて購読し、窓間イベント
+  // （`event_emit` のブロードキャスト）を受け取る。`win.executeJs` push と違い表示窓へ確実に届く。
+  if (req.method === "GET" && url.pathname === EVENTS_PATH) {
+    return handleEventsRequest(req, pushHub);
+  }
   // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は data/store/window/event 系
   // コマンドを `fetch("/__invoke")` で叩く。`win.bind` と違い HTTP は表示窓に確実に届くため、
   // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window 系は webview が自窓
   // label をリクエストに載せ、`resolveWindow` が label→窓を解決して `handleWindowCommand` へ
-  // 委譲する。event 系は全窓ブロードキャスト（`handleEventCommand(liveWindows, ...)`）なので
+  // 委譲する。event 系は全窓ブロードキャスト（`handleEventCommand(pushHub, ...)`＝SSE push）なので
   // label 不要。menu は未移行のため引き続き `bindings.invoke`（別 transport）で扱う。
   if (req.method === "POST" && url.pathname === INVOKE_PATH) {
     return await handleInvokeRequest(
@@ -176,7 +178,7 @@ const server = Deno.serve(async (req) => {
               cmd,
               winArgs,
             ),
-          (cmd, eventArgs) => handleEventCommand(liveWindows, cmd, eventArgs),
+          (cmd, eventArgs) => handleEventCommand(pushHub, cmd, eventArgs),
         );
       },
     );

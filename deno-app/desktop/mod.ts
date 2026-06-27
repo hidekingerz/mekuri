@@ -19,11 +19,7 @@ export {
   INVOKE_PATH,
   type InvokeDispatch,
 } from "./httpInvoke.ts";
-export {
-  type BroadcastTarget,
-  deliverScript,
-  handleEventCommand,
-} from "./event.ts";
+export { type EventBroadcaster, handleEventCommand } from "./event.ts";
 export {
   type ContextMenuWindow,
   extractMenuClickId,

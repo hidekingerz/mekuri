@@ -1,92 +1,63 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import {
-  type BroadcastTarget,
-  deliverScript,
-  handleEventCommand,
-} from "./event.ts";
+import { type EventBroadcaster, handleEventCommand } from "./event.ts";
+import { EVENT_CHANNEL, PushHub, type PushMessage } from "./pushHub.ts";
 
-function fakeWindows(sink: string[][]): {
-  windows: () => BroadcastTarget[];
-  add: () => void;
-} {
-  const targets: BroadcastTarget[] = [];
-  const add = () => {
-    const calls: string[] = [];
-    sink.push(calls);
-    targets.push({
-      executeJs: (code) => {
-        calls.push(code);
-        return undefined;
-      },
-    });
-  };
-  return { windows: () => targets, add };
+function recordingHub(): { hub: EventBroadcaster; messages: PushMessage[] } {
+  const messages: PushMessage[] = [];
+  return { hub: { broadcast: (m) => messages.push(m) }, messages };
 }
 
-Deno.test("deliverScript embeds the event and payload as JSON", () => {
-  assertEquals(
-    deliverScript("file-trashed", null),
-    'globalThis.__mekuriDeliverEvent&&globalThis.__mekuriDeliverEvent("file-trashed",null)',
-  );
-  assertEquals(
-    deliverScript("ping", { n: 1 }),
-    'globalThis.__mekuriDeliverEvent&&globalThis.__mekuriDeliverEvent("ping",{"n":1})',
-  );
-});
+Deno.test("handleEventCommand broadcasts event_emit on the event channel", async () => {
+  const { hub, messages } = recordingHub();
 
-Deno.test("handleEventCommand broadcasts event_emit to every window", async () => {
-  const sink: string[][] = [];
-  const { windows, add } = fakeWindows(sink);
-  add();
-  add();
-
-  const result = await handleEventCommand(windows, "event_emit", {
+  const result = await handleEventCommand(hub, "event_emit", {
     event: "file-trashed",
   });
 
   assertEquals(result, null);
-  const expected = deliverScript("file-trashed", null);
-  assertEquals(sink, [[expected], [expected]]);
+  assertEquals(messages, [
+    { channel: EVENT_CHANNEL, data: { event: "file-trashed", payload: null } },
+  ]);
 });
 
 Deno.test("handleEventCommand forwards a provided payload", async () => {
-  const sink: string[][] = [];
-  const { windows, add } = fakeWindows(sink);
-  add();
+  const { hub, messages } = recordingHub();
 
-  await handleEventCommand(windows, "event_emit", {
+  await handleEventCommand(hub, "event_emit", {
     event: "ping",
     payload: { n: 2 },
   });
 
-  assertEquals(sink, [[deliverScript("ping", { n: 2 })]]);
+  assertEquals(messages, [
+    { channel: EVENT_CHANNEL, data: { event: "ping", payload: { n: 2 } } },
+  ]);
 });
 
-Deno.test("handleEventCommand re-reads the live window set at emit time", async () => {
-  const sink: string[][] = [];
-  const { windows, add } = fakeWindows(sink);
-  add();
-  // A window opened after the binding was created must still receive events.
-  add();
+Deno.test("handleEventCommand reaches every subscribed window via the hub", async () => {
+  const hub = new PushHub();
+  const received: PushMessage[][] = [[], []];
+  hub.subscribe("main", (m) => received[0].push(m));
+  hub.subscribe("viewer-1", (m) => received[1].push(m));
 
-  await handleEventCommand(windows, "event_emit", { event: "x" });
+  await handleEventCommand(hub, "event_emit", { event: "x" });
 
-  assertEquals(sink.length, 2);
-  assertEquals(sink[0].length, 1);
-  assertEquals(sink[1].length, 1);
+  assertEquals(received[0].length, 1);
+  assertEquals(received[1].length, 1);
 });
 
 Deno.test("handleEventCommand rejects an unknown event command", async () => {
+  const { hub } = recordingHub();
   await assertRejects(
-    () => handleEventCommand(() => [], "event_unknown", {}),
+    () => handleEventCommand(hub, "event_unknown", {}),
     Error,
     "Unknown event command",
   );
 });
 
 Deno.test("handleEventCommand rejects when event name is not a string", async () => {
+  const { hub } = recordingHub();
   await assertRejects(
-    () => handleEventCommand(() => [], "event_emit", { event: 42 }),
+    () => handleEventCommand(hub, "event_emit", { event: 42 }),
     Error,
     "'event' must be a string",
   );

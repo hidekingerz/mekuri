@@ -54,6 +54,17 @@ export {
 } from "./event.ts";
 
 export {
+  dispatchPushMessage,
+  EVENT_CHANNEL,
+  EVENTS_PATH,
+  type EventSourceFactory,
+  type EventSourceLike,
+  MENU_CLICK_CHANNEL,
+  type PushDeliveryHost,
+  subscribeEvents,
+} from "./events.ts";
+
+export {
   Menu,
   type MenuAction,
   MenuHandle,

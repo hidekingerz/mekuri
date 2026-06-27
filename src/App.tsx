@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "./api/dialog";
 import { searchDirectory } from "./api/directory";
+import { subscribeEvents } from "./api/event";
 import { addFavorite } from "./api/favorites";
 import { getWindowSettings, saveWindowSettings } from "./api/settings";
 import { openViewer } from "./api/viewer";
@@ -28,6 +29,9 @@ function App() {
     DEFAULT_TREE_COLUMN_WIDTH,
     columnsRef,
   );
+
+  // Subscribe to main → webview push (window-to-window events) on mount.
+  useEffect(() => subscribeEvents(), []);
 
   // Load settings on mount
   useEffect(() => {

@@ -9,3 +9,6 @@
 
 export type { EventCallback, TauriEvent } from "../../deno-app/frontend/event.ts";
 export { emit, listen } from "../../deno-app/frontend/event.ts";
+// main → webview の SSE push（窓間イベント delivery と menu クリック配送）を自窓 label で
+// 購読する shim。起動時に 1 度呼び、窓クローズ時に解除関数を呼ぶ。
+export { subscribeEvents } from "../../deno-app/frontend/events.ts";

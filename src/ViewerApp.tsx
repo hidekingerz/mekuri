@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { ask } from "./api/dialog";
 import { getSiblingArchives, trashFile } from "./api/directory";
-import { emit } from "./api/event";
+import { emit, subscribeEvents } from "./api/event";
 import { Menu, MenuItem, PredefinedMenuItem } from "./api/menu";
 import { saveViewerSettings } from "./api/settings";
 import { getCurrentWindow } from "./api/window";
@@ -20,6 +20,9 @@ function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
   const [trashError, setTrashError] = useState<string | null>(null);
   const spreadViewerRef = useRef<SpreadViewerHandle>(null);
+
+  // Subscribe to main → webview push (window-to-window events and menu clicks) on mount.
+  useEffect(() => subscribeEvents(), []);
 
   // Read archive path from URL query parameter
   useEffect(() => {

@@ -6,6 +6,7 @@ import {
   getImageBase64,
   listImages,
 } from "./zip.ts";
+import { clearArchiveCache } from "./cache.ts";
 
 /** 指定エントリを持つ ZIP を一時ファイルに作成し、そのパスを返す。 */
 async function createTestZip(
@@ -113,6 +114,69 @@ Deno.test("extractNestedArchive は存在しないエントリでエラー", asy
     throw new Error("should have thrown");
   } catch (e) {
     assert(e instanceof Error && e.message.includes("Entry not found"));
+  }
+});
+
+Deno.test("連続 getImageBase64 は書庫を 1 回しか readFile しない", async () => {
+  const path = await createTestZip([
+    ["page01.jpg", bytes("img-1")],
+    ["page02.jpg", bytes("img-2")],
+    ["page03.jpg", bytes("img-3")],
+  ]);
+
+  clearArchiveCache();
+  const original = Deno.readFile;
+  const reads: string[] = [];
+  // 対象書庫の読み込みだけ数える（他パスは元の実装へ委譲）。
+  Deno.readFile = ((p: string | URL, opts?: Deno.ReadFileOptions) => {
+    if (p === path) reads.push(String(p));
+    return original(p, opts);
+  }) as typeof Deno.readFile;
+
+  try {
+    const r1 = await getImageBase64(path, "page01.jpg");
+    const r2 = await getImageBase64(path, "page02.jpg");
+    const r3 = await getImageBase64(path, "page03.jpg");
+    assert(r1.startsWith("data:image/jpeg;base64,"));
+    assert(r2.startsWith("data:image/jpeg;base64,"));
+    assert(r3.startsWith("data:image/jpeg;base64,"));
+    assertEquals(reads.length, 1);
+  } finally {
+    Deno.readFile = original;
+    clearArchiveCache();
+  }
+});
+
+Deno.test("並行 getImageBase64 は全て成功し書庫読込は 1 回", async () => {
+  const path = await createTestZip([
+    ["page01.jpg", bytes("img-1")],
+    ["page02.jpg", bytes("img-2")],
+    ["page03.jpg", bytes("img-3")],
+    ["page04.jpg", bytes("img-4")],
+  ]);
+
+  clearArchiveCache();
+  const original = Deno.readFile;
+  const reads: string[] = [];
+  Deno.readFile = ((p: string | URL, opts?: Deno.ReadFileOptions) => {
+    if (p === path) reads.push(String(p));
+    return original(p, opts);
+  }) as typeof Deno.readFile;
+
+  try {
+    const results = await Promise.all([
+      getImageBase64(path, "page01.jpg"),
+      getImageBase64(path, "page02.jpg"),
+      getImageBase64(path, "page03.jpg"),
+      getImageBase64(path, "page04.jpg"),
+    ]);
+    for (const r of results) {
+      assert(r.startsWith("data:image/jpeg;base64,"));
+    }
+    assertEquals(reads.length, 1);
+  } finally {
+    Deno.readFile = original;
+    clearArchiveCache();
   }
 });
 

@@ -12,6 +12,11 @@ import * as rar from "./rar.ts";
 import type { ArchiveContents } from "./zip.ts";
 
 export type { ArchiveContents };
+export {
+  type ArchiveReader,
+  clearArchiveCache,
+  readArchiveBytes,
+} from "./cache.ts";
 
 /** サポートするアーカイブ形式の分類。Tauri 版 `ArchiveFormat` 相当。 */
 type ArchiveFormat = "zip" | "rar";

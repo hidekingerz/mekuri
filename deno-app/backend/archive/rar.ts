@@ -11,6 +11,7 @@ import { createExtractorFromData } from "node-unrar-js";
 import { naturalCompare } from "../sort.ts";
 import { isArchiveFile, isImageFile, mimeTypeFromName } from "../extensions.ts";
 import type { ArchiveContents } from "./zip.ts";
+import { readArchiveBytes } from "./cache.ts";
 
 export type { ArchiveContents };
 
@@ -41,7 +42,7 @@ function encodeBase64(bytes: Uint8Array): string {
 async function openRar(archivePath: string): Promise<RarExtractor> {
   let data: Uint8Array;
   try {
-    data = await Deno.readFile(archivePath);
+    data = await readArchiveBytes(archivePath);
   } catch (e) {
     throw new Error(`Failed to open RAR archive: ${errMsg(e)}`);
   }

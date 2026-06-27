@@ -55,7 +55,10 @@ export {
 export {
   analyzeContents,
   type ArchiveContents,
+  type ArchiveReader,
+  clearArchiveCache,
   extractNestedArchive,
   getImageBase64,
   listImages,
+  readArchiveBytes,
 } from "./archive/mod.ts";

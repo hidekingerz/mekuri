@@ -102,3 +102,52 @@ single-agent-loop）の振り返り。
 
 single-agent-loop は「自律実装エンジン」ではなく「**強力だがゲート依存の増幅器**」。
 ゲート設計こそが人間の主戦場、というのが本実験の結論。
+
+## 8. トークン実測とコスト比較
+
+Claude Code のトランスクリプト（`~/.claude/projects/.../*.jsonl`、6/25 以降の 120 ファイル＝
+メインセッション + ループ各周の `claude -p`）の `usage` を集計した実測値。
+
+### トークン量（実測・Anthropic）
+
+| 種別 | 量 |
+|------|-----|
+| 出力 | 5.02M |
+| 入力（非キャッシュ） | 5.03M |
+| 入力（cache write） | 38.56M |
+| 入力（cache read） | 706.5M |
+| 入力 合計（課金対象） | ≈ 750M |
+| アシスタント発話数 | 4,453 |
+
+純粋な in/out は「入力 ≈5M / 出力 ≈5M」。ただし**実際の入力課金の大半は cache_read 706.5M**で、
+これは長い対話＋50 周超のループが毎ターン肥大した文脈を読み直すため（cache_read は安価だが量で効く）。
+
+### 推定コスト比較（実測トークン量に各社単価を適用）
+
+単価（2026-06 時点, per 1M tokens）: Claude Opus（標準単価の仮定）入力$15 / cache read$1.5 /
+cache write$18.75 / 出力$75。GPT-5.4 入力$2.50 / cached$0.25 / 出力$15。GPT-5.5 入力$5 /
+cached$0.50 / 出力$30。
+
+| 種別 | Claude Opus | GPT-5.4 | GPT-5.5 |
+|------|-------------|---------|---------|
+| 入力（非キャッシュ）5.03M | $75 | $13 | $25 |
+| cache write 38.56M | $723 | $96 ※ | $193 ※ |
+| cache read 706.5M | $1,060 | $177 | $353 |
+| 出力 5.02M | $377 | $75 | $151 |
+| **合計** | **≈ $2,235** | **≈ $361** | **≈ $722** |
+
+※ OpenAI には「キャッシュ作成の割増」が無いため、Anthropic の cache write 38.56M は GPT 側では
+通常入力単価で換算。
+
+**この表は桁感の目安**（正確な比較ではない）:
+
+- トークナイザが違うため、GPT 側の実トークン量は異なる（「Anthropic 実測量 × GPT 単価」の換算）。
+- cache_read 量（最大の費目）はエージェント依存。Codex は文脈管理・キャッシュ挙動が違うので
+  706.5M にはならない。正確に比べるなら同じ作業を実際に Codex で走らせて usage を測るのが確実。
+- 桁としては Opus ≈ $2.2k / GPT-5.5 ≈ $720 / GPT-5.4 ≈ $360。主因は単価差（Opus が 5〜6 倍）と
+  cache_read の量。
+
+出典: [aipricing.guru](https://www.aipricing.guru/openai-pricing/) /
+[Morph](https://www.morphllm.com/openai-api-pricing) /
+[OpenRouter GPT-5.5](https://openrouter.ai/openai/gpt-5.5) /
+[pricepertoken GPT-5.4](https://pricepertoken.com/pricing-page/model/openai-gpt-5.4)

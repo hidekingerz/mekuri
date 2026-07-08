@@ -129,9 +129,38 @@ function bindInvoke(target: Deno.BrowserWindow, windowLabel: string): void {
   });
 }
 
+/**
+ * ネイティブのタイトルバー閉じるボタン対策（laufey 0.5.0 / deno 2.9.1 のバグ）。
+ *
+ * セカンダリ窓では、赤ボタン押下時に `close` イベントが発火し `isClosed()` が true になるものの、
+ * 実際の NSWindow が order-out されず窓が画面に残る（プログラム的 `close()`＝`window_close` 経由の
+ * メニュー「閉じる」は元から正常に閉じる）。回避策として `close` イベントで window を order-out する。
+ *
+ * 実装上の注意（切り分け済み）:
+ * - `close` イベント中に**同期**で `close()` を呼ぶと close 経路への再入でプロセスがクラッシュする。
+ *   → **次 tick（`setTimeout 0`）へ遅延**して再入を避ける。
+ * - 遅延後に `close()` ではなく `hide()` で order-out する（destroy 経路への再入回避）。既に不可視
+ *   （プログラム的 close 済み）なら何もしない＝冪等。
+ */
+function attachNativeCloseWorkaround(target: Deno.BrowserWindow): void {
+  target.addEventListener("close", () => {
+    setTimeout(() => {
+      if (target.isVisible()) target.hide();
+    }, 0);
+  });
+}
+
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
 // auto-navigation より前に同期で登録し、採用したメイン窓を確実にバインドする。
 bindInvoke(win, MAIN_WINDOW_LABEL);
+
+// メイン窓の赤ボタンでアプリを終了する。メイン窓を閉じる＝アプリ終了が期待動作だが、上記 laufey
+// バグにより採用窓もネイティブ close で order-out されない（＝無反応に見える）。採用窓にも `close`
+// イベントは届くことを確認済みなので、ここで次 tick に `Deno.exit(0)` する（Store は store_set 毎に
+// 自動保存済みのため保留書き込みは無い）。同期 exit は close イベント中の再入を避けるため遅延する。
+win.addEventListener("close", () => {
+  setTimeout(() => Deno.exit(0), 0);
+});
 
 // フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
 const server = Deno.serve(async (req) => {
@@ -227,6 +256,7 @@ async function doOpenViewer(archivePath: string): Promise<null> {
     createWindow: (label, options, url) => {
       const viewer = new Deno.BrowserWindow(options);
       bindInvoke(viewer, label);
+      attachNativeCloseWorkaround(viewer);
       viewer.navigate(`${origin}/${url}`);
       viewer.show();
       viewerWindows.set(label, viewer);

@@ -2,19 +2,21 @@
 /**
  * Deno Desktop エントリポイント（マイルストーン4）。
  *
- * Tauri 版（`src-tauri/`）の `WebviewWindow` + IPC を `Deno.BrowserWindow` + bindings で置き換える。
+ * Tauri 版（`src-tauri/`）の `WebviewWindow` + IPC を `Deno.BrowserWindow` + HTTP/SSE で置き換える。
  * 本ファイルは Desktop API への配線のみを担い、ロジックは `desktop/`（純粋・テスト可能）に置く。
  *
  * 役割:
  * 1. `Deno.serve` でビルド済みフロント（`dist/`）を配信する。webview は自動でここへ遷移する。
  * 2. メインウィンドウを `Deno.BrowserWindow` で起動する（サイズ/タイトルは `desktop/windowConfig.ts`）。
- * 3. webview→Deno メインの IPC ブリッジを確立する。`bindings.invoke(command, args)` を
- *    `win.bind("invoke", ...)` で受け、`bindings/`（→`backend/`）へディスパッチする。
- * 4. ビューワー窓を生成する `open_viewer` バインディング（`src/App.tsx` の `handleArchiveSelect`
- *    相当）。同一アーカイブの二重オープンは label レジストリで防止する（ロジックは
- *    `desktop/viewer.ts`、ここは `Deno.BrowserWindow` 管理の注入のみ）。
+ * 3. webview→Deno メインの IPC を確立する。invoke（要求/応答）は HTTP `POST /__invoke`
+ *    （`handleInvokeRequest`）で受けて `bindings/`（→`backend/`）へディスパッチし、main→webview の
+ *    push は SSE `GET /__events` で配送する。`win.bind`/`executeJs` は framework の採用窓に届かない
+ *    ため使わない（白画面の真因、[m7:denidian-http-pivot]）。
+ * 4. ビューワー窓を生成する `open_viewer`（HTTP `/__invoke` の特別コマンド。`src/App.tsx` の
+ *    `handleArchiveSelect` 相当）。同一アーカイブの二重オープンは label レジストリで防止する
+ *    （ロジックは `desktop/viewer.ts`、ここは `Deno.BrowserWindow` 管理の注入のみ）。
  *
- * 実行: `deno desktop main.ts`（deno >= 2.9.0 / canary が必要）。
+ * 実行: `deno desktop main.ts`（deno >= 2.9.1 が必要）。
  */
 
 import { serveDir } from "@std/http/file-server";
@@ -26,9 +28,7 @@ import {
   handleEventsRequest,
   handleInvoke,
   handleInvokeRequest,
-  handleMenuCommand,
   handleMenuCommandByLabel,
-  handleWindowCommand,
   handleWindowCommandByLabel,
   INVOKE_PATH,
   mainWindowOptions,
@@ -57,13 +57,11 @@ const ERR_FORWARDER = errorForwarderScript();
 // ウィンドウを自動で開き、`Deno.serve` のハンドラへ自動遷移させる。最初の
 // `new Deno.BrowserWindow()` がその初期ウィンドウを「採用」するが、採用は初回スクリプト
 // 評価の同期実行中に構築された場合に成立する。よって `await Store.load()` などのトップ
-// レベル await より前に構築し、`bindInvoke` で invoke を登録してから serve/await へ進む。
-// これにより、自動遷移したフロントが起動直後に呼ぶ `invoke` が確実にバインド済みウィンドウ
-// へ届く（白画面＝起動時 "No callback bound for: invoke" の根本対策）。
+// レベル await より前に構築する。これにより `win` が採用された「表示窓」そのものになり、
+// window 系コマンド（HTTP `/__invoke` → `resolveWindow(MAIN)` → `win`）・close イベント・
+// コンテキストメニューが実際の表示窓へ効く。invoke（要求/応答）自体は `win.bind` ではなく
+// HTTP `/__invoke` で受けるため、bind 登録は不要（[m7:denidian-http-pivot]）。
 const win = new Deno.BrowserWindow(mainWindowOptions());
-
-/** `win.bind` ハンドラが返すべき JSON 値型（lib から導出）。 */
-type BridgeReturn = Awaited<ReturnType<Parameters<typeof win.bind>[1]>>;
 
 /** 開いているビューワー窓を label で管理し、同一アーカイブの二重オープンを防ぐ。 */
 const viewerWindows = new Map<string, Deno.BrowserWindow>();
@@ -104,26 +102,23 @@ function resolveWindow(label: string): Deno.BrowserWindow | undefined {
   return viewer;
 }
 
-/** invoke ブリッジを窓に登録する（メイン窓・各ビューワー窓とも IPC が必要）。 */
-function bindInvoke(target: Deno.BrowserWindow, windowLabel: string): void {
-  target.bind(
-    "invoke",
-    async (...args) =>
-      (await handleInvoke(
-        args,
-        undefined,
-        async (command, storeArgs) =>
-          handleStoreCommand(await loadStore(), command, storeArgs),
-        (command, winArgs) => handleWindowCommand(target, command, winArgs),
-        (command, eventArgs) => handleEventCommand(pushHub, command, eventArgs),
-        (command, menuArgs) => handleMenuCommand(target, command, menuArgs),
-      )) as BridgeReturn,
-  );
-  // ネイティブコンテキストメニューのクリックを webview の click hook へ配送する。
-  // `showContextMenu` のクリックは `contextMenuClick` イベントとしてメインへ返るため、
-  // クリックされた項目 id を push チャネル（SSE）でこの窓へ送り、webview 側
-  // （`frontend/menu.ts` の `globalThis.__mekuriMenuClick`）で対応する action を実行させる。
-  // `executeJs` push は framework の採用窓に届かないため SSE で配送する（[m8b:pushhub]）。
+/**
+ * ネイティブコンテキストメニューのクリックを webview の click hook へ配送する（メイン窓・
+ * 各ビューワー窓とも必要）。
+ *
+ * `showContextMenu` のクリックは `contextMenuClick` イベントとしてメインへ返るため、クリックされた
+ * 項目 id を push チャネル（SSE）でこの窓へ送り、webview 側（`frontend/menu.ts` の
+ * `globalThis.__mekuriMenuClick`）で対応する action を実行させる。`executeJs` push は framework の
+ * 採用窓に届かないため SSE で配送する（[m8b:pushhub]）。
+ *
+ * 注: invoke（要求/応答）は `win.bind` ではなく HTTP `/__invoke`（`handleInvokeRequest`）に一本化
+ * 済み。`win.bind` は framework の採用窓に届かない（白画面の真因、[m7:denidian-http-pivot]）ため、
+ * かつてここにあった `bind("invoke", ...)` 登録は撤去した（frontend は一切呼ばない）。
+ */
+function forwardContextMenuClicks(
+  target: Deno.BrowserWindow,
+  windowLabel: string,
+): void {
   target.addEventListener("contextMenuClick", (ev) => {
     deliverMenuClick(pushHub, windowLabel, (ev as CustomEvent).detail);
   });
@@ -152,7 +147,7 @@ function attachNativeCloseWorkaround(target: Deno.BrowserWindow): void {
 
 // IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
 // auto-navigation より前に同期で登録し、採用したメイン窓を確実にバインドする。
-bindInvoke(win, MAIN_WINDOW_LABEL);
+forwardContextMenuClicks(win, MAIN_WINDOW_LABEL);
 
 // メイン窓の赤ボタンでアプリを終了する。メイン窓を閉じる＝アプリ終了が期待動作だが、上記 laufey
 // バグにより採用窓もネイティブ close で order-out されない（＝無反応に見える）。採用窓にも `close`
@@ -255,7 +250,7 @@ async function doOpenViewer(archivePath: string): Promise<null> {
     },
     createWindow: (label, options, url) => {
       const viewer = new Deno.BrowserWindow(options);
-      bindInvoke(viewer, label);
+      forwardContextMenuClicks(viewer, label);
       attachNativeCloseWorkaround(viewer);
       viewer.navigate(`${origin}/${url}`);
       viewer.show();

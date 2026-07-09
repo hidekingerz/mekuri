@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, deno-desktop]
   pull_request:
-    branches: [main]
+    branches: [main, deno-desktop]
 
 jobs:
   frontend:
@@ -34,34 +34,19 @@ jobs:
       - name: Test
         run: pnpm test
 
-  backend:
-    name: Backend (Rust)
+  deno:
+    name: Backend (Deno)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src-tauri
+        working-directory: deno-app
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
-        working-directory: .
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: denoland/setup-deno@v2
         with:
-          components: clippy, rustfmt
+          # deno desktop の型（lib="deno.desktop"）を含む最初の安定版。main.ts の check に必要。
+          deno-version: "2.9.1"
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Format check
-        run: cargo fmt --check
-
-      - name: Clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Test
-        run: cargo test
+      - name: Verify (fmt, lint, type-check, test)
+        run: deno task verify

@@ -1,18 +1,19 @@
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { open } from "./api/dialog";
 import { searchDirectory } from "./api/directory";
+import { subscribeEvents } from "./api/event";
 import { addFavorite } from "./api/favorites";
-import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
+import { getWindowSettings, saveWindowSettings } from "./api/settings";
+import { openViewer } from "./api/viewer";
+import { getCurrentWindow, LogicalSize } from "./api/window";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
 import type { DirectoryEntry } from "./types";
-import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
-import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
+import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
+import { fileNameFromPath } from "./utils/windowLabel";
 
 function App() {
   const [selectedFavorite, setSelectedFavorite] = useState<string | null>(null);
@@ -28,6 +29,9 @@ function App() {
     DEFAULT_TREE_COLUMN_WIDTH,
     columnsRef,
   );
+
+  // Subscribe to main → webview push (window-to-window events) on mount.
+  useEffect(() => subscribeEvents(), []);
 
   // Load settings on mount
   useEffect(() => {
@@ -139,27 +143,13 @@ function App() {
   }, []);
 
   const handleArchiveSelect = useCallback(async (archivePath: string) => {
-    const label = viewerLabel(archivePath);
-
-    const existing = await WebviewWindow.getByLabel(label);
-    if (existing) {
-      await existing.setFocus();
-      return;
+    // ビューワー窓生成（label 算出・二重オープン防止・保存サイズ・focus）は
+    // メイン側 `open_viewer` バインディングが内包する（`deno-app/desktop/viewer.ts`）。
+    try {
+      await openViewer(archivePath);
+    } catch (e) {
+      console.error("Failed to open viewer window:", e);
     }
-
-    const viewerSettings = await getViewerSettings();
-    const webview = new WebviewWindow(label, {
-      url: `viewer.html?archive=${encodeURIComponent(archivePath)}`,
-      title: `${fileNameFromPath(archivePath)} - mekuri`,
-      width: viewerSettings.width,
-      height: viewerSettings.height,
-      minWidth: VIEWER_MIN_WIDTH,
-      minHeight: VIEWER_MIN_HEIGHT,
-      visible: true,
-    });
-    webview.once("tauri://error", (e) => {
-      console.error("Failed to create viewer window:", e);
-    });
   }, []);
 
   return (

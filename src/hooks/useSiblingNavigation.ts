@@ -1,6 +1,6 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 import { getSiblingArchives } from "../api/directory";
+import { getCurrentWindow } from "../api/window";
 import { fileNameFromPath } from "../utils/windowLabel";
 
 export function useSiblingNavigation(

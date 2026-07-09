@@ -1,4 +1,4 @@
-import { load } from "@tauri-apps/plugin-store";
+import { load } from "../../deno-app/frontend/store.ts";
 
 const STORE_NAME = "settings.json";
 

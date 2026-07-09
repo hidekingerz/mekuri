@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import react from "@vitejs/plugin-react";
-import { type Plugin, defineConfig } from "vite";
+import type { Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -55,6 +56,10 @@ function pdfjsStaticPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), pdfjsStaticPlugin()],
+  // Scope Vitest to the frontend; deno-app/ holds Deno.test files run by `deno test`.
+  test: {
+    include: ["src/**/*.test.ts"],
+  },
   build: {
     rollupOptions: {
       input: {

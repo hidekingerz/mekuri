@@ -1,9 +1,11 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
+import { ask } from "./api/dialog";
 import { getSiblingArchives, trashFile } from "./api/directory";
+import { emit, subscribeEvents } from "./api/event";
+import { Menu, MenuItem, PredefinedMenuItem } from "./api/menu";
 import { saveViewerSettings } from "./api/settings";
+import { getCurrentWindow } from "./api/window";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { usePdfLoader } from "./hooks/usePdfLoader";
@@ -18,6 +20,9 @@ function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
   const [trashError, setTrashError] = useState<string | null>(null);
   const spreadViewerRef = useRef<SpreadViewerHandle>(null);
+
+  // Subscribe to main → webview push (window-to-window events and menu clicks) on mount.
+  useEffect(() => subscribeEvents(), []);
 
   // Read archive path from URL query parameter
   useEffect(() => {
@@ -61,7 +66,6 @@ function Viewer() {
           : null;
 
       await trashFile(currentPath);
-      const { emit } = await import("@tauri-apps/api/event");
       await emit("file-trashed");
 
       if (nextPath) {
@@ -95,7 +99,6 @@ function Viewer() {
       const currentPath = archivePathRef.current;
       if (!currentPath) return;
 
-      const { Menu, MenuItem, PredefinedMenuItem } = await import("@tauri-apps/api/menu");
       const handle = spreadViewerRef.current;
 
       const viewModeItem = await MenuItem.new({
@@ -124,7 +127,9 @@ function Viewer() {
       const menu = await Menu.new({
         items: [viewModeItem, directionItem, separator1, trashItem, separator2, closeItem],
       });
-      await menu.popup();
+      // showContextMenu は macOS Cocoa 座標系（原点 左下・Y は上方向）で解釈するため、
+      // web の clientY（上→下）を Y 反転（innerHeight - clientY）して渡す。
+      await menu.popup({ x: e.clientX, y: window.innerHeight - e.clientY });
     }
 
     window.addEventListener("contextmenu", handleContextMenu);

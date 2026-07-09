@@ -1,0 +1,57 @@
+import { assertEquals } from "@std/assert";
+import { ask, open } from "./dialog.ts";
+
+Deno.test("ask resolves to true when confirm accepts", async () => {
+  const result = await ask("delete?", undefined, () => true);
+  assertEquals(result, true);
+});
+
+Deno.test("ask resolves to false when confirm rejects", async () => {
+  const result = await ask(
+    "delete?",
+    { title: "x", kind: "warning" },
+    () => false,
+  );
+  assertEquals(result, false);
+});
+
+Deno.test("ask forwards the message to confirm and ignores options", async () => {
+  let received: string | undefined;
+  const result = await ask("move to trash", { kind: "warning" }, (msg) => {
+    received = msg;
+    return true;
+  });
+  assertEquals(received, "move to trash");
+  assertEquals(result, true);
+});
+
+Deno.test("open returns the selected folder path via open_folder", async () => {
+  let received: string | undefined;
+  const result = await open({ directory: true }, (command) => {
+    received = command;
+    return Promise.resolve("/Users/me/Pictures");
+  });
+  assertEquals(received, "open_folder");
+  assertEquals(result, "/Users/me/Pictures");
+});
+
+Deno.test("open resolves to null when the picker is cancelled", async () => {
+  const result = await open(undefined, () => Promise.resolve(null));
+  assertEquals(result, null);
+});
+
+Deno.test("ask uses globalThis.confirm by default", async () => {
+  const original = (globalThis as { confirm?: (m: string) => boolean }).confirm;
+  let received: string | undefined;
+  (globalThis as { confirm?: (m: string) => boolean }).confirm = (msg) => {
+    received = msg;
+    return true;
+  };
+  try {
+    const result = await ask("default path");
+    assertEquals(received, "default path");
+    assertEquals(result, true);
+  } finally {
+    (globalThis as { confirm?: (m: string) => boolean }).confirm = original;
+  }
+});

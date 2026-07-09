@@ -1,0 +1,269 @@
+/// <reference lib="deno.desktop" />
+/**
+ * Deno Desktop エントリポイント（マイルストーン4）。
+ *
+ * Tauri 版（`src-tauri/`）の `WebviewWindow` + IPC を `Deno.BrowserWindow` + HTTP/SSE で置き換える。
+ * 本ファイルは Desktop API への配線のみを担い、ロジックは `desktop/`（純粋・テスト可能）に置く。
+ *
+ * 役割:
+ * 1. `Deno.serve` でビルド済みフロント（`dist/`）を配信する。webview は自動でここへ遷移する。
+ * 2. メインウィンドウを `Deno.BrowserWindow` で起動する（サイズ/タイトルは `desktop/windowConfig.ts`）。
+ * 3. webview→Deno メインの IPC を確立する。invoke（要求/応答）は HTTP `POST /__invoke`
+ *    （`handleInvokeRequest`）で受けて `bindings/`（→`backend/`）へディスパッチし、main→webview の
+ *    push は SSE `GET /__events` で配送する。`win.bind`/`executeJs` は framework の採用窓に届かない
+ *    ため使わない（白画面の真因、[m7:denidian-http-pivot]）。
+ * 4. ビューワー窓を生成する `open_viewer`（HTTP `/__invoke` の特別コマンド。`src/App.tsx` の
+ *    `handleArchiveSelect` 相当）。同一アーカイブの二重オープンは label レジストリで防止する
+ *    （ロジックは `desktop/viewer.ts`、ここは `Deno.BrowserWindow` 管理の注入のみ）。
+ *
+ * 実行: `deno desktop main.ts`（deno >= 2.9.1 が必要）。
+ */
+
+import { serveDir } from "@std/http/file-server";
+import {
+  deliverMenuClick,
+  errorForwarderScript,
+  EVENTS_PATH,
+  handleEventCommand,
+  handleEventsRequest,
+  handleInvoke,
+  handleInvokeRequest,
+  handleMenuCommandByLabel,
+  handleWindowCommandByLabel,
+  INVOKE_PATH,
+  mainWindowOptions,
+  openViewer,
+  PushHub,
+} from "./desktop/mod.ts";
+import { handleStoreCommand } from "./bindings/mod.ts";
+import { getViewerSettings, settingsPath, Store } from "./backend/mod.ts";
+import { MAIN_WINDOW_LABEL } from "./frontend/windowLabel.ts";
+
+/**
+ * ビルド済み Vite フロント。`deno desktop` は main.ts をコンパイルして自己完結アプリへ
+ * バンドルし、`--include ../dist` で dist を埋め込む。展開後の仮想 FS はリポジトリルートを
+ * 基準に構造を保つ（main.ts は `deno-app/main.ts`、dist は `dist/`）ため、main.ts から見た
+ * 配信元は `../dist/`。`--include ../dist` とこのパスは必ずセットで合わせること。
+ */
+const FRONTEND_DIR = new URL("../dist/", import.meta.url).pathname;
+
+// webview の未捕捉エラーを serve 経由でプロセス stderr（`[web]` 行）へ転送する小スクリプト。
+// GUI 無しでも実行時クラッシュ（例: 移行漏れの Tauri API が `__TAURI_INTERNALS__` を触る）を
+// 検知でき、smoke test（scripts/smoke.sh）の判定材料になる。表示には影響しない。
+// ロジックは desktop/errorForwarder.ts（純粋・テスト可能）に置く。
+const ERR_FORWARDER = errorForwarderScript();
+
+// メインウィンドウは「最初の同期処理」として構築する。`deno desktop` は起動時に初期
+// ウィンドウを自動で開き、`Deno.serve` のハンドラへ自動遷移させる。最初の
+// `new Deno.BrowserWindow()` がその初期ウィンドウを「採用」するが、採用は初回スクリプト
+// 評価の同期実行中に構築された場合に成立する。よって `await Store.load()` などのトップ
+// レベル await より前に構築する。これにより `win` が採用された「表示窓」そのものになり、
+// window 系コマンド（HTTP `/__invoke` → `resolveWindow(MAIN)` → `win`）・close イベント・
+// コンテキストメニューが実際の表示窓へ効く。invoke（要求/応答）自体は `win.bind` ではなく
+// HTTP `/__invoke` で受けるため、bind 登録は不要（[m7:denidian-http-pivot]）。
+const win = new Deno.BrowserWindow(mainWindowOptions());
+
+/** 開いているビューワー窓を label で管理し、同一アーカイブの二重オープンを防ぐ。 */
+const viewerWindows = new Map<string, Deno.BrowserWindow>();
+
+/**
+ * main → webview の push チャネル（SSE）。窓間イベント（`event_emit` のブロードキャスト）と
+ * 将来の menu クリック配送をここへ流す。`win.executeJs` push は framework の採用窓に届かない
+ * （白画面の真因）が、`Deno.serve` 上の SSE は窓に依存せず確実に届く（[m8b:pushhub]）。
+ * webview は `GET /__events?windowLabel=<label>` で購読する（購読 shim は `frontend`）。
+ */
+const pushHub = new PushHub();
+
+/**
+ * 設定永続化ストア（tauri-plugin-store 相当）。Tauri 版と同じ settings.json パスを
+ * app config dir 配下に開き、`store_set` ごとに自動保存する。webview からの `store_*`
+ * コマンドはこの 1 インスタンスへ集約される（M3/M5 の store 系 IPC 配線）。
+ *
+ * 採用＝bind を auto-navigation より先に確定させるため、ストアの読み込みは遅延する
+ * （初回の `store_*`/`open_viewer` 時に解決し、以降は同一インスタンスを共有）。
+ */
+let storePromise: Promise<Store> | undefined;
+function loadStore(): Promise<Store> {
+  return (storePromise ??= Store.load(settingsPath(), { autoSave: true }));
+}
+
+/**
+ * 窓 label から実窓を解決する（HTTP transport の `window_*` コマンド用）。webview が自窓 label
+ * （`frontend/windowLabel.ts`）をリクエストに載せ、ここでメイン窓／ビューワー窓へ引き当てる。
+ * 閉じられたビューワー窓は registry から除いて undefined を返す。
+ */
+function resolveWindow(label: string): Deno.BrowserWindow | undefined {
+  if (label === MAIN_WINDOW_LABEL) return win;
+  const viewer = viewerWindows.get(label);
+  if (!viewer || viewer.isClosed()) {
+    viewerWindows.delete(label);
+    return undefined;
+  }
+  return viewer;
+}
+
+/**
+ * ネイティブコンテキストメニューのクリックを webview の click hook へ配送する（メイン窓・
+ * 各ビューワー窓とも必要）。
+ *
+ * `showContextMenu` のクリックは `contextMenuClick` イベントとしてメインへ返るため、クリックされた
+ * 項目 id を push チャネル（SSE）でこの窓へ送り、webview 側（`frontend/menu.ts` の
+ * `globalThis.__mekuriMenuClick`）で対応する action を実行させる。`executeJs` push は framework の
+ * 採用窓に届かないため SSE で配送する（[m8b:pushhub]）。
+ *
+ * 注: invoke（要求/応答）は `win.bind` ではなく HTTP `/__invoke`（`handleInvokeRequest`）に一本化
+ * 済み。`win.bind` は framework の採用窓に届かない（白画面の真因、[m7:denidian-http-pivot]）ため、
+ * かつてここにあった `bind("invoke", ...)` 登録は撤去した（frontend は一切呼ばない）。
+ */
+function forwardContextMenuClicks(
+  target: Deno.BrowserWindow,
+  windowLabel: string,
+): void {
+  target.addEventListener("contextMenuClick", (ev) => {
+    deliverMenuClick(pushHub, windowLabel, (ev as CustomEvent).detail);
+  });
+}
+
+/**
+ * ネイティブのタイトルバー閉じるボタン対策（laufey 0.5.0 / deno 2.9.1 のバグ）。
+ *
+ * セカンダリ窓では、赤ボタン押下時に `close` イベントが発火し `isClosed()` が true になるものの、
+ * 実際の NSWindow が order-out されず窓が画面に残る（プログラム的 `close()`＝`window_close` 経由の
+ * メニュー「閉じる」は元から正常に閉じる）。回避策として `close` イベントで window を order-out する。
+ *
+ * 実装上の注意（切り分け済み）:
+ * - `close` イベント中に**同期**で `close()` を呼ぶと close 経路への再入でプロセスがクラッシュする。
+ *   → **次 tick（`setTimeout 0`）へ遅延**して再入を避ける。
+ * - 遅延後に `close()` ではなく `hide()` で order-out する（destroy 経路への再入回避）。既に不可視
+ *   （プログラム的 close 済み）なら何もしない＝冪等。
+ */
+function attachNativeCloseWorkaround(target: Deno.BrowserWindow): void {
+  target.addEventListener("close", () => {
+    setTimeout(() => {
+      if (target.isVisible()) target.hide();
+    }, 0);
+  });
+}
+
+// IPC ブリッジ: webview の `bindings.invoke(command, args)` を backend へ橋渡しする。
+// auto-navigation より前に同期で登録し、採用したメイン窓を確実にバインドする。
+forwardContextMenuClicks(win, MAIN_WINDOW_LABEL);
+
+// メイン窓の赤ボタンでアプリを終了する。メイン窓を閉じる＝アプリ終了が期待動作だが、上記 laufey
+// バグにより採用窓もネイティブ close で order-out されない（＝無反応に見える）。採用窓にも `close`
+// イベントは届くことを確認済みなので、ここで次 tick に `Deno.exit(0)` する（Store は store_set 毎に
+// 自動保存済みのため保留書き込みは無い）。同期 exit は close イベント中の再入を避けるため遅延する。
+win.addEventListener("close", () => {
+  setTimeout(() => Deno.exit(0), 0);
+});
+
+// フロント配信。webview はこの Deno.serve のアドレス（127.0.0.1）へ遷移する。
+const server = Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  if (url.pathname === "/__log") {
+    console.error("[web]", url.searchParams.get("m"));
+    return new Response("ok");
+  }
+  // main → webview の push チャネル（SSE）。webview が自窓 label を載せて購読し、窓間イベント
+  // （`event_emit` のブロードキャスト）を受け取る。`win.executeJs` push と違い表示窓へ確実に届く。
+  if (req.method === "GET" && url.pathname === EVENTS_PATH) {
+    return handleEventsRequest(req, pushHub);
+  }
+  // HTTP invoke transport（[m7:denidian-http-pivot]）。webview は data/store/window/event 系
+  // コマンドを `fetch("/__invoke")` で叩く。`win.bind` と違い HTTP は表示窓に確実に届くため、
+  // 起動時の白画面（`No callback bound for: invoke`）を回避できる。window 系は webview が自窓
+  // label をリクエストに載せ、`resolveWindow` が label→窓を解決して `handleWindowCommand` へ
+  // 委譲する。event 系は全窓ブロードキャスト（`handleEventCommand(pushHub, ...)`＝SSE push）なので
+  // label 不要。menu 系（`menu_popup`）も window と同様 webview が自窓 label を載せ、
+  // `resolveWindow` が label→窓を解決して `handleMenuCommandByLabel` へ委譲する（HTTP へ移行済み）。
+  if (req.method === "POST" && url.pathname === INVOKE_PATH) {
+    return await handleInvokeRequest(
+      req,
+      async (command, args, windowLabel) => {
+        // ビューワー窓生成。`open_viewer` は invoke ディスパッチ外（窓生成＝メイン操作）なので
+        // ここで直接処理する。HTTP transport なので表示窓から確実に届く（`win.bind` だと届かず
+        // ダブルクリックしても窓が開かない）。
+        if (command === "open_viewer") {
+          const archivePath = (args as Record<string, unknown> | null)
+            ?.archivePath;
+          if (typeof archivePath !== "string") {
+            throw new Error("open_viewer: archivePath must be a string");
+          }
+          return await doOpenViewer(archivePath);
+        }
+        return await handleInvoke(
+          [command, args],
+          undefined,
+          async (cmd, storeArgs) =>
+            handleStoreCommand(await loadStore(), cmd, storeArgs),
+          (cmd, winArgs) =>
+            handleWindowCommandByLabel(
+              resolveWindow,
+              windowLabel,
+              cmd,
+              winArgs,
+            ),
+          (cmd, eventArgs) => handleEventCommand(pushHub, cmd, eventArgs),
+          (cmd, menuArgs) =>
+            handleMenuCommandByLabel(
+              resolveWindow,
+              windowLabel,
+              cmd,
+              menuArgs,
+            ),
+        );
+      },
+    );
+  }
+  // index.html / viewer.html には ERR_FORWARDER を注入し、メイン窓・ビューワー窓の
+  // どちらの webview 実行時エラーも `[web]` 行として stderr へ転送する（smoke の判定材料）。
+  if (
+    url.pathname === "/" || url.pathname === "/index.html" ||
+    url.pathname === "/viewer.html"
+  ) {
+    const file = url.pathname === "/viewer.html" ? "viewer.html" : "index.html";
+    const html = await Deno.readTextFile(FRONTEND_DIR + file);
+    return new Response(html.replace("<head>", `<head>${ERR_FORWARDER}`), {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+  return serveDir(req, { fsRoot: FRONTEND_DIR, quiet: true });
+});
+/**
+ * 配信元 origin。webview がバインドされるのは常に 127.0.0.1（Deno.serve が
+ * 0.0.0.0 を報告しても実際は 127.0.0.1 にバインドされる）。0.0.0.0 へ navigate すると
+ * webview が接続できず "Not Found" になるため、必ず 127.0.0.1 を使う。
+ */
+const origin = `http://127.0.0.1:${server.addr.port}`;
+
+// ビューワー窓生成。HTTP invoke transport（`/__invoke` の `open_viewer` コマンド）から呼ばれる。
+// `win.bind` だと採用窓に届かず窓が開かないため、HTTP 経路に乗せている（[m7:open-viewer-http]）。
+async function doOpenViewer(archivePath: string): Promise<null> {
+  await openViewer(archivePath, {
+    findWindow: (label) => {
+      const existing = viewerWindows.get(label);
+      if (!existing || existing.isClosed()) {
+        viewerWindows.delete(label);
+        return undefined;
+      }
+      return { focus: () => existing.focus() };
+    },
+    createWindow: (label, options, url) => {
+      const viewer = new Deno.BrowserWindow(options);
+      forwardContextMenuClicks(viewer, label);
+      attachNativeCloseWorkaround(viewer);
+      viewer.navigate(`${origin}/${url}`);
+      viewer.show();
+      viewerWindows.set(label, viewer);
+    },
+    // 保存済みビューワーサイズ（settings.json）を読み出す（Tauri 版 `getViewerSettings` と等価）。
+    loadViewerSettings: async () => getViewerSettings(await loadStore()),
+  });
+  return null;
+}
+
+// メイン窓は明示 navigate/show しない。`deno desktop` のリファレンス実装（denidian）に倣い、
+// 採用した初期ウィンドウへのフロント表示は **framework の自動遷移**（server readiness 時に
+// `Deno.serve` ハンドラへ自動 navigate）に委ねる。明示 `win.navigate(origin)` は採用窓とは別の
+// 表示窓を生み（白画面＝表示窓が未 bind＝`No callback bound for: invoke` の原因）得るため外す。
+// `origin` はビューワー窓（明示生成＝別窓）の navigate にのみ使う（open_viewer 内で参照）。

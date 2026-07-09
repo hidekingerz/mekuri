@@ -1,0 +1,180 @@
+import { assertEquals, assertRejects } from "@std/assert";
+import {
+  type ContextMenuWindow,
+  deliverMenuClick,
+  extractMenuClickId,
+  handleMenuCommand,
+  handleMenuCommandByLabel,
+  type NativeMenuItem,
+  type SerializedMenuItem,
+  toNativeMenuItems,
+} from "./menu.ts";
+import { MENU_CLICK_CHANNEL, type PushMessage } from "./pushHub.ts";
+
+Deno.test("toNativeMenuItems converts items and separators", () => {
+  const input: SerializedMenuItem[] = [
+    { type: "item", id: "a", label: "Open" },
+    { type: "separator" },
+    { type: "item", id: "b", label: "Close" },
+  ];
+  assertEquals(toNativeMenuItems(input), [
+    { item: { label: "Open", id: "a", enabled: true } },
+    { role: { role: "separator" } },
+    { item: { label: "Close", id: "b", enabled: true } },
+  ]);
+});
+
+Deno.test("extractMenuClickId reads a string detail", () => {
+  assertEquals(extractMenuClickId("item-1"), "item-1");
+});
+
+Deno.test("extractMenuClickId reads an object detail with id", () => {
+  assertEquals(extractMenuClickId({ id: "item-2" }), "item-2");
+});
+
+Deno.test("extractMenuClickId returns null for unusable detail", () => {
+  assertEquals(extractMenuClickId(null), null);
+  assertEquals(extractMenuClickId(42), null);
+  assertEquals(extractMenuClickId({ other: "x" }), null);
+});
+
+Deno.test("deliverMenuClick sends the click to the target window", () => {
+  const sent: Array<{ windowLabel: string; message: PushMessage }> = [];
+  const sender = {
+    sendTo: (windowLabel: string, message: PushMessage) => {
+      sent.push({ windowLabel, message });
+    },
+  };
+
+  const id = deliverMenuClick(sender, "viewer-1", { id: "item-1" });
+
+  assertEquals(id, "item-1");
+  assertEquals(sent, [{
+    windowLabel: "viewer-1",
+    message: { channel: MENU_CLICK_CHANNEL, data: { id: "item-1" } },
+  }]);
+});
+
+Deno.test("deliverMenuClick ignores an unusable detail", () => {
+  const sent: PushMessage[] = [];
+  const sender = {
+    sendTo: (_windowLabel: string, message: PushMessage) => {
+      sent.push(message);
+    },
+  };
+
+  const id = deliverMenuClick(sender, "main", { other: "x" });
+
+  assertEquals(id, null);
+  assertEquals(sent, []);
+});
+
+Deno.test("handleMenuCommand shows the native context menu", async () => {
+  const calls: Array<{ x: number; y: number; items: NativeMenuItem[] }> = [];
+  const win: ContextMenuWindow = {
+    showContextMenu: (x, y, items) => {
+      calls.push({ x, y, items });
+    },
+  };
+
+  const result = await handleMenuCommand(win, "menu_popup", {
+    x: 10,
+    y: 20,
+    items: [{ type: "item", id: "a", label: "Open" }],
+  });
+
+  assertEquals(result, null);
+  assertEquals(calls, [{
+    x: 10,
+    y: 20,
+    items: [{ item: { label: "Open", id: "a", enabled: true } }],
+  }]);
+});
+
+Deno.test("handleMenuCommand rejects unknown commands", async () => {
+  const win: ContextMenuWindow = { showContextMenu: () => {} };
+  await assertRejects(
+    () => handleMenuCommand(win, "menu_other", { x: 0, y: 0, items: [] }),
+    Error,
+    "Unknown menu command",
+  );
+});
+
+Deno.test("handleMenuCommand rejects non-numeric coordinates", async () => {
+  const win: ContextMenuWindow = { showContextMenu: () => {} };
+  await assertRejects(
+    () =>
+      handleMenuCommand(win, "menu_popup", {
+        x: "10" as unknown as number,
+        y: 0,
+        items: [],
+      }),
+    Error,
+    "must be numbers",
+  );
+});
+
+Deno.test("handleMenuCommand rejects a non-array items argument", async () => {
+  const win: ContextMenuWindow = { showContextMenu: () => {} };
+  await assertRejects(
+    () =>
+      handleMenuCommand(win, "menu_popup", {
+        x: 0,
+        y: 0,
+        items: "nope" as unknown as SerializedMenuItem[],
+      }),
+    Error,
+    "must be an array",
+  );
+});
+
+Deno.test("handleMenuCommandByLabel resolves the window and shows the menu", async () => {
+  const calls: Array<{ x: number; y: number; items: NativeMenuItem[] }> = [];
+  const win: ContextMenuWindow = {
+    showContextMenu: (x, y, items) => {
+      calls.push({ x, y, items });
+    },
+  };
+
+  const result = await handleMenuCommandByLabel(
+    (label) => (label === "viewer-1" ? win : undefined),
+    "viewer-1",
+    "menu_popup",
+    { x: 5, y: 6, items: [{ type: "item", id: "a", label: "Open" }] },
+  );
+
+  assertEquals(result, null);
+  assertEquals(calls, [{
+    x: 5,
+    y: 6,
+    items: [{ item: { label: "Open", id: "a", enabled: true } }],
+  }]);
+});
+
+Deno.test("handleMenuCommandByLabel rejects a missing window label", async () => {
+  await assertRejects(
+    () =>
+      handleMenuCommandByLabel(
+        () => ({ showContextMenu: () => {} }),
+        undefined,
+        "menu_popup",
+        { x: 0, y: 0, items: [] },
+      ),
+    Error,
+    "windowLabel is required",
+  );
+});
+
+Deno.test("handleMenuCommandByLabel rejects when no window matches the label", async () => {
+  await assertRejects(
+    () =>
+      handleMenuCommandByLabel(
+        () => undefined,
+        "viewer-gone",
+        "menu_popup",
+        { x: 0, y: 0, items: [] },
+      ),
+    Error,
+    "no window for label 'viewer-gone'",
+  );
+});

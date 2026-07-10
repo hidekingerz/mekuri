@@ -16,7 +16,7 @@
 
 - **Node.js** 18以上
 - **pnpm** 8以上
-- **Rust** 1.70以上
+- **Deno** 2.9.1以上（`deno desktop` を使用）
 
 ### macOS
 
@@ -25,11 +25,6 @@ Xcode Command Line Toolsが必要です:
 ```bash
 xcode-select --install
 ```
-
-### Windows
-
-- [Microsoft Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 
 ## セットアップ
 
@@ -44,47 +39,47 @@ pnpm install
 
 ## 開発
 
+フロントエンド（React）は Vite でビルドし、その成果物（`dist/`）を Deno Desktop アプリが配信する。開発起動は次の手順で行う。
+
 ```bash
-# 開発モードで起動（ホットリロード有効）
-pnpm tauri dev
+# 1. フロントエンドをビルド（dist/ を生成）
+pnpm build
+
+# 2. Deno Desktop アプリを開発起動
+cd deno-app
+deno task dev
 ```
+
+フロントエンドのみを Vite dev サーバーで確認する場合は `pnpm dev` を使う。
 
 ## ビルド
 
 ```bash
-# プロダクションビルド（macOS）
-pnpm tauri build --bundles app
+# 1. フロントエンドをビルド
+pnpm build
 
-# プロダクションビルド（DMGも作成）
-pnpm tauri build --bundles dmg
+# 2. .app をビルド（dist を埋め込んだ自己完結アプリ）
+cd deno-app
+deno task build
 ```
 
-ビルド成果物は以下に生成されます:
-
-- **macOS**: `src-tauri/target/release/bundle/macos/mekuri.app`
-- **macOS (DMG)**: `src-tauri/target/release/bundle/dmg/mekuri_x.x.x_aarch64.dmg`
-- **Windows**: `src-tauri/target/release/bundle/msi/` または `nsis/`
+`deno task build` は `deno desktop --output Mekuri.app --include ../dist -A main.ts` を実行し、`deno-app/Mekuri.app` を生成する。
 
 ## テスト・リント
 
 ```bash
-# TypeScript リント
-pnpm lint
+# フロントエンド（React / TypeScript）
+pnpm lint      # Biome リント
+pnpm format    # Biome フォーマット
+pnpm test      # Vitest テスト
 
-# TypeScript フォーマット
-pnpm format
-
-# TypeScript テスト
-pnpm test
-
-# Rust リント
-cd src-tauri && cargo clippy
-
-# Rust フォーマット
-cd src-tauri && cargo fmt
-
-# Rust テスト
-cd src-tauri && cargo test
+# バックエンド / デスクトップ（deno-app/ 配下で実行）
+cd deno-app
+deno task verify   # 品質ゲート: fmt --check && lint && check && test
+deno task test     # テストのみ
+deno task check    # 型チェックのみ
+deno task fmt      # フォーマット
+deno task lint     # リント
 ```
 
 ## キーボードショートカット
@@ -101,7 +96,7 @@ cd src-tauri && cargo test
 
 ## 技術スタック
 
-- **Tauri v2** (Rust + React)
+- **Deno Desktop**（`Deno.BrowserWindow` + Deno プロセス、TypeScript バックエンド）
 - **React 19** + TypeScript
 - **Vite**
 

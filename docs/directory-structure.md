@@ -1,6 +1,6 @@
 # mekuri - ディレクトリ構成
 
-Tauri v2 + React + Vite の標準的な構成に従う。
+フロントエンド（React + Vite）と Deno Desktop バックエンド（`deno-app/`）を分離した構成に従う。
 
 ```
 mekuri/
@@ -48,23 +48,52 @@ mekuri/
 │       ├── global.css             #     グローバルスタイル（メインウィンドウ）
 │       └── viewer.css             #     ビューワー用スタイル
 │
-├── src-tauri/                     # バックエンド (Rust/Tauri)
-│   ├── Cargo.toml                 #   Rust 依存定義
-│   ├── tauri.conf.json            #   Tauri 設定（ウィンドウ、権限等）
-│   ├── capabilities/              #   Tauri v2 権限設定
-│   │   └── default.json           #     デフォルト権限
-│   ├── src/
-│   │   ├── main.rs                #     エントリポイント
-│   │   ├── lib.rs                 #     ライブラリルート
-│   │   ├── commands/              #     Tauri コマンド
-│   │   │   ├── mod.rs             #       モジュール定義
-│   │   │   ├── fs.rs              #       フォルダ走査コマンド
-│   │   │   └── archive.rs         #       アーカイブ操作コマンド
+├── deno-app/                      # バックエンド / デスクトップ (TypeScript / Deno)
+│   ├── deno.json                  #   tasks（verify/check/test/fmt/lint/dev/build）・imports 定義
+│   ├── deno.lock                  #   ロックファイル
+│   ├── main.ts                    #   Deno.BrowserWindow / Deno.serve への薄い配線層
+│   ├── frontend/                  #   webview 側 Tauri 互換 shim（ブラウザセーフ・backend 非 import）
+│   │   ├── invoke.ts              #     fetch POST /__invoke による invoke shim
+│   │   ├── events.ts              #     SSE /__events 購読
+│   │   ├── event.ts               #     emit/listen 互換
+│   │   ├── window.ts              #     window 操作互換
+│   │   ├── viewer.ts              #     ビューワー起動
+│   │   ├── dialog.ts              #     フォルダ選択ダイアログ互換
+│   │   ├── menu.ts                #     コンテキストメニュー互換
+│   │   ├── store.ts               #     設定ストア互換
+│   │   ├── windowLabel.ts         #     ウィンドウラベル生成
+│   │   └── mod.ts                 #     公開 API re-export
+│   ├── desktop/                   #   Desktop API 配線
+│   │   ├── httpInvoke.ts          #     POST /__invoke ハンドラ
+│   │   ├── pushHub.ts             #     SSE /__events（PushHub）
+│   │   ├── event.ts               #     イベント配送
+│   │   ├── bridge.ts              #     invoke ブリッジ
+│   │   ├── window.ts              #     窓操作
+│   │   ├── windowRegistry.ts      #     label → 窓 の解決
+│   │   ├── windowConfig.ts        #     メイン窓設定
+│   │   ├── viewer.ts              #     ビューワー窓生成
+│   │   ├── menu.ts                #     ネイティブメニュー
+│   │   ├── errorForwarder.ts      #     webview のエラー転送
+│   │   └── mod.ts                 #     公開 API re-export
+│   ├── bindings/                  #   コマンド名 → backend のディスパッチ
+│   │   ├── invoke.ts              #     invoke ディスパッチ
+│   │   ├── store.ts               #     store コマンド
+│   │   └── mod.ts                 #     公開 API re-export
+│   ├── backend/                   #   純ロジック（Desktop 非依存・単体テスト可能）
+│   │   ├── fs.ts                  #     ディレクトリ走査・ファイル読み込み・trash
+│   │   ├── sort.ts                #     自然順ソート
+│   │   ├── extensions.ts          #     拡張子・MIME 判定
+│   │   ├── dialog.ts              #     フォルダ選択コマンド組み立て
+│   │   ├── paths.ts               #     config dir / settings.json パス解決
+│   │   ├── settings.ts            #     設定スキーマ・アクセサ
+│   │   ├── store.ts               #     Store クラス（settings.json 永続化）
+│   │   ├── mod.ts                 #     公開 API re-export
 │   │   └── archive/               #     アーカイブ処理ロジック
-│   │       ├── mod.rs             #       モジュール定義
-│   │       ├── zip.rs             #       ZIP 処理
-│   │       └── rar.rs             #       RAR 処理
-│   └── icons/                     #   アプリアイコン
+│   │       ├── zip.ts             #       ZIP/CBZ 処理（@zip-js/zip-js）
+│   │       ├── rar.ts             #       RAR/CBR 処理（node-unrar-js）
+│   │       ├── cache.ts           #       アーカイブキャッシュ
+│   │       └── mod.ts             #       内容分析・画像取得・ネスト展開の統一 API
+│   └── scripts/                   #   補助スクリプト（check-no-tauri, make-test-cbz, smoke）
 │
 ├── index.html                     #   メインウィンドウ HTML
 ├── viewer.html                    #   ビューワーウィンドウ HTML
@@ -82,16 +111,18 @@ mekuri/
 
 ### マルチウィンドウ対応
 
-Tauri v2 のマルチウィンドウ機能を使うため、フロントエンドのエントリポイントを2つ用意する。
+`Deno.BrowserWindow` のマルチウィンドウを使うため、フロントエンドのエントリポイントを2つ用意する。
 
 - `index.html` + `src/main.tsx` → メインウィンドウ
 - `viewer.html` + `src/viewer.tsx` → ビューワーウィンドウ
 
 Vite の `build.rollupOptions.input` で複数エントリを指定する。
 
-### Rust モジュール分割
+### deno-app のレイヤ分割
 
-- `commands/`: Tauri の `#[tauri::command]` を定義するレイヤー。入出力の変換を行う
-- `archive/`: アーカイブ処理の実装レイヤー。Tauri に依存しない純粋なロジック
+- `frontend/`: webview に置く Tauri 互換 `invoke`/`event` shim。`backend` を import しないブラウザセーフ実装
+- `desktop/`: `Deno.serve`・`Deno.BrowserWindow` への配線（HTTP/SSE/窓/メニュー）
+- `bindings/`: コマンド名 → `backend` のディスパッチ
+- `backend/`: アーカイブ展開・FS・ソート等の純粋なロジック。Desktop API に依存しない
 
-この分離により、アーカイブ処理ロジックの単体テストが書きやすくなる。
+`backend/` を Desktop 非依存に保つことで、アーカイブ処理ロジックの単体テストが書きやすくなる（旧 Tauri 版の `commands/` と `archive/` の分離を引き継いだ方針）。

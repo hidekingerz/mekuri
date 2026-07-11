@@ -4,22 +4,21 @@
 
 | 項目 | 技術 | 備考 |
 |------|------|------|
-| アプリフレームワーク | **Tauri v2** | Rust + Web のデスクトップアプリフレームワーク |
+| アプリフレームワーク | **Deno Desktop** | `Deno.BrowserWindow` + Deno プロセス。`deno desktop` で main.ts をコンパイルし dist を埋め込んだ自己完結アプリにする |
 | フロントエンド | **React 19** + **TypeScript** | Vite でバンドル |
-| バックエンド | **Rust** (Tauri 内蔵) | |
-| ビルドツール | **Vite** | Tauri の推奨構成 |
+| バックエンド | **TypeScript**（Deno / `deno-app/`） | 純ロジックは Desktop API 非依存 |
+| ビルドツール | **Vite** | フロントエンド（`dist/`）のバンドル |
 
 ## フロントエンド依存ライブラリ
 
 | ライブラリ | 用途 |
 |-----------|------|
-| `@tauri-apps/api` | Tauri IPC 呼び出し（invoke, event, window） |
-| `@tauri-apps/plugin-dialog` | フォルダ選択ダイアログ |
-| `@tauri-apps/plugin-store` | 設定・お気に入りの永続化 |
 | `pdfjs-dist` | PDF のページレンダリング（CMap/標準フォント対応で CJK 文字表示可能） |
 | `react`, `react-dom` | UI コンポーネント |
 
 最小限の依存で構成する方針とする。アイコンは外部ライブラリを使わず、カスタム SVG コンポーネントで実装している。
+
+`@tauri-apps/*` への依存は撤去済み。IPC 呼び出しはフロント内の Tauri 互換 `invoke`/`event` shim（`deno-app/frontend/`）が `fetch("/__invoke")` および SSE `/__events` に変換して担う。フォルダ選択ダイアログ・設定/お気に入りの永続化もこの shim 経由でバックエンドが処理する。
 
 ### pdfjs-dist の静的アセット配信
 
@@ -29,39 +28,37 @@ pdfjs-dist が必要とする CMap ファイルと標準フォントファイル
 - **ビルド時**: `generateBundle` フックで出力ディレクトリにコピー
 - **URL パス**: `/pdfjs/cmaps/`, `/pdfjs/standard_fonts/`
 
-## Rust 依存クレート
+## バックエンド / デスクトップ依存（`deno-app/deno.json` の imports）
 
-| クレート | 用途 | 備考 |
-|---------|------|------|
-| `tauri` | アプリフレームワーク | v2 |
-| `tauri-plugin-dialog` | ダイアログプラグイン | |
-| `tauri-plugin-store` | キーバリューストアプラグイン | 設定・お気に入りの永続化 |
-| `serde`, `serde_json` | JSON シリアライズ / デシリアライズ | IPC データ変換用 |
-| `zip` | ZIP/CBZ ファイル展開 | deflate 機能のみ有効 |
-| `unrar` | RAR/CBR ファイル展開 | |
-| `natord` | 自然順ソート | ファイル名ソート用 |
-| `base64` | Base64 エンコーディング | 画像データ転送用 |
-| `tempfile` | 一時ファイル/ディレクトリ作成 | ネストアーカイブ展開用 |
+| ライブラリ | 用途 | 備考 |
+|-----------|------|------|
+| `@std/http` | HTTP サーバ補助 | `Deno.serve` による `/__invoke` / `/__events` / dist 配信 |
+| `@zip-js/zip-js` | ZIP/CBZ ファイル展開 | |
+| `node-unrar-js` | RAR/CBR ファイル展開 | |
+| `trash` | ファイルをゴミ箱へ移動 | |
+| `@std/fs` | ファイルシステム補助 | |
+| `@std/assert` | テスト用アサーション | |
+
+自然順ソートは `deno-app/backend/sort.ts`（自前実装）、設定永続化は自前 `Store` クラス（`settings.json`）、Base64 data URL への変換もバックエンド（TypeScript）で行う。
 
 ## 開発ツール
 
 | ツール | 用途 |
 |--------|------|
-| `pnpm` | パッケージマネージャ |
+| `pnpm` | フロントエンドのパッケージマネージャ |
 | `biome` | フロントエンドリンタ + フォーマッタ |
 | `vitest` | フロントエンドテストフレームワーク |
-| `clippy` | Rust リンタ |
-| `rustfmt` | Rust フォーマッタ |
+| `deno` | バックエンド / デスクトップのランタイム・リンタ・フォーマッタ・テスト（`deno lint` / `deno fmt` / `deno test`） |
 
 ## 対応プラットフォーム
 
 | OS | 状態 |
 |----|------|
-| Windows 10/11 | 対応 |
 | macOS 12+ | 対応 |
-| Linux (Ubuntu 22.04+) | 対応 |
 
-## Rust エディション
+Deno Desktop（`deno desktop`）が対応する範囲に準ずる。
 
-- **Rust 2021 edition** を使用する
-- MSRV（最小対応 Rust バージョン）は Tauri v2 の要件に準ずる
+## 実行要件
+
+- **Deno 2.9.1 以上**（`deno desktop` を使用）
+- フロントエンドのビルドに Node.js 18 以上 + pnpm 8 以上

@@ -197,8 +197,8 @@ body {
 
 .spread-viewer__mode-toggle--active {
   background: var(--viewer-color-bg-hover);
-  border-color: var(--viewer-color-accent);
-  color: var(--viewer-color-accent);
+  border-color: var(--viewer-color-accent-hover);
+  color: var(--viewer-color-text);
 }
 
 /* Nested archive selector */

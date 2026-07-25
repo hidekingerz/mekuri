@@ -257,7 +257,9 @@ export function SpreadViewer({
     const img = e.currentTarget;
     if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
     const aspect = img.naturalWidth / img.naturalHeight;
-    setPageAspect((prev) => (prev !== null && Math.abs(prev - aspect) < 0.001 ? prev : aspect));
+    // Latch the first measured page aspect (spec: measure the first displayed page).
+    // Updating on every load can oscillate fitPageCount on mixed-aspect archives.
+    setPageAspect((prev) => prev ?? aspect);
   }, []);
 
   const displayPages = isRtl ? [...currentGroup].reverse() : currentGroup;
@@ -336,6 +338,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "single" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("single")}
               title={VIEW_MODE_LABELS.single}
+              aria-pressed={viewMode === "single"}
             >
               <SinglePageIcon size={16} />
             </button>
@@ -344,6 +347,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "spread" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("spread")}
               title={VIEW_MODE_LABELS.spread}
+              aria-pressed={viewMode === "spread"}
             >
               <SpreadViewIcon size={16} />
             </button>
@@ -352,6 +356,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "triple" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("triple")}
               title={VIEW_MODE_LABELS.triple}
+              aria-pressed={viewMode === "triple"}
             >
               <TriplePageIcon size={16} />
             </button>
@@ -360,6 +365,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "fit" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("fit")}
               title={VIEW_MODE_LABELS.fit}
+              aria-pressed={viewMode === "fit"}
             >
               <FitWindowIcon size={16} />
             </button>

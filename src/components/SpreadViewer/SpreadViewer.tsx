@@ -9,15 +9,22 @@ import {
 } from "react";
 import { getViewerSettings, saveViewerSettings } from "../../api/settings";
 import { errorToString } from "../../utils/errorToString";
-import type { ReadingDirection, Spread, ViewMode } from "../../utils/spreadLayout";
-import { buildSpreads, currentPageFromSpread, spreadIndexForPage } from "../../utils/spreadLayout";
-import { LtrIcon, RtlIcon, SinglePageIcon, SpreadViewIcon } from "../Icons/Icons";
+import type { PageGroup, ReadingDirection, ViewMode } from "../../utils/spreadLayout";
+import { buildPageGroups, computeFitPageCount, groupIndexForPage } from "../../utils/spreadLayout";
+import {
+  FitWindowIcon,
+  LtrIcon,
+  RtlIcon,
+  SinglePageIcon,
+  SpreadViewIcon,
+  TriplePageIcon,
+} from "../Icons/Icons";
 import { PageImage } from "./PageImage";
 
 export type SpreadViewerHandle = {
   viewMode: ViewMode;
   readingDirection: ReadingDirection;
-  toggleViewMode: () => void;
+  setViewMode: (mode: ViewMode) => void;
   toggleReadingDirection: () => void;
 };
 
@@ -31,6 +38,16 @@ type SpreadViewerProps = {
   ref?: Ref<SpreadViewerHandle>;
 };
 
+/** Assumed page aspect (width/height) until a real page is measured. A4 portrait. */
+const DEFAULT_PAGE_ASPECT = 0.707;
+
+const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  single: "単ページ表示",
+  spread: "見開き表示",
+  triple: "3ページ表示",
+  fit: "ウィンドウ追従表示",
+};
+
 export function SpreadViewer({
   pageCount,
   pageNames,
@@ -40,122 +57,121 @@ export function SpreadViewer({
   defaultReadingDirection = "rtl",
   ref,
 }: SpreadViewerProps) {
-  const [spreadIndex, setSpreadIndex] = useState(0);
-  const [rightSrc, setRightSrc] = useState<string | null>(null);
-  const [leftSrc, setLeftSrc] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [srcs, setSrcs] = useState<(string | null)[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("spread");
+  const [viewMode, setViewModeState] = useState<ViewMode>("spread");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>(defaultReadingDirection);
-  const settingsLoaded = useRef(false);
+  const [pageAspect, setPageAspect] = useState<number | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const pagesRef = useRef<HTMLDivElement>(null);
 
   // Load saved settings on mount
   useEffect(() => {
     getViewerSettings().then((settings) => {
       if (settings.viewMode) {
-        setViewMode(settings.viewMode);
+        setViewModeState(settings.viewMode);
       }
       if (settings.readingDirection) {
         setReadingDirection(settings.readingDirection);
       }
-      settingsLoaded.current = true;
     });
+  }, []);
+
+  // Track the pages container size for the fit mode
+  useEffect(() => {
+    const el = pagesRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize({ width, height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   const isRtl = readingDirection === "rtl";
 
-  const spreads: Spread[] = useMemo(
-    () => buildSpreads(pageCount, viewMode, readingDirection),
-    [pageCount, viewMode, readingDirection],
+  const fitPageCount =
+    viewMode === "fit"
+      ? computeFitPageCount(
+          containerSize.width,
+          containerSize.height,
+          pageAspect ?? DEFAULT_PAGE_ASPECT,
+        )
+      : 2;
+
+  const groups: PageGroup[] = useMemo(
+    () => buildPageGroups(pageCount, viewMode, fitPageCount),
+    [pageCount, viewMode, fitPageCount],
   );
 
-  const currentSpread = spreads[spreadIndex] ?? { right: null, left: null };
+  // Derive the group index from the canonical currentPage so that position is
+  // preserved whenever the grouping changes (mode switch, fit resize).
+  const groupIndex = Math.max(
+    0,
+    groupIndexForPage(groups, Math.min(currentPage, Math.max(0, pageCount - 1))),
+  );
+  const currentGroup: PageGroup = groups[groupIndex] ?? [];
+  const groupKey = currentGroup.join(",");
 
-  const toggleViewMode = useCallback(() => {
-    setViewMode((prev) => {
-      const next: ViewMode = prev === "spread" ? "single" : "spread";
-      // Preserve current page position
-      const currentPageIndex = currentPageFromSpread(
-        spreads[spreadIndex] ?? { right: null, left: null },
-        readingDirection,
-      );
-      const newSpreads = buildSpreads(pageCount, next, readingDirection);
-      const newIndex = spreadIndexForPage(newSpreads, currentPageIndex);
-      setSpreadIndex(Math.max(0, newIndex));
-      saveViewerSettings({ viewMode: next });
-      return next;
-    });
-  }, [spreads, spreadIndex, pageCount, readingDirection]);
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeState(mode);
+    saveViewerSettings({ viewMode: mode });
+  }, []);
 
   const toggleReadingDirection = useCallback(() => {
     setReadingDirection((prev) => {
       const next: ReadingDirection = prev === "rtl" ? "ltr" : "rtl";
-      // Preserve current page position
-      const currentPageIndex = currentPageFromSpread(
-        spreads[spreadIndex] ?? { right: null, left: null },
-        prev,
-      );
-      const newSpreads = buildSpreads(pageCount, viewMode, next);
-      const newIndex = spreadIndexForPage(newSpreads, currentPageIndex);
-      setSpreadIndex(Math.max(0, newIndex));
       saveViewerSettings({ readingDirection: next });
       return next;
     });
-  }, [spreads, spreadIndex, pageCount, viewMode]);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     viewMode,
     readingDirection,
-    toggleViewMode,
+    setViewMode,
     toggleReadingDirection,
   }));
 
-  // Notify parent of spread change
+  // Notify parent of group change
   useEffect(() => {
-    onSpreadChange?.(spreadIndex, spreads.length);
-  }, [spreadIndex, spreads.length, onSpreadChange]);
+    onSpreadChange?.(groupIndex, groups.length);
+  }, [groupIndex, groups.length, onSpreadChange]);
 
-  // Load images for current spread
+  // Load images for the current group
   useEffect(() => {
     let cancelled = false;
+    const pages = groupKey === "" ? [] : groupKey.split(",").map(Number);
 
-    async function loadImages() {
-      setRightSrc(null);
-      setLeftSrc(null);
-      setLoadError(null);
+    setSrcs(pages.map(() => null));
+    setLoadError(null);
+    if (pages.length === 0) return;
 
-      try {
-        const [right, left] = await Promise.all([
-          currentSpread.right !== null
-            ? getPageDataUrl(currentSpread.right)
-            : Promise.resolve(null),
-          currentSpread.left !== null ? getPageDataUrl(currentSpread.left) : Promise.resolve(null),
-        ]);
+    Promise.all(pages.map((p) => getPageDataUrl(p)))
+      .then((loaded) => {
+        if (!cancelled) setSrcs(loaded);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(errorToString(err));
+      });
 
-        if (!cancelled) {
-          setRightSrc(right);
-          setLeftSrc(left);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(errorToString(err));
-        }
-      }
-    }
-
-    loadImages();
     return () => {
       cancelled = true;
     };
-  }, [getPageDataUrl, currentSpread.right, currentSpread.left]);
+  }, [getPageDataUrl, groupKey]);
 
   const goNext = useCallback(() => {
-    setSpreadIndex((prev) => Math.min(prev + 1, spreads.length - 1));
-  }, [spreads.length]);
+    const next = groups[groupIndex + 1];
+    if (next) setCurrentPage(next[0]);
+  }, [groups, groupIndex]);
 
   const goPrev = useCallback(() => {
-    setSpreadIndex((prev) => Math.max(prev - 1, 0));
-  }, []);
+    const prev = groups[groupIndex - 1];
+    if (prev) setCurrentPage(prev[0]);
+  }, [groups, groupIndex]);
 
   // Keyboard navigation (direction-aware)
   useEffect(() => {
@@ -171,16 +187,17 @@ export function SpreadViewer({
         isRtl ? goPrev() : goNext();
       } else if (e.key === "Home") {
         e.preventDefault();
-        setSpreadIndex(0);
+        setCurrentPage(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        setSpreadIndex(spreads.length - 1);
+        const last = groups[groups.length - 1];
+        if (last) setCurrentPage(last[0]);
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goNext, goPrev, spreads.length, isRtl]);
+  }, [goNext, goPrev, groups, isRtl]);
 
   // Mouse wheel navigation
   useEffect(() => {
@@ -204,9 +221,9 @@ export function SpreadViewer({
     return () => window.removeEventListener("wheel", handleWheel);
   }, [goNext, goPrev]);
 
-  const isFirst = spreadIndex === 0;
-  const isLast = spreadIndex >= spreads.length - 1;
-  const progressPercent = spreads.length > 1 ? (spreadIndex / (spreads.length - 1)) * 100 : 100;
+  const isFirst = groupIndex === 0;
+  const isLast = groupIndex >= groups.length - 1;
+  const progressPercent = groups.length > 1 ? (groupIndex / (groups.length - 1)) * 100 : 100;
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -214,13 +231,38 @@ export function SpreadViewer({
       const ratio = isRtl
         ? (rect.right - e.clientX) / rect.width
         : (e.clientX - rect.left) / rect.width;
-      const newIndex = Math.round(ratio * (spreads.length - 1));
-      setSpreadIndex(Math.max(0, Math.min(newIndex, spreads.length - 1)));
+      const newIndex = Math.round(ratio * (groups.length - 1));
+      const clamped = Math.max(0, Math.min(newIndex, groups.length - 1));
+      const group = groups[clamped];
+      if (group) setCurrentPage(group[0]);
     },
-    [spreads.length, isRtl],
+    [groups, isRtl],
   );
 
-  const isSingle = viewMode === "single";
+  // Page-turn by clicking the left/right half of the pages area
+  const handlePagesClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const isLeftHalf = e.clientX < window.innerWidth / 2;
+      if (isLeftHalf) {
+        isRtl ? goNext() : goPrev();
+      } else {
+        isRtl ? goPrev() : goNext();
+      }
+    },
+    [isRtl, goNext, goPrev],
+  );
+
+  // Measure the real page aspect for the fit mode
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+    const aspect = img.naturalWidth / img.naturalHeight;
+    setPageAspect((prev) => (prev !== null && Math.abs(prev - aspect) < 0.001 ? prev : aspect));
+  }, []);
+
+  const displayPages = isRtl ? [...currentGroup].reverse() : currentGroup;
+  const displaySrcs = isRtl ? [...srcs].reverse() : srcs;
+  const isPair = displayPages.length === 2;
 
   return (
     <div className="spread-viewer">
@@ -229,36 +271,21 @@ export function SpreadViewer({
           <p>Failed to load image: {loadError}</p>
         </div>
       )}
-      <div className="spread-viewer__pages">
-        {isSingle ? (
-          // Single page mode: one full-width page
-          // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level
-          <div className="spread-viewer__half spread-viewer__half--single" onClick={goNext}>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
+      <div
+        className={`spread-viewer__pages${isPair ? " spread-viewer__pages--pair" : ""}`}
+        ref={pagesRef}
+        onClick={handlePagesClick}
+      >
+        {displayPages.map((pageIndex, i) => (
+          <div className="spread-viewer__cell" key={pageIndex}>
             <PageImage
-              src={rightSrc}
-              alt={currentSpread.right !== null ? pageNames[currentSpread.right] : ""}
+              src={displaySrcs[i] ?? null}
+              alt={pageNames[pageIndex] ?? ""}
+              onLoad={handleImageLoad}
             />
           </div>
-        ) : (
-          <>
-            {/* Left half of screen: next in RTL, prev in LTR */}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-            <div className="spread-viewer__half" onClick={isRtl ? goNext : goPrev}>
-              <PageImage
-                src={leftSrc}
-                alt={currentSpread.left !== null ? pageNames[currentSpread.left] : ""}
-              />
-            </div>
-            {/* Right half of screen: prev in RTL, next in LTR */}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}
-            <div className="spread-viewer__half" onClick={isRtl ? goPrev : goNext}>
-              <PageImage
-                src={rightSrc}
-                alt={currentSpread.right !== null ? pageNames[currentSpread.right] : ""}
-              />
-            </div>
-          </>
-        )}
+        ))}
       </div>
       <div className="spread-viewer__footer">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: mouse interaction for progress bar */}
@@ -294,7 +321,7 @@ export function SpreadViewer({
             ←
           </button>
           <span className="spread-viewer__info">
-            {spreadIndex + 1} / {spreads.length}
+            {groupIndex + 1} / {groups.length}
           </span>
           <button
             type="button"
@@ -306,11 +333,35 @@ export function SpreadViewer({
           <div className="spread-viewer__toggles">
             <button
               type="button"
-              className="spread-viewer__mode-toggle"
-              onClick={toggleViewMode}
-              title={isSingle ? "見開き表示" : "単ページ表示"}
+              className={`spread-viewer__mode-toggle${viewMode === "single" ? " spread-viewer__mode-toggle--active" : ""}`}
+              onClick={() => setViewMode("single")}
+              title={VIEW_MODE_LABELS.single}
             >
-              {isSingle ? <SpreadViewIcon size={16} /> : <SinglePageIcon size={16} />}
+              <SinglePageIcon size={16} />
+            </button>
+            <button
+              type="button"
+              className={`spread-viewer__mode-toggle${viewMode === "spread" ? " spread-viewer__mode-toggle--active" : ""}`}
+              onClick={() => setViewMode("spread")}
+              title={VIEW_MODE_LABELS.spread}
+            >
+              <SpreadViewIcon size={16} />
+            </button>
+            <button
+              type="button"
+              className={`spread-viewer__mode-toggle${viewMode === "triple" ? " spread-viewer__mode-toggle--active" : ""}`}
+              onClick={() => setViewMode("triple")}
+              title={VIEW_MODE_LABELS.triple}
+            >
+              <TriplePageIcon size={16} />
+            </button>
+            <button
+              type="button"
+              className={`spread-viewer__mode-toggle${viewMode === "fit" ? " spread-viewer__mode-toggle--active" : ""}`}
+              onClick={() => setViewMode("fit")}
+              title={VIEW_MODE_LABELS.fit}
+            >
+              <FitWindowIcon size={16} />
             </button>
             <button
               type="button"

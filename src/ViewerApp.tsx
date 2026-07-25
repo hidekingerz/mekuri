@@ -95,19 +95,34 @@ function Viewer() {
       const currentPath = archivePathRef.current;
       if (!currentPath) return;
 
-      const { Menu, MenuItem, PredefinedMenuItem } = await import("@tauri-apps/api/menu");
+      const { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } = await import(
+        "@tauri-apps/api/menu"
+      );
       const handle = spreadViewerRef.current;
 
-      const viewModeItem = await MenuItem.new({
-        text: handle?.viewMode === "single" ? "見開き表示" : "単ページ表示",
-        action: () => handle?.toggleViewMode(),
-      });
+      const modeEntries = [
+        ["single", "単ページ表示"],
+        ["spread", "見開き表示"],
+        ["triple", "3ページ表示"],
+        ["fit", "ウィンドウ追従表示"],
+      ] as const;
+
+      const modeItems = await Promise.all(
+        modeEntries.map(([mode, text]) =>
+          CheckMenuItem.new({
+            text,
+            checked: handle?.viewMode === mode,
+            action: () => handle?.setViewMode(mode),
+          }),
+        ),
+      );
 
       const directionItem = await MenuItem.new({
         text: handle?.readingDirection === "rtl" ? "左→右 (LTR) に切替" : "右→左 (RTL) に切替",
         action: () => handle?.toggleReadingDirection(),
       });
 
+      const separator0 = await PredefinedMenuItem.new({ item: "Separator" });
       const separator1 = await PredefinedMenuItem.new({ item: "Separator" });
       const separator2 = await PredefinedMenuItem.new({ item: "Separator" });
 
@@ -122,7 +137,15 @@ function Viewer() {
       });
 
       const menu = await Menu.new({
-        items: [viewModeItem, directionItem, separator1, trashItem, separator2, closeItem],
+        items: [
+          ...modeItems,
+          separator0,
+          directionItem,
+          separator1,
+          trashItem,
+          separator2,
+          closeItem,
+        ],
       });
       await menu.popup();
     }

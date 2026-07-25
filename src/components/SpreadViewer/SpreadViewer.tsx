@@ -39,7 +39,7 @@ type SpreadViewerProps = {
 };
 
 /** Assumed page aspect (width/height) until a real page is measured. A4 portrait. */
-const DEFAULT_PAGE_ASPECT = 0.707;
+const DEFAULT_PAGE_ASPECT = Math.SQRT1_2;
 
 const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   single: "単ページ表示",

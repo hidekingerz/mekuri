@@ -47,7 +47,7 @@ export function buildPageGroups(
       groupSize = 3;
       break;
     case "fit":
-      groupSize = Math.max(1, Math.floor(fitPageCount));
+      groupSize = Number.isFinite(fitPageCount) ? Math.max(1, Math.floor(fitPageCount)) : 1;
       break;
   }
 
@@ -86,6 +86,13 @@ export function computeFitPageCount(
   containerHeight: number,
   pageAspect: number,
 ): number {
+  if (
+    !Number.isFinite(containerWidth) ||
+    !Number.isFinite(containerHeight) ||
+    !Number.isFinite(pageAspect)
+  ) {
+    return 1;
+  }
   if (containerWidth <= 0 || containerHeight <= 0 || pageAspect <= 0) return 1;
   return Math.max(1, Math.floor(containerWidth / (containerHeight * pageAspect)));
 }

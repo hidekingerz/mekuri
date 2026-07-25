@@ -74,6 +74,10 @@ describe("buildPageGroups (fit)", () => {
   it("treats N below 1 as 1", () => {
     expect(buildPageGroups(3, "fit", 0)).toEqual([[0], [1], [2]]);
   });
+
+  it("treats NaN fitPageCount as 1", () => {
+    expect(buildPageGroups(3, "fit", Number.NaN)).toEqual([[0], [1], [2]]);
+  });
 });
 
 describe("groupIndexForPage", () => {
@@ -103,30 +107,36 @@ describe("currentPageFromGroup", () => {
 });
 
 describe("computeFitPageCount", () => {
-  // pageAspect = 幅/高さ。A4 縦 ≒ 0.707
+  // pageAspect = 幅/高さ。A4 縦 = 1/√2
   it("returns 1 for a portrait window", () => {
-    expect(computeFitPageCount(800, 1200, 0.707)).toBe(1);
+    expect(computeFitPageCount(800, 1200, Math.SQRT1_2)).toBe(1);
   });
 
   it("returns 4 for an ultrawide window (21:9)", () => {
-    // 2560 / (1080 * 0.707) = 3.35... → 3? 21:9 実寸で検証:
-    // 3440 / (1440 * 0.707) = 3.379 → 3
-    expect(computeFitPageCount(3440, 1440, 0.707)).toBe(3);
+    // 2560 / (1080 * Math.SQRT1_2) = 3.35... → 3? 21:9 実寸で検証:
+    // 3440 / (1440 * Math.SQRT1_2) = 3.379 → 3
+    expect(computeFitPageCount(3440, 1440, Math.SQRT1_2)).toBe(3);
     // より横長なら 4
-    expect(computeFitPageCount(4096, 1440, 0.707)).toBe(4);
+    expect(computeFitPageCount(4096, 1440, Math.SQRT1_2)).toBe(4);
   });
 
   it("returns at least 1 even when nothing fits", () => {
-    expect(computeFitPageCount(100, 1200, 0.707)).toBe(1);
+    expect(computeFitPageCount(100, 1200, Math.SQRT1_2)).toBe(1);
   });
 
   it("returns 1 for zero or negative sizes", () => {
-    expect(computeFitPageCount(0, 1080, 0.707)).toBe(1);
-    expect(computeFitPageCount(1920, 0, 0.707)).toBe(1);
-    expect(computeFitPageCount(-100, 1080, 0.707)).toBe(1);
+    expect(computeFitPageCount(0, 1080, Math.SQRT1_2)).toBe(1);
+    expect(computeFitPageCount(1920, 0, Math.SQRT1_2)).toBe(1);
+    expect(computeFitPageCount(-100, 1080, Math.SQRT1_2)).toBe(1);
   });
 
   it("returns 1 for zero or negative aspect", () => {
     expect(computeFitPageCount(1920, 1080, 0)).toBe(1);
+  });
+
+  it("returns 1 for non-finite inputs", () => {
+    expect(computeFitPageCount(Number.NaN, 1080, Math.SQRT1_2)).toBe(1);
+    expect(computeFitPageCount(Number.POSITIVE_INFINITY, 1080, Math.SQRT1_2)).toBe(1);
+    expect(computeFitPageCount(1920, 1080, Number.NaN)).toBe(1);
   });
 });

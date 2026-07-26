@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -33,6 +34,13 @@ function App() {
   useEffect(() => {
     async function loadSettings() {
       const win = getCurrentWindow();
+      // Finder のファイルオープン起動ではメインウィンドウを表示しない
+      let openedViaFile = false;
+      try {
+        openedViaFile = await invoke<boolean>("was_opened_via_file");
+      } catch (err) {
+        console.error("Failed to query launch state:", err);
+      }
       try {
         const settings = await getWindowSettings();
         setWidth(settings.treeColumnWidth);
@@ -40,8 +48,9 @@ function App() {
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
-        // Always show window
-        await win.show();
+        if (!openedViaFile) {
+          await win.show();
+        }
         setSettingsLoaded(true);
       }
     }

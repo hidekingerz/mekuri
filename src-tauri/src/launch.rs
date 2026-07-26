@@ -41,7 +41,8 @@ pub fn is_supported_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn encode_uri_component(s: &str) -> String {
+/// JS の encodeURIComponent 互換エンコード（クロスプラットフォームの純関数）。
+pub fn encode_uri_component(s: &str) -> String {
     utf8_percent_encode(s, URI_COMPONENT).to_string()
 }
 

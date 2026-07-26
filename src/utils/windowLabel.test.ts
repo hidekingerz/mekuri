@@ -17,6 +17,16 @@ describe("hashCode", () => {
   it("handles empty string", () => {
     expect(hashCode("")).toBe("0");
   });
+
+  it("matches the Rust golden vectors (src-tauri/src/window_label.rs)", () => {
+    // 値を変える場合は必ず Rust 側のテストも同時に更新すること
+    expect(hashCode("test")).toBe("2487m");
+    expect(hashCode("/path/to/file.zip")).toBe("pwu1o8");
+    expect(hashCode("a.zip")).toBe("1i800k");
+    expect(hashCode("b.zip")).toBe("1irslx");
+    expect(hashCode("/home/user/comics/vol1.cbz")).toBe("6noich");
+    expect(hashCode("/Users/山田/漫画/第1巻.zip")).toBe("bs292c");
+  });
 });
 
 describe("viewerLabel", () => {
@@ -31,6 +41,10 @@ describe("viewerLabel", () => {
 
   it("produces different labels for different paths", () => {
     expect(viewerLabel("a.zip")).not.toBe(viewerLabel("b.zip"));
+  });
+
+  it("matches the Rust golden vector (src-tauri/src/window_label.rs)", () => {
+    expect(viewerLabel("/home/user/comics/vol1.cbz")).toBe("viewer-6noich");
   });
 });
 

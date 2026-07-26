@@ -264,3 +264,26 @@ Tauri のマルチウィンドウ機能を使用する。
 | `windowLabel` | アーカイブパスからウィンドウラベルのハッシュ生成、ファイル名抽出 |
 | `pdf` | PDF ファイルの読み込みとページレンダリング（pdfjs-dist 使用、CMap/標準フォント対応） |
 | `fileType` | ファイルパスの拡張子からファイル種別（archive/pdf/unknown）を判定 |
+
+## Finder からのファイルオープン（macOS）
+
+`bundle.fileAssociations`（zip/cbz/rar/cbr/pdf, role=Viewer）により、バンドルされた
+.app の Info.plist に `CFBundleDocumentTypes` が生成され、Finder の
+「このアプリケーションで開く」に mekuri が表示される（`pnpm tauri dev` では無効）。
+
+フロー:
+
+1. Finder で開くと macOS が Apple Event を配送し、Tauri の
+   `RunEvent::Opened { urls }` が発火する（新規起動・起動中とも同じ）
+2. `src-tauri/src/launch.rs` の `handle_run_event` が `LaunchState.opened_via_file`
+   を立て、対応拡張子のみ `viewer.html?archive=<path>` のビューワーウィンドウを
+   Rust から直接生成する。ウィンドウラベルは `src-tauri/src/window_label.rs`
+   （JS `src/utils/windowLabel.ts` と同一アルゴリズム）で計算し、フォルダツリー
+   経由と二重オープン防止を共有する
+3. メインウィンドウのフロント（`src/App.tsx`）は起動時に `was_opened_via_file`
+   コマンドを参照し、true なら `show()` を抑制する（ビューワーのみ起動）
+4. 全ウィンドウを閉じた後の Dock クリックは `RunEvent::Reopen` で受け、
+   メインウィンドウを表示（破棄済みなら設定から再生成）する
+
+注意: `window_label.rs` と `windowLabel.ts` は同一のテストベクタを持ち、
+アルゴリズムの乖離をテストで検知する。片方を変更する場合は必ず両方を更新する。

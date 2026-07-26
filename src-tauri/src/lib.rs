@@ -1,5 +1,6 @@
 mod archive;
 mod commands;
+pub mod window_label;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

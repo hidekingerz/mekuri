@@ -187,6 +187,13 @@ function Viewer() {
   // Archive loader (only active for archive files)
   const archive = useArchiveLoader(isPdf ? null : archivePath);
 
+  // Nested archive transitions remount SpreadViewer without changing archivePath,
+  // so resumePage must be reset explicitly here (navigateToArchive doesn't run).
+  const handleBackToNestedList = useCallback(() => {
+    setResumePage(0);
+    archive.backToNestedList();
+  }, [archive]);
+
   // PDF loader (only active for PDF files)
   const pdf = usePdfLoader(isPdf ? archivePath : null);
 
@@ -248,7 +255,10 @@ function Viewer() {
                 <button
                   type="button"
                   className="nested-selector__item"
-                  onClick={() => archive.selectNestedArchive(name)}
+                  onClick={() => {
+                    setResumePage(0);
+                    archive.selectNestedArchive(name);
+                  }}
                 >
                   {name.split("/").pop() || name}
                 </button>
@@ -289,7 +299,7 @@ function Viewer() {
         pageNames={pageNames}
         getPageDataUrl={getPageDataUrl}
         onSpreadChange={handleSpreadChange}
-        onBack={!isPdf && archive.hasNestedCache ? archive.backToNestedList : undefined}
+        onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         defaultReadingDirection={defaultReadingDirection}
         initialPage={resumePage}
         movePanel={{

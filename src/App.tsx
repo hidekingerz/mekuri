@@ -189,6 +189,9 @@ function App() {
       minWidth: VIEWER_MIN_WIDTH,
       minHeight: VIEWER_MIN_HEIGHT,
       visible: true,
+      // Tauri のネイティブ drag-drop 横取りを無効化しないと、
+      // webview 内の HTML5 D&D（ファイル移動）が発火しない
+      dragDropEnabled: false,
     });
     webview.once("tauri://error", (e) => {
       console.error("Failed to create viewer window:", e);

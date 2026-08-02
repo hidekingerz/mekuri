@@ -21,6 +21,7 @@
         "minHeight": 400,
         "resizable": true,
         "visible": false,
+        "dragDropEnabled": false,
         "url": "index.html"
       }
     ],

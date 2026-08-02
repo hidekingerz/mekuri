@@ -165,6 +165,32 @@ export function FitWindowIcon({ size = 16, className }: IconProps) {
   );
 }
 
+export function MoveFolderIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M2 4C2 3.44772 2.44772 3 3 3H6.17157C6.43679 3 6.69114 3.10536 6.87868 3.29289L7.70711 4.12132C7.89464 4.30886 8.149 4.41421 8.41421 4.41421H13C13.5523 4.41421 14 4.86193 14 5.41421V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V4Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      />
+      <path
+        d="M6 8.5H10M10 8.5L8.5 7M10 8.5L8.5 10"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function PdfIcon({ size = 16, className }: IconProps) {
   return (
     <svg

@@ -2,9 +2,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
-import { getSiblingArchives, trashFile } from "./api/directory";
+import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
+import { SubfolderPanel } from "./components/SubfolderPanel/SubfolderPanel";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { usePdfLoader } from "./hooks/usePdfLoader";
 import { useSiblingNavigation } from "./hooks/useSiblingNavigation";
@@ -17,6 +18,9 @@ import { fileNameFromPath } from "./utils/windowLabel";
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
   const [trashError, setTrashError] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [movePanelOpen, setMovePanelOpen] = useState(false);
+  const [resumePage, setResumePage] = useState(0);
   const spreadViewerRef = useRef<SpreadViewerHandle>(null);
 
   // Read archive path from URL query parameter
@@ -36,7 +40,12 @@ function Viewer() {
   }, []);
   useWindowResize(handleWindowResize);
 
-  useSiblingNavigation(archivePath, setArchivePath);
+  const navigateToArchive = useCallback((path: string) => {
+    setResumePage(0);
+    setArchivePath(path);
+  }, []);
+
+  useSiblingNavigation(archivePath, navigateToArchive);
 
   // Native OS context menu with "Move to Trash"
   const archivePathRef = useRef(archivePath);
@@ -65,13 +74,34 @@ function Viewer() {
       await emit("file-trashed");
 
       if (nextPath) {
-        setArchivePath(nextPath);
+        navigateToArchive(nextPath);
         await getCurrentWindow().setTitle(`${fileNameFromPath(nextPath)} - mekuri`);
       } else {
         await getCurrentWindow().close();
       }
     } catch (err) {
       setTrashError(errorToString(err));
+    }
+  }, [navigateToArchive]);
+
+  const handleToggleMovePanel = useCallback(() => {
+    setMovePanelOpen((v) => !v);
+  }, []);
+
+  const handleMoveTo = useCallback(async (destDir: string) => {
+    const currentPath = archivePathRef.current;
+    if (!currentPath) return;
+    setMoveError(null);
+    try {
+      const newPath = await moveFile(currentPath, destDir);
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("file-moved");
+      // 新パスで再読込しても同じページ位置から再開する
+      setResumePage(spreadViewerRef.current?.currentPage ?? 0);
+      setMovePanelOpen(false);
+      setArchivePath(newPath);
+    } catch (err) {
+      setMoveError(errorToString(err));
     }
   }, []);
 
@@ -244,7 +274,16 @@ function Viewer() {
 
   return (
     <div className="viewer">
+      {moveError && (
+        <div className="viewer__move-error" role="alert">
+          <span>Failed to move file: {moveError}</span>
+          <button type="button" onClick={() => setMoveError(null)}>
+            ×
+          </button>
+        </div>
+      )}
       <SpreadViewer
+        key={archivePath}
         ref={spreadViewerRef}
         pageCount={pageCount}
         pageNames={pageNames}
@@ -252,7 +291,14 @@ function Viewer() {
         onSpreadChange={handleSpreadChange}
         onBack={!isPdf && archive.hasNestedCache ? archive.backToNestedList : undefined}
         defaultReadingDirection={defaultReadingDirection}
+        initialPage={resumePage}
+        movePanel={{
+          open: movePanelOpen,
+          onToggle: handleToggleMovePanel,
+          dragData: archivePath,
+        }}
       />
+      {movePanelOpen && <SubfolderPanel archivePath={archivePath} onMove={handleMoveTo} />}
     </div>
   );
 }

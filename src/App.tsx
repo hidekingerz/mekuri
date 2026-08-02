@@ -74,6 +74,16 @@ function App() {
     }
   }, [selectedFavorite]);
 
+  const runSearch = useCallback(async (root: string, query: string) => {
+    try {
+      const results = await searchDirectory(root, query);
+      setSearchResults(results);
+    } catch (err) {
+      console.error("Search failed:", err);
+      setSearchResults([]);
+    }
+  }, []);
+
   // Debounced search
   useEffect(() => {
     if (searchTimerRef.current) {
@@ -85,14 +95,8 @@ function App() {
       return;
     }
 
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const results = await searchDirectory(selectedFavorite, searchQuery);
-        setSearchResults(results);
-      } catch (err) {
-        console.error("Search failed:", err);
-        setSearchResults([]);
-      }
+    searchTimerRef.current = setTimeout(() => {
+      void runSearch(selectedFavorite, searchQuery);
     }, 300);
 
     return () => {
@@ -100,7 +104,7 @@ function App() {
         clearTimeout(searchTimerRef.current);
       }
     };
-  }, [searchQuery, selectedFavorite]);
+  }, [searchQuery, selectedFavorite, runSearch]);
 
   // Reset search when favorite changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: must reset search when selectedFavorite changes
@@ -149,16 +153,23 @@ function App() {
     setFavoritesRefresh((n) => n + 1);
   }, []);
 
-  const handleFileDrop = useCallback(async (srcPath: string, destDir: string) => {
-    setMoveError(null);
-    try {
-      await moveFile(srcPath, destDir);
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("file-moved");
-    } catch (err) {
-      setMoveError(errorToString(err));
-    }
-  }, []);
+  const handleFileDrop = useCallback(
+    async (srcPath: string, destDir: string) => {
+      setMoveError(null);
+      try {
+        await moveFile(srcPath, destDir);
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("file-moved");
+        // Refresh the active search so a moved-out entry doesn't linger stale.
+        if (searchResults !== null && selectedFavorite && searchQuery) {
+          await runSearch(selectedFavorite, searchQuery);
+        }
+      } catch (err) {
+        setMoveError(errorToString(err));
+      }
+    },
+    [searchResults, selectedFavorite, searchQuery, runSearch],
+  );
 
   const handleArchiveSelect = useCallback(async (archivePath: string) => {
     const label = viewerLabel(archivePath);

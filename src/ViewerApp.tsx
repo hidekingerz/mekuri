@@ -272,6 +272,10 @@ function Viewer() {
 
   const defaultReadingDirection: ReadingDirection = isPdf ? "ltr" : "rtl";
 
+  // Moving the outer archive of a nested container remounts through the nested
+  // selector, dropping page position and selection — disable move in that flow.
+  const canMoveFile = isPdf || !archive.hasNestedCache;
+
   if (pageCount === 0) {
     return (
       <div className="viewer viewer--empty">
@@ -302,13 +306,19 @@ function Viewer() {
         onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         defaultReadingDirection={defaultReadingDirection}
         initialPage={resumePage}
-        movePanel={{
-          open: movePanelOpen,
-          onToggle: handleToggleMovePanel,
-          dragData: archivePath,
-        }}
+        movePanel={
+          canMoveFile
+            ? {
+                open: movePanelOpen,
+                onToggle: handleToggleMovePanel,
+                dragData: archivePath,
+              }
+            : undefined
+        }
       />
-      {movePanelOpen && <SubfolderPanel archivePath={archivePath} onMove={handleMoveTo} />}
+      {movePanelOpen && canMoveFile && (
+        <SubfolderPanel archivePath={archivePath} onMove={handleMoveTo} />
+      )}
     </div>
   );
 }

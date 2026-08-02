@@ -34,6 +34,10 @@ export async function trashFile(path: string): Promise<void> {
   return invoke<void>("trash_file", { path });
 }
 
+export async function moveFile(src: string, destDir: string): Promise<string> {
+  return invoke<string>("move_file", { src, destDir });
+}
+
 export async function getSiblingArchives(
   currentPath: string,
 ): Promise<{ archives: string[]; currentIndex: number }> {

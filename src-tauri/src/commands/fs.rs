@@ -92,6 +92,57 @@ pub fn trash_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn move_file(src: String, dest_dir: String) -> Result<String, String> {
+    let src_path = PathBuf::from(&src);
+    if !src_path.exists() {
+        return Err(format!("File does not exist: {src}"));
+    }
+    if !src_path.is_file() {
+        return Err(format!("Path is not a file: {src}"));
+    }
+    let dest_dir_path = PathBuf::from(&dest_dir);
+    if !dest_dir_path.is_dir() {
+        return Err(format!("Destination is not a directory: {dest_dir}"));
+    }
+
+    // 同一フォルダへの移動は no-op ではなくエラーとして返す
+    let src_parent = src_path
+        .parent()
+        .ok_or_else(|| format!("Invalid file path: {src}"))?;
+    let same_dir = match (src_parent.canonicalize(), dest_dir_path.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    };
+    if same_dir {
+        return Err("Source and destination are the same folder".to_string());
+    }
+
+    let file_name = src_path
+        .file_name()
+        .ok_or_else(|| format!("Invalid file path: {src}"))?;
+    let dest_path = dest_dir_path.join(file_name);
+    if dest_path.exists() {
+        return Err(format!(
+            "A file with the same name already exists: {}",
+            dest_path.display()
+        ));
+    }
+
+    // rename を試し、失敗（クロスデバイス等）なら copy + remove にフォールバック。
+    // コピー後の削除失敗は二重存在を許容し、データ喪失は起こさない。
+    if std::fs::rename(&src_path, &dest_path).is_err() {
+        std::fs::copy(&src_path, &dest_path).map_err(|e| format!("Failed to copy file: {e}"))?;
+        std::fs::remove_file(&src_path)
+            .map_err(|e| format!("Copied to destination but failed to remove the original: {e}"))?;
+    }
+
+    dest_path
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Destination path is not valid UTF-8".to_string())
+}
+
+#[tauri::command]
 pub fn search_directory(path: String, query: String) -> Result<Vec<DirectoryEntry>, String> {
     let dir_path = PathBuf::from(&path);
     let query_lower = query.to_lowercase();
@@ -278,5 +329,92 @@ mod tests {
         let result = trash_file(file_path.to_string_lossy().to_string());
         assert!(result.is_ok(), "trash_file failed: {:?}", result);
         assert!(!file_path.exists());
+    }
+
+    #[test]
+    fn move_file_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("a.zip");
+        std::fs::write(&src, b"data").unwrap();
+        let dest_dir = dir.path().join("sub");
+        std::fs::create_dir(&dest_dir).unwrap();
+
+        let result = move_file(
+            src.to_string_lossy().to_string(),
+            dest_dir.to_string_lossy().to_string(),
+        );
+
+        let new_path = result.unwrap();
+        assert_eq!(new_path, dest_dir.join("a.zip").to_string_lossy());
+        assert!(!src.exists());
+        assert!(dest_dir.join("a.zip").exists());
+        assert_eq!(std::fs::read(dest_dir.join("a.zip")).unwrap(), b"data");
+    }
+
+    #[test]
+    fn move_file_collision_is_error_and_keeps_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("a.zip");
+        std::fs::write(&src, b"data").unwrap();
+        let dest_dir = dir.path().join("sub");
+        std::fs::create_dir(&dest_dir).unwrap();
+        std::fs::write(dest_dir.join("a.zip"), b"other").unwrap();
+
+        let result = move_file(
+            src.to_string_lossy().to_string(),
+            dest_dir.to_string_lossy().to_string(),
+        );
+
+        assert!(result.unwrap_err().contains("already exists"));
+        assert!(src.exists());
+        assert_eq!(std::fs::read(dest_dir.join("a.zip")).unwrap(), b"other");
+    }
+
+    #[test]
+    fn move_file_nonexistent_src() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = move_file(
+            "/tmp/nonexistent_mekuri_move_12345.zip".to_string(),
+            dir.path().to_string_lossy().to_string(),
+        );
+        assert!(result.unwrap_err().contains("does not exist"));
+    }
+
+    #[test]
+    fn move_file_src_is_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        let result = move_file(
+            sub.to_string_lossy().to_string(),
+            dir.path().to_string_lossy().to_string(),
+        );
+        assert!(result.unwrap_err().contains("not a file"));
+    }
+
+    #[test]
+    fn move_file_dest_not_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("a.zip");
+        std::fs::write(&src, b"data").unwrap();
+        let result = move_file(
+            src.to_string_lossy().to_string(),
+            dir.path().join("no_such_dir").to_string_lossy().to_string(),
+        );
+        assert!(result.unwrap_err().contains("not a directory"));
+        assert!(src.exists());
+    }
+
+    #[test]
+    fn move_file_same_directory_is_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("a.zip");
+        std::fs::write(&src, b"data").unwrap();
+        let result = move_file(
+            src.to_string_lossy().to_string(),
+            dir.path().to_string_lossy().to_string(),
+        );
+        assert!(result.unwrap_err().contains("same"));
+        assert!(src.exists());
     }
 }

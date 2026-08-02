@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { readDirectoryFiles, trashFile } from "../../api/directory";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry } from "../../types";
+import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
@@ -72,15 +73,19 @@ export function FileList({
     };
   }, [folderPath]);
 
-  // Reload file list when a file is trashed from the viewer window
+  // Reload file list when a file is trashed or moved from another surface
   useEffect(() => {
     if (!folderPath) return;
     const path = folderPath;
-    const unlisten = listen("file-trashed", () => {
+    const unlistenTrash = listen("file-trashed", () => {
+      loadFiles(path);
+    });
+    const unlistenMove = listen("file-moved", () => {
       loadFiles(path);
     });
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenTrash.then((fn) => fn());
+      unlistenMove.then((fn) => fn());
     };
   }, [folderPath, loadFiles]);
 
@@ -140,6 +145,11 @@ export function FileList({
               onClick={() => onArchiveSelect(file.path)}
               onContextMenu={(e) => openContextMenu(e, file.path)}
               title={file.path}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
+                e.dataTransfer.effectAllowed = "move";
+              }}
             >
               {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
               <span className="file-list__name">{file.name}</span>
@@ -206,6 +216,11 @@ export function FileList({
             onClick={() => onArchiveSelect(file.path)}
             onContextMenu={(e) => openContextMenu(e, file.path)}
             title={file.path}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
+              e.dataTransfer.effectAllowed = "move";
+            }}
           >
             {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
             <span className="file-list__name">{file.name}</span>

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { TreeNodeData } from "../../types";
+import { FILE_DRAG_MIME } from "../../utils/constants";
 import { ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
 
 type TreeNodeProps = {
@@ -8,6 +10,7 @@ type TreeNodeProps = {
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, path: string) => void;
+  onFileDrop: (srcPath: string, destDir: string) => void;
 };
 
 export function TreeNode({
@@ -17,9 +20,11 @@ export function TreeNode({
   onToggle,
   onSelect,
   onContextMenu,
+  onFileDrop,
 }: TreeNodeProps) {
   const { entry } = node;
   const isSelected = entry.path === selectedPath;
+  const [isDragOver, setIsDragOver] = useState(false);
   // Hide chevron if the folder has no subfolders
   const hasChildren = entry.has_subfolders;
 
@@ -35,14 +40,38 @@ export function TreeNode({
     onContextMenu(e, entry.path);
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(FILE_DRAG_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const srcPath = e.dataTransfer.getData(FILE_DRAG_MIME);
+    if (srcPath) {
+      onFileDrop(srcPath, entry.path);
+    }
+  };
+
   return (
     <>
       <div
-        className={`tree-node tree-node--folder ${isSelected ? "tree-node--selected" : ""}`}
+        className={`tree-node tree-node--folder ${isSelected ? "tree-node--selected" : ""}${isDragOver ? " tree-node--drop-target" : ""}`}
         style={{ paddingLeft: `${depth * 20 + 8}px` }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -101,6 +130,7 @@ export function TreeNode({
             onToggle={onToggle}
             onSelect={onSelect}
             onContextMenu={onContextMenu}
+            onFileDrop={onFileDrop}
           />
         ))}
     </>

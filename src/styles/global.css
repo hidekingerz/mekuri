@@ -448,3 +448,40 @@ body {
   flex: 1;
   min-width: 0;
 }
+
+/* Drag & drop file move */
+.tree-node--drop-target {
+  outline: 2px solid #4a90d9;
+  outline-offset: -2px;
+  background-color: rgba(74, 144, 217, 0.15);
+}
+
+.toolbar__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  padding: 4px 10px;
+  background: #5a2b2b;
+  color: #f0c0c0;
+  border: 1px solid #a05050;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.toolbar__error span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar__error-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+}

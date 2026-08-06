@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getFavorites, removeFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
+import { FILE_DRAG_MIME } from "../../utils/constants";
 import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
 
@@ -8,14 +9,17 @@ type FavoritesSidebarProps = {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   refreshTrigger?: number;
+  onFileDrop?: (srcPath: string, destDir: string) => void;
 };
 
 export function FavoritesSidebar({
   selectedPath,
   onSelect,
   refreshTrigger,
+  onFileDrop,
 }: FavoritesSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
 
   const loadFavorites = useCallback(async () => {
@@ -47,9 +51,25 @@ export function FavoritesSidebar({
             <button
               key={path}
               type="button"
-              className={`favorites-sidebar__item ${selectedPath === path ? "favorites-sidebar__item--selected" : ""}`}
+              className={`favorites-sidebar__item ${selectedPath === path ? "favorites-sidebar__item--selected" : ""}${dragOverPath === path ? " favorites-sidebar__item--drop-target" : ""}`}
               onClick={() => onSelect(path)}
               onContextMenu={(e) => openContextMenu(e, path)}
+              onDragOver={(e) => {
+                if (onFileDrop && e.dataTransfer.types.includes(FILE_DRAG_MIME)) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverPath(path);
+                }
+              }}
+              onDragLeave={() => setDragOverPath(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverPath(null);
+                const srcPath = e.dataTransfer.getData(FILE_DRAG_MIME);
+                if (srcPath && onFileDrop) {
+                  onFileDrop(srcPath, path);
+                }
+              }}
               title={path}
             >
               <FolderIcon size={14} />

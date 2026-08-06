@@ -233,6 +233,7 @@ function App() {
           selectedPath={selectedFavorite}
           onSelect={handleFavoriteSelect}
           refreshTrigger={favoritesRefresh}
+          onFileDrop={handleFileDrop}
         />
         <div className="app__tree-column" style={{ width: treeColumnWidth, flexShrink: 0 }}>
           {selectedFavorite ? (

@@ -323,3 +323,8 @@ body {
   padding: 0;
   line-height: 1;
 }
+
+/* Parent-folder chip: dashed border to distinguish "up" from subfolders */
+.subfolder-panel__chip--parent {
+  border-style: dashed;
+}

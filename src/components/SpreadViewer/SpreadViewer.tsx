@@ -8,12 +8,19 @@ import {
   useState,
 } from "react";
 import { getViewerSettings, saveViewerSettings } from "../../api/settings";
+import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import type { PageGroup, ReadingDirection, ViewMode } from "../../utils/spreadLayout";
-import { buildPageGroups, computeFitPageCount, groupIndexForPage } from "../../utils/spreadLayout";
+import {
+  buildPageGroups,
+  computeFitPageCount,
+  currentPageFromGroup,
+  groupIndexForPage,
+} from "../../utils/spreadLayout";
 import {
   FitWindowIcon,
   LtrIcon,
+  MoveFolderIcon,
   RtlIcon,
   SinglePageIcon,
   SpreadViewIcon,
@@ -24,6 +31,7 @@ import { PageImage } from "./PageImage";
 export type SpreadViewerHandle = {
   viewMode: ViewMode;
   readingDirection: ReadingDirection;
+  currentPage: number;
   setViewMode: (mode: ViewMode) => void;
   toggleReadingDirection: () => void;
 };
@@ -35,6 +43,14 @@ type SpreadViewerProps = {
   onSpreadChange?: (spreadIndex: number, totalSpreads: number) => void;
   onBack?: () => void;
   defaultReadingDirection?: ReadingDirection;
+  /** マウント時に開くページ index（移動後の位置復帰用） */
+  initialPage?: number;
+  /** ファイル移動パネル連携（指定時のみ移動ボタンとドラッグを有効化） */
+  movePanel?: {
+    open: boolean;
+    onToggle: () => void;
+    dragData: string;
+  };
   ref?: Ref<SpreadViewerHandle>;
 };
 
@@ -55,9 +71,11 @@ export function SpreadViewer({
   onSpreadChange,
   onBack,
   defaultReadingDirection = "rtl",
+  initialPage,
+  movePanel,
   ref,
 }: SpreadViewerProps) {
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(initialPage ?? 0);
   const [srcs, setSrcs] = useState<(string | null)[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [viewMode, setViewModeState] = useState<ViewMode>("spread");
@@ -132,6 +150,7 @@ export function SpreadViewer({
   useImperativeHandle(ref, () => ({
     viewMode,
     readingDirection,
+    currentPage: currentPageFromGroup(currentGroup),
     setViewMode,
     toggleReadingDirection,
   }));
@@ -278,6 +297,15 @@ export function SpreadViewer({
         className={`spread-viewer__pages${isPair ? " spread-viewer__pages--pair" : ""}`}
         ref={pagesRef}
         onClick={handlePagesClick}
+        draggable={movePanel?.open ?? false}
+        onDragStart={(e) => {
+          if (!movePanel?.open) {
+            e.preventDefault();
+            return;
+          }
+          e.dataTransfer.setData(FILE_DRAG_MIME, movePanel.dragData);
+          e.dataTransfer.effectAllowed = "move";
+        }}
       >
         {displayPages.map((pageIndex, i) => (
           <div className="spread-viewer__cell" key={pageIndex}>
@@ -377,6 +405,17 @@ export function SpreadViewer({
             >
               {isRtl ? <RtlIcon size={16} /> : <LtrIcon size={16} />}
             </button>
+            {movePanel && (
+              <button
+                type="button"
+                className={`spread-viewer__mode-toggle${movePanel.open ? " spread-viewer__mode-toggle--active" : ""}`}
+                onClick={movePanel.onToggle}
+                title="ファイルを移動"
+                aria-pressed={movePanel.open}
+              >
+                <MoveFolderIcon size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>

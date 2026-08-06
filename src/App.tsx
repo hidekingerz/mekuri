@@ -3,7 +3,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { searchDirectory } from "./api/directory";
+import { moveFile, searchDirectory } from "./api/directory";
 import { addFavorite } from "./api/favorites";
 import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
@@ -13,6 +13,7 @@ import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
 import type { DirectoryEntry } from "./types";
 import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
+import { errorToString } from "./utils/errorToString";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DirectoryEntry[] | null>(null);
   const [revealPath, setRevealPath] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const columnsRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
@@ -72,6 +74,16 @@ function App() {
     }
   }, [selectedFavorite]);
 
+  const runSearch = useCallback(async (root: string, query: string) => {
+    try {
+      const results = await searchDirectory(root, query);
+      setSearchResults(results);
+    } catch (err) {
+      console.error("Search failed:", err);
+      setSearchResults([]);
+    }
+  }, []);
+
   // Debounced search
   useEffect(() => {
     if (searchTimerRef.current) {
@@ -83,14 +95,8 @@ function App() {
       return;
     }
 
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const results = await searchDirectory(selectedFavorite, searchQuery);
-        setSearchResults(results);
-      } catch (err) {
-        console.error("Search failed:", err);
-        setSearchResults([]);
-      }
+    searchTimerRef.current = setTimeout(() => {
+      void runSearch(selectedFavorite, searchQuery);
     }, 300);
 
     return () => {
@@ -98,7 +104,7 @@ function App() {
         clearTimeout(searchTimerRef.current);
       }
     };
-  }, [searchQuery, selectedFavorite]);
+  }, [searchQuery, selectedFavorite, runSearch]);
 
   // Reset search when favorite changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: must reset search when selectedFavorite changes
@@ -147,6 +153,24 @@ function App() {
     setFavoritesRefresh((n) => n + 1);
   }, []);
 
+  const handleFileDrop = useCallback(
+    async (srcPath: string, destDir: string) => {
+      setMoveError(null);
+      try {
+        await moveFile(srcPath, destDir);
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("file-moved");
+        // Refresh the active search so a moved-out entry doesn't linger stale.
+        if (searchResults !== null && selectedFavorite && searchQuery) {
+          await runSearch(selectedFavorite, searchQuery);
+        }
+      } catch (err) {
+        setMoveError(errorToString(err));
+      }
+    },
+    [searchResults, selectedFavorite, searchQuery, runSearch],
+  );
+
   const handleArchiveSelect = useCallback(async (archivePath: string) => {
     const label = viewerLabel(archivePath);
 
@@ -165,6 +189,9 @@ function App() {
       minWidth: VIEWER_MIN_WIDTH,
       minHeight: VIEWER_MIN_HEIGHT,
       visible: true,
+      // Tauri のネイティブ drag-drop 横取りを無効化しないと、
+      // webview 内の HTML5 D&D（ファイル移動）が発火しない
+      dragDropEnabled: false,
     });
     webview.once("tauri://error", (e) => {
       console.error("Failed to create viewer window:", e);
@@ -185,6 +212,18 @@ function App() {
           onChange={(e) => setSearchQuery(e.target.value)}
           disabled={!selectedFavorite}
         />
+        {moveError && (
+          <div className="toolbar__error" role="alert">
+            <span>Failed to move: {moveError}</span>
+            <button
+              type="button"
+              className="toolbar__error-close"
+              onClick={() => setMoveError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
       <div
         className={`app__columns ${isResizing ? "app__columns--resizing" : ""}`}
@@ -194,6 +233,7 @@ function App() {
           selectedPath={selectedFavorite}
           onSelect={handleFavoriteSelect}
           refreshTrigger={favoritesRefresh}
+          onFileDrop={handleFileDrop}
         />
         <div className="app__tree-column" style={{ width: treeColumnWidth, flexShrink: 0 }}>
           {selectedFavorite ? (
@@ -205,6 +245,7 @@ function App() {
               searchFolders={searchFolders}
               revealPath={revealPath}
               onRevealComplete={handleRevealComplete}
+              onFileDrop={handleFileDrop}
             />
           ) : (
             <div className="column-empty">

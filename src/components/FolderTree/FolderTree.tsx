@@ -15,6 +15,7 @@ type FolderTreeProps = {
   searchFolders: DirectoryEntry[] | null;
   revealPath: string | null;
   onRevealComplete: () => void;
+  onFileDrop: (srcPath: string, destDir: string) => void;
 };
 
 // rootPath から targetPath までの各階層のパスを返す
@@ -75,6 +76,7 @@ export function FolderTree({
   searchFolders,
   revealPath,
   onRevealComplete,
+  onFileDrop,
 }: FolderTreeProps) {
   const [nodes, setNodes] = useState<TreeNodeData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -236,6 +238,7 @@ export function FolderTree({
           onToggle={toggleNode}
           onSelect={onFolderSelect}
           onContextMenu={openContextMenu}
+          onFileDrop={onFileDrop}
         />
       ))}
 

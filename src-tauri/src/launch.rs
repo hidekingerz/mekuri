@@ -109,6 +109,9 @@ mod macos {
                 .title(title)
                 .inner_size(width, height)
                 .min_inner_size(VIEWER_MIN_WIDTH, VIEWER_MIN_HEIGHT)
+                // Tauri のネイティブ drag-drop 横取りを無効化しないと、
+                // webview 内の HTML5 D&D（ファイル移動）が発火しない
+                .disable_drag_drop_handler()
                 .build();
             if let Err(e) = result {
                 eprintln!("mekuri: failed to create viewer window: {e}");

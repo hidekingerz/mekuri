@@ -10,3 +10,6 @@ export const DEFAULT_MAIN_HEIGHT = 700;
 export const DEFAULT_TREE_COLUMN_WIDTH = 300;
 export const DEFAULT_VIEWER_WIDTH = 1200;
 export const DEFAULT_VIEWER_HEIGHT = 900;
+
+/** D&D でファイルパスを受け渡すための独自 MIME タイプ */
+export const FILE_DRAG_MIME = "application/x-mekuri-file";

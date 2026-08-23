@@ -91,6 +91,20 @@ pub fn trash_file(path: String) -> Result<(), String> {
     trash::delete(&file_path).map_err(|e| format!("Failed to move file to trash: {e}"))
 }
 
+/// 複数ファイルをゴミ箱へ移動する。失敗したものがあっても残りを処理し、失敗分をまとめて返す。
+#[tauri::command]
+pub fn trash_files(paths: Vec<String>) -> Result<(), String> {
+    let failures: Vec<String> = paths
+        .into_iter()
+        .filter_map(|path| trash_file(path).err())
+        .collect();
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("\n"))
+    }
+}
+
 #[tauri::command]
 pub fn move_file(src: String, dest_dir: String) -> Result<String, String> {
     let src_path = PathBuf::from(&src);
@@ -254,6 +268,21 @@ mod tests {
         let result = trash_file(dir_path);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Path is not a file"));
+    }
+
+    #[test]
+    fn trash_files_reports_all_failures_and_continues() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("missing.zip").to_string_lossy().to_string();
+        let dir_path = dir.path().to_string_lossy().to_string();
+        let err = trash_files(vec![missing.clone(), dir_path.clone()]).unwrap_err();
+        assert!(err.contains("missing.zip"), "{err}");
+        assert!(err.contains("Path is not a file"), "{err}");
+    }
+
+    #[test]
+    fn trash_files_empty_is_ok() {
+        assert!(trash_files(vec![]).is_ok());
     }
 
     #[test]

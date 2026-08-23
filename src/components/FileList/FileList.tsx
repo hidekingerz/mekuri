@@ -1,8 +1,9 @@
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useState } from "react";
-import { readDirectoryFiles, trashFile } from "../../api/directory";
+import { readDirectoryFiles, trashFiles } from "../../api/directory";
 import { useContextMenu } from "../../hooks/useContextMenu";
+import { useFileSelection } from "../../hooks/useFileSelection";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
@@ -15,6 +16,18 @@ type FileListProps = {
   searchResults: DirectoryEntry[] | null;
 };
 
+const CONFIRM_PREVIEW_COUNT = 5;
+
+function confirmMessage(paths: string[]): string {
+  if (paths.length === 1) {
+    return `Are you sure you want to move this file to the trash?\n\n${paths[0]}`;
+  }
+  const preview = paths.slice(0, CONFIRM_PREVIEW_COUNT).join("\n");
+  const rest = paths.length - CONFIRM_PREVIEW_COUNT;
+  const suffix = rest > 0 ? `\n…and ${rest} more` : "";
+  return `Are you sure you want to move ${paths.length} files to the trash?\n\n${preview}${suffix}`;
+}
+
 export function FileList({
   folderPath,
   onArchiveSelect,
@@ -25,6 +38,7 @@ export function FileList({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
+  const { selected, toggle, selectRange, clear } = useFileSelection();
 
   const loadFiles = useCallback(async (path: string) => {
     setLoading(true);
@@ -73,6 +87,13 @@ export function FileList({
     };
   }, [folderPath]);
 
+  // Clear selection whenever the displayed list changes
+  const [prevList, setPrevList] = useState({ folderPath, searchResults });
+  if (prevList.folderPath !== folderPath || prevList.searchResults !== searchResults) {
+    setPrevList({ folderPath, searchResults });
+    clear();
+  }
+
   // Reload file list when a file is trashed or moved from another surface
   useEffect(() => {
     if (!folderPath) return;
@@ -89,24 +110,101 @@ export function FileList({
     };
   }, [folderPath, loadFiles]);
 
-  const handleTrashFile = useCallback(async () => {
-    if (!contextMenu || !folderPath) return;
-    const filePath = contextMenu.path;
+  const trashPaths = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0) return;
+      const confirmed = await ask(confirmMessage(paths), {
+        title: "Move to Trash",
+        kind: "warning",
+      });
+      if (!confirmed) return;
+
+      try {
+        await trashFiles(paths);
+      } catch (err) {
+        setError(errorToString(err));
+      } finally {
+        clear();
+        if (folderPath) await loadFiles(folderPath);
+        await emit("file-trashed");
+      }
+    },
+    [folderPath, loadFiles, clear],
+  );
+
+  // Right-click on a selected item targets the whole selection; otherwise only that item
+  const contextTargets =
+    contextMenu && selected.has(contextMenu.path)
+      ? [...selected]
+      : contextMenu
+        ? [contextMenu.path]
+        : [];
+
+  const handleTrashFromMenu = useCallback(() => {
     closeContextMenu();
+    trashPaths(contextTargets);
+  }, [closeContextMenu, trashPaths, contextTargets]);
 
-    const confirmed = await ask(
-      `Are you sure you want to move this file to the trash?\n\n${filePath}`,
-      { title: "Move to Trash", kind: "warning" },
-    );
-    if (!confirmed) return;
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Escape") {
+        clear();
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+        e.preventDefault();
+        trashPaths([...selected]);
+      }
+    },
+    [clear, selected, trashPaths],
+  );
 
-    try {
-      await trashFile(filePath);
-      await loadFiles(folderPath);
-    } catch (err) {
-      setError(errorToString(err));
+  const handleItemClick = (e: React.MouseEvent, file: DirectoryEntry, order: string[]) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      selectRange(order, file.path);
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      toggle(file.path);
+    } else {
+      clear();
+      onArchiveSelect(file.path);
     }
-  }, [contextMenu, folderPath, closeContextMenu, loadFiles]);
+  };
+
+  const renderFileItem = (file: DirectoryEntry, order: string[]) => (
+    <button
+      key={file.path}
+      type="button"
+      className={`file-list__item${selected.has(file.path) ? " file-list__item--selected" : ""}`}
+      onClick={(e) => handleItemClick(e, file, order)}
+      onContextMenu={(e) => openContextMenu(e, file.path)}
+      title={file.path}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+    >
+      {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
+      <span className="file-list__name">{file.name}</span>
+    </button>
+  );
+
+  const renderContextMenu = () =>
+    contextMenu && (
+      <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+        <button
+          type="button"
+          className="context-menu__item context-menu__item--danger"
+          onClick={handleTrashFromMenu}
+        >
+          {contextTargets.length > 1
+            ? `Move ${contextTargets.length} files to Trash`
+            : "Move to Trash"}
+        </button>
+      </div>
+    );
 
   // 検索結果表示モード
   if (searchResults !== null) {
@@ -120,9 +218,11 @@ export function FileList({
 
     const resultFolders = searchResults.filter((e) => e.is_dir);
     const resultFiles = searchResults.filter((e) => !e.is_dir);
+    const order = resultFiles.map((f) => f.path);
 
     return (
-      <div className="file-list">
+      // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
+      <div className="file-list" tabIndex={-1} onKeyDown={handleKeyDown}>
         <div className="file-list__header">Search Results</div>
         <div className="file-list__items">
           {resultFolders.map((folder) => (
@@ -137,37 +237,9 @@ export function FileList({
               <span className="file-list__name">{folder.name}</span>
             </button>
           ))}
-          {resultFiles.map((file) => (
-            <button
-              key={file.path}
-              type="button"
-              className="file-list__item"
-              onClick={() => onArchiveSelect(file.path)}
-              onContextMenu={(e) => openContextMenu(e, file.path)}
-              title={file.path}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-            >
-              {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
-              <span className="file-list__name">{file.name}</span>
-            </button>
-          ))}
+          {resultFiles.map((file) => renderFileItem(file, order))}
         </div>
-
-        {contextMenu && (
-          <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
-            <button
-              type="button"
-              className="context-menu__item context-menu__item--danger"
-              onClick={handleTrashFile}
-            >
-              Move to Trash
-            </button>
-          </div>
-        )}
+        {renderContextMenu()}
       </div>
     );
   }
@@ -204,41 +276,14 @@ export function FileList({
     );
   }
 
-  return (
-    <div className="file-list">
-      <div className="file-list__header">Files</div>
-      <div className="file-list__items">
-        {files.map((file) => (
-          <button
-            key={file.path}
-            type="button"
-            className="file-list__item"
-            onClick={() => onArchiveSelect(file.path)}
-            onContextMenu={(e) => openContextMenu(e, file.path)}
-            title={file.path}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
-              e.dataTransfer.effectAllowed = "move";
-            }}
-          >
-            {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
-            <span className="file-list__name">{file.name}</span>
-          </button>
-        ))}
-      </div>
+  const order = files.map((f) => f.path);
 
-      {contextMenu && (
-        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
-          <button
-            type="button"
-            className="context-menu__item context-menu__item--danger"
-            onClick={handleTrashFile}
-          >
-            Move to Trash
-          </button>
-        </div>
-      )}
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
+    <div className="file-list" tabIndex={-1} onKeyDown={handleKeyDown}>
+      <div className="file-list__header">Files</div>
+      <div className="file-list__items">{files.map((file) => renderFileItem(file, order))}</div>
+      {renderContextMenu()}
     </div>
   );
 }

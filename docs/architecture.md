@@ -121,6 +121,21 @@ Output:  string   // 展開された一時ファイルのパス
 
 親アーカイブ内のネストアーカイブを一時ディレクトリに展開し、そのパスを返す。一時ディレクトリはアプリ終了まで保持される。
 
+### ファイルのゴミ箱移動
+
+```
+Command: trash_file
+Input:   { path: string }
+Output:  void
+
+Command: trash_files
+Input:   { paths: string[] }
+Output:  void
+```
+
+`trash_files` は複数ファイルを順に処理し、一部が失敗しても残りを処理したうえで失敗分のメッセージを改行区切りでまとめて `Err` として返す。
+完了後はフロントエンドが `file-trashed` イベントを emit し、他ウィンドウのファイルリストが再読込される。
+
 ## ウィンドウ管理
 
 Tauri のマルチウィンドウ機能を使用する。

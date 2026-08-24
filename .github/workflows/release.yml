@@ -31,12 +31,20 @@ jobs:
 
       - run: pnpm install
 
-      # Builds the app and uploads the .dmg / .app archive as assets to the
-      # release for this tag (creates the release if it does not exist yet).
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build
+        run: pnpm tauri build --target aarch64-apple-darwin
+
+      # tauri-action's built-in uploader cannot resolve artifact paths for
+      # explicit --target builds (tauri-apps/tauri-action#243), so upload
+      # the bundle to the tag's release with the gh CLI instead.
+      - name: Upload release assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          args: --target aarch64-apple-darwin
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "$tag" --generate-notes
+          fi
+          gh release upload "$tag" --clobber \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          gh release edit "$tag" --draft=false

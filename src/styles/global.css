@@ -276,6 +276,11 @@ body {
   background-color: var(--color-bg-link-hover);
 }
 
+.file-list__item--selected,
+.file-list__item--selected:hover {
+  background-color: var(--color-bg-selected);
+}
+
 .file-list__name {
   overflow: hidden;
   text-overflow: ellipsis;

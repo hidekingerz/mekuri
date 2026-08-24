@@ -47,3 +47,7 @@ export async function getSiblingArchives(
   const currentIndex = archives.indexOf(currentPath);
   return { archives, currentIndex };
 }
+
+export async function trashFiles(paths: string[]): Promise<void> {
+  return invoke<void>("trash_files", { paths });
+}

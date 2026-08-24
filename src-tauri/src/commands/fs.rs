@@ -79,16 +79,42 @@ pub fn read_file_base64(path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(&data))
 }
 
-#[tauri::command]
-pub fn trash_file(path: String) -> Result<(), String> {
-    let file_path = PathBuf::from(&path);
+fn validate_trash_target(path: &str) -> Result<PathBuf, String> {
+    let file_path = PathBuf::from(path);
     if !file_path.exists() {
         return Err(format!("File does not exist: {path}"));
     }
     if !file_path.is_file() {
         return Err(format!("Path is not a file: {path}"));
     }
+    Ok(file_path)
+}
+
+#[tauri::command]
+pub fn trash_file(path: String) -> Result<(), String> {
+    let file_path = validate_trash_target(&path)?;
     trash::delete(&file_path).map_err(|e| format!("Failed to move file to trash: {e}"))
+}
+
+/// 複数ファイルをゴミ箱へ移動する。全パスを事前検証し、無効なものがあれば何も削除せずまとめて返す。
+/// 削除は `delete_all` で 1 回の操作にまとめる（macOS では Finder 呼び出しが 1 回で済む）。
+#[tauri::command]
+pub fn trash_files(paths: Vec<String>) -> Result<(), String> {
+    let mut targets = Vec::with_capacity(paths.len());
+    let mut errors = Vec::new();
+    for path in &paths {
+        match validate_trash_target(path) {
+            Ok(p) => targets.push(p),
+            Err(e) => errors.push(e),
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors.join("\n"));
+    }
+    if targets.is_empty() {
+        return Ok(());
+    }
+    trash::delete_all(&targets).map_err(|e| format!("Failed to move files to trash: {e}"))
 }
 
 #[tauri::command]
@@ -257,6 +283,28 @@ mod tests {
     }
 
     #[test]
+    fn trash_files_reports_all_invalid_paths_without_trashing_anything() {
+        let dir = tempfile::tempdir().unwrap();
+        let valid = dir.path().join("valid.zip");
+        fs::write(&valid, "").unwrap();
+        let missing = dir.path().join("missing.zip").to_string_lossy().to_string();
+        let dir_path = dir.path().to_string_lossy().to_string();
+        let err =
+            trash_files(vec![valid.to_string_lossy().to_string(), missing, dir_path]).unwrap_err();
+        assert!(err.contains("missing.zip"), "{err}");
+        assert!(err.contains("Path is not a file"), "{err}");
+        assert!(
+            valid.exists(),
+            "valid file must not be trashed when validation fails"
+        );
+    }
+
+    #[test]
+    fn trash_files_empty_is_ok() {
+        assert!(trash_files(vec![]).is_ok());
+    }
+
+    #[test]
     fn search_directory_finds_matching_files() {
         let dir = tempfile::tempdir().unwrap();
         let sub = dir.path().join("subdir");
@@ -329,6 +377,24 @@ mod tests {
         let result = trash_file(file_path.to_string_lossy().to_string());
         assert!(result.is_ok(), "trash_file failed: {:?}", result);
         assert!(!file_path.exists());
+    }
+
+    #[test]
+    #[ignore] // Requires Finder interaction on macOS; run manually with `cargo test -- --ignored`
+    fn trash_files_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.zip");
+        let b = dir.path().join("b.zip");
+        fs::write(&a, "").unwrap();
+        fs::write(&b, "").unwrap();
+
+        let result = trash_files(vec![
+            a.to_string_lossy().to_string(),
+            b.to_string_lossy().to_string(),
+        ]);
+        assert!(result.is_ok(), "trash_files failed: {:?}", result);
+        assert!(!a.exists());
+        assert!(!b.exists());
     }
 
     #[test]

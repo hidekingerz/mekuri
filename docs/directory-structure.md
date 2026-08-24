@@ -33,6 +33,7 @@ mekuri/
 │   │   ├── usePdfLoader.ts        #     PDF 読み込み・ページレンダリング
 │   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
+│   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
 │   │   └── useWindowResize.ts     #     ウィンドウリサイズ検知
 │   ├── utils/                     #   ユーティリティ
 │   │   ├── spreadLayout.ts        #     見開きレイアウト計算（RTL/LTR 対応）
@@ -41,7 +42,9 @@ mekuri/
 │   │   ├── fileType.ts            #     ファイル種別判定
 │   │   ├── fileType.test.ts       #     fileType テスト
 │   │   ├── windowLabel.ts         #     ウィンドウラベル生成
-│   │   └── windowLabel.test.ts    #     windowLabel テスト
+│   │   ├── windowLabel.test.ts    #     windowLabel テスト
+│   │   ├── selection.ts           #     選択トグル・範囲選択の純粋ロジック
+│   │   └── selection.test.ts      #     selection テスト
 │   ├── types/                     #   型定義
 │   │   └── index.ts               #     共通型（DirectoryEntry）
 │   └── styles/                    #   スタイル

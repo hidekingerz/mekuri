@@ -32,7 +32,7 @@ jobs:
       - run: pnpm install
 
       - name: Build
-        run: pnpm tauri build --target aarch64-apple-darwin
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
 
       # tauri-action's built-in uploader cannot resolve artifact paths for
       # explicit --target builds (tauri-apps/tauri-action#243), so upload

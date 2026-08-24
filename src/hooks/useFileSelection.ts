@@ -22,10 +22,15 @@ export function useFileSelection() {
     [anchor],
   );
 
+  const selectOnly = useCallback((path: string) => {
+    setSelected(new Set([path]));
+    setAnchor(path);
+  }, []);
+
   const clear = useCallback(() => {
     setSelected(new Set());
     setAnchor(null);
   }, []);
 
-  return { selected, toggle, selectRange, clear };
+  return { selected, toggle, selectRange, selectOnly, clear };
 }

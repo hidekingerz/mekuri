@@ -38,7 +38,7 @@ export function FileList({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
-  const { selected, toggle, selectRange, clear } = useFileSelection();
+  const { selected, toggle, selectRange, selectOnly, clear } = useFileSelection();
 
   const loadFiles = useCallback(async (path: string) => {
     setLoading(true);
@@ -159,6 +159,7 @@ export function FileList({
     [clear, selected, trashPaths],
   );
 
+  // Finder-style: single click selects (and anchors a range), double click opens
   const handleItemClick = (e: React.MouseEvent, file: DirectoryEntry, order: string[]) => {
     if (e.shiftKey) {
       e.preventDefault();
@@ -167,8 +168,7 @@ export function FileList({
       e.preventDefault();
       toggle(file.path);
     } else {
-      clear();
-      onArchiveSelect(file.path);
+      selectOnly(file.path);
     }
   };
 
@@ -178,6 +178,7 @@ export function FileList({
       type="button"
       className={`file-list__item${selected.has(file.path) ? " file-list__item--selected" : ""}`}
       onClick={(e) => handleItemClick(e, file, order)}
+      onDoubleClick={() => onArchiveSelect(file.path)}
       onContextMenu={(e) => openContextMenu(e, file.path)}
       title={file.path}
       draggable

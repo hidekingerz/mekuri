@@ -33,6 +33,11 @@ jobs:
 
       - name: Build
         run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+        env:
+          # Ad-hoc sign the whole bundle. Without this only the linker's
+          # ad-hoc signature is present and Gatekeeper reports the
+          # downloaded app as "damaged" instead of merely unidentified.
+          APPLE_SIGNING_IDENTITY: "-"
 
       # tauri-action's built-in uploader cannot resolve artifact paths for
       # explicit --target builds (tauri-apps/tauri-action#243), so upload

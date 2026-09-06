@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { DirectoryEntry } from "../types";
+import { errorToString } from "../utils/errorToString";
 
 export async function readDirectory(path: string): Promise<DirectoryEntry[]> {
   return invoke<DirectoryEntry[]>("read_directory", { path });
@@ -50,4 +51,20 @@ export async function getSiblingArchives(
 
 export async function trashFiles(paths: string[]): Promise<void> {
   return invoke<void>("trash_files", { paths });
+}
+
+export type MoveFilesResult = { moved: string[]; errors: string[] };
+
+/** 複数ファイルを順に移動する。1 件の失敗で止めず、成功分と失敗分を分けて返す。 */
+export async function moveFiles(srcPaths: string[], destDir: string): Promise<MoveFilesResult> {
+  const moved: string[] = [];
+  const errors: string[] = [];
+  for (const src of srcPaths) {
+    try {
+      moved.push(await moveFile(src, destDir));
+    } catch (err) {
+      errors.push(errorToString(err));
+    }
+  }
+  return { moved, errors };
 }

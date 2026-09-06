@@ -15,7 +15,7 @@ type FolderTreeProps = {
   searchFolders: DirectoryEntry[] | null;
   revealPath: string | null;
   onRevealComplete: () => void;
-  onFileDrop: (srcPath: string, destDir: string) => void;
+  onFileDrop: (srcPaths: string[], destDir: string) => void;
 };
 
 // rootPath から targetPath までの各階層のパスを返す

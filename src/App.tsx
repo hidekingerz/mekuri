@@ -3,7 +3,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { moveFile, searchDirectory } from "./api/directory";
+import { moveFiles, searchDirectory } from "./api/directory";
 import { addFavorite } from "./api/favorites";
 import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
@@ -13,7 +13,6 @@ import { useColumnResize } from "./hooks/useColumnResize";
 import { useWindowResize } from "./hooks/useWindowResize";
 import type { DirectoryEntry } from "./types";
 import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
-import { errorToString } from "./utils/errorToString";
 import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
 
 function App() {
@@ -154,18 +153,18 @@ function App() {
   }, []);
 
   const handleFileDrop = useCallback(
-    async (srcPath: string, destDir: string) => {
+    async (srcPaths: string[], destDir: string) => {
       setMoveError(null);
-      try {
-        await moveFile(srcPath, destDir);
-        const { emit } = await import("@tauri-apps/api/event");
-        await emit("file-moved");
-        // Refresh the active search so a moved-out entry doesn't linger stale.
-        if (searchResults !== null && selectedFavorite && searchQuery) {
-          await runSearch(selectedFavorite, searchQuery);
-        }
-      } catch (err) {
-        setMoveError(errorToString(err));
+      const { moved, errors } = await moveFiles(srcPaths, destDir);
+      if (errors.length > 0) {
+        setMoveError(errors.join(" / "));
+      }
+      if (moved.length === 0) return;
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("file-moved");
+      // Refresh the active search so a moved-out entry doesn't linger stale.
+      if (searchResults !== null && selectedFavorite && searchQuery) {
+        await runSearch(selectedFavorite, searchQuery);
       }
     },
     [searchResults, selectedFavorite, searchQuery, runSearch],

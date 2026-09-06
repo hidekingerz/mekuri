@@ -7,6 +7,7 @@ import { useFileSelection } from "../../hooks/useFileSelection";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
+import { encodeDragPaths } from "../../utils/fileDrag";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
 type FileListProps = {
@@ -183,7 +184,9 @@ export function FileList({
       title={file.path}
       draggable
       onDragStart={(e) => {
-        e.dataTransfer.setData(FILE_DRAG_MIME, file.path);
+        // Dragging a selected item carries the whole selection; otherwise only that item
+        const paths = selected.has(file.path) ? [...selected] : [file.path];
+        e.dataTransfer.setData(FILE_DRAG_MIME, encodeDragPaths(paths));
         e.dataTransfer.effectAllowed = "move";
       }}
     >

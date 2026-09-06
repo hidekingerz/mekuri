@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getFavorites, removeFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { FILE_DRAG_MIME } from "../../utils/constants";
+import { decodeDragPaths } from "../../utils/fileDrag";
 import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
 
@@ -9,7 +10,7 @@ type FavoritesSidebarProps = {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   refreshTrigger?: number;
-  onFileDrop?: (srcPath: string, destDir: string) => void;
+  onFileDrop?: (srcPaths: string[], destDir: string) => void;
 };
 
 export function FavoritesSidebar({
@@ -65,9 +66,9 @@ export function FavoritesSidebar({
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOverPath(null);
-                const srcPath = e.dataTransfer.getData(FILE_DRAG_MIME);
-                if (srcPath && onFileDrop) {
-                  onFileDrop(srcPath, path);
+                const srcPaths = decodeDragPaths(e.dataTransfer.getData(FILE_DRAG_MIME));
+                if (srcPaths.length > 0 && onFileDrop) {
+                  onFileDrop(srcPaths, path);
                 }
               }}
               title={path}

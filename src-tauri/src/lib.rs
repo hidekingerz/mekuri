@@ -8,6 +8,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(launch::LaunchState::default())
         .invoke_handler(tauri::generate_handler![
             commands::fs::read_directory,

@@ -270,6 +270,7 @@ Tauri のマルチウィンドウ機能を使用する。
 | `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
 | `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
 | `useSiblingNavigation` | Alt+矢印キーによる兄弟ファイル間のナビゲーション |
+| `useUpdater` | アプリ内アップデートの状態管理・自動確認・ダウンロード/インストール・再起動（メインウィンドウのみ） |
 
 ## ユーティリティ
 
@@ -279,6 +280,8 @@ Tauri のマルチウィンドウ機能を使用する。
 | `windowLabel` | アーカイブパスからウィンドウラベルのハッシュ生成、ファイル名抽出 |
 | `pdf` | PDF ファイルの読み込みとページレンダリング（pdfjs-dist 使用、CMap/標準フォント対応） |
 | `fileType` | ファイルパスの拡張子からファイル種別（archive/pdf/unknown）を判定 |
+| `updateState` | アップデート UI の状態遷移（副作用なし。`useUpdater` から利用） |
+| `updateProgress` | ダウンロード進捗イベントの累積・パーセント計算（Tauri 非依存） |
 
 ## Finder からのファイルオープン（macOS）
 

@@ -26,6 +26,8 @@ mekuri/
 │   │   ├── SpreadViewer/          #     見開きビューワー
 │   │   │   ├── SpreadViewer.tsx   #       ビューワー本体
 │   │   │   └── PageImage.tsx      #       画像表示コンポーネント
+│   │   ├── UpdateBanner/          #     アップデート状態バナー
+│   │   │   └── UpdateBanner.tsx
 │   │   └── Icons/                 #     カスタム SVG アイコン
 │   │       └── Icons.tsx
 │   ├── hooks/                     #   カスタムフック
@@ -34,6 +36,7 @@ mekuri/
 │   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
 │   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
+│   │   ├── useUpdater.ts          #     アプリ内アップデートの状態と操作
 │   │   └── useWindowResize.ts     #     ウィンドウリサイズ検知
 │   ├── utils/                     #   ユーティリティ
 │   │   ├── spreadLayout.ts        #     見開きレイアウト計算（RTL/LTR 対応）
@@ -43,6 +46,10 @@ mekuri/
 │   │   ├── fileType.test.ts       #     fileType テスト
 │   │   ├── windowLabel.ts         #     ウィンドウラベル生成
 │   │   ├── windowLabel.test.ts    #     windowLabel テスト
+│   │   ├── updateState.ts         #     アップデート UI の状態遷移 reducer
+│   │   ├── updateState.test.ts    #     updateState テスト
+│   │   ├── updateProgress.ts      #     ダウンロード進捗の集計
+│   │   ├── updateProgress.test.ts #     updateProgress テスト
 │   │   ├── selection.ts           #     選択トグル・範囲選択の純粋ロジック
 │   │   └── selection.test.ts      #     selection テスト
 │   ├── types/                     #   型定義

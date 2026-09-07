@@ -32,12 +32,45 @@ jobs:
       - run: pnpm install
 
       - name: Build
-        run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+        run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg
         env:
           # Ad-hoc sign the whole bundle. Without this only the linker's
           # ad-hoc signature is present and Gatekeeper reports the
           # downloaded app as "damaged" instead of merely unidentified.
           APPLE_SIGNING_IDENTITY: "-"
+          # Sign updater artifacts (mekuri.app.tar.gz.sig) with the minisign key.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Prepare updater artifacts
+        run: |
+          set -euo pipefail
+          bundle="src-tauri/target/aarch64-apple-darwin/release/bundle/macos"
+          ls -la "$bundle"
+          # Fix the asset name so latest.json can point at a stable URL.
+          tarball=$(ls "$bundle"/*.app.tar.gz)
+          if [ "$tarball" != "$bundle/mekuri.app.tar.gz" ]; then
+            mv "$tarball" "$bundle/mekuri.app.tar.gz"
+            mv "$tarball.sig" "$bundle/mekuri.app.tar.gz.sig"
+          fi
+
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          jq -n \
+            --arg version "$version" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg signature "$(cat "$bundle/mekuri.app.tar.gz.sig")" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/mekuri.app.tar.gz" \
+            '{
+              version: $version,
+              notes: "See the release page for details.",
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { signature: $signature, url: $url }
+              }
+            }' > "$bundle/latest.json"
+          cat "$bundle/latest.json"
+          jq -e '.platforms["darwin-aarch64"].signature | length > 0' "$bundle/latest.json"
 
       # tauri-action's built-in uploader cannot resolve artifact paths for
       # explicit --target builds (tauri-apps/tauri-action#243), so upload
@@ -46,10 +79,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          bundle="src-tauri/target/aarch64-apple-darwin/release/bundle"
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" --title "$tag" --generate-notes
+            gh release create "$tag" --title "$tag" --generate-notes --draft
           fi
           gh release upload "$tag" --clobber \
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            "$bundle"/dmg/*.dmg \
+            "$bundle"/macos/mekuri.app.tar.gz \
+            "$bundle"/macos/mekuri.app.tar.gz.sig \
+            "$bundle"/macos/latest.json
           gh release edit "$tag" --draft=false

@@ -81,6 +81,11 @@ body {
   background: var(--color-bg-active);
 }
 
+.toolbar__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .toolbar__search {
   margin-left: auto;
   width: 200px;
@@ -489,6 +494,66 @@ body {
   font-size: 14px;
   padding: 0;
   line-height: 1;
+}
+
+/* Update banner (reuses .toolbar__error layout) */
+.update-banner--neutral {
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.update-banner span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 48ch;
+}
+
+.update-banner__btn {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.update-banner__btn:hover {
+  background: var(--color-bg-active);
+}
+
+.update-banner__progress {
+  display: block;
+  width: 80px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.update-banner__progress-bar {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.15s ease;
+}
+
+.update-banner__progress--indeterminate .update-banner__progress-bar {
+  animation: update-banner-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes update-banner-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
 }
 
 .favorites-sidebar__item--drop-target {

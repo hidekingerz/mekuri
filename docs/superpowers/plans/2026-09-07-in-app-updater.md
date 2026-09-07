@@ -119,11 +119,11 @@ tauri-plugin-process = "2"
 **本番公開鍵がまだ手元に無い場合の代替手順**: 開発用の鍵を生成して一時的に使う。この鍵は本番には使わない。
 
 ```bash
-pnpm tauri signer generate -w ~/.tauri/mekuri-dev.key --ci
+pnpm tauri signer generate -w ~/.tauri/mekuri-dev.key -p devpass --ci
 cat ~/.tauri/mekuri-dev.key.pub
 ```
 
-`--ci` はパスワード無しで生成するオプション。この公開鍵を `<PUBKEY>` に入れ、PR 本文に「`plugins.updater.pubkey` は開発用鍵。マージ前に本番公開鍵に差し替える」と明記する。Task 9 のチェックリストで差し替えを確認する。
+`--ci` はプロンプトを省略するオプション。パスワードは `-p devpass` で明示する (無パスワードの鍵は CLI から署名できない)。この公開鍵を `<PUBKEY>` に入れ、PR 本文に「`plugins.updater.pubkey` は開発用鍵。マージ前に本番公開鍵に差し替える」と明記する。Task 9 のチェックリストで差し替えを確認する。
 
 - [ ] **Step 5: npm パッケージを追加する**
 
@@ -1278,14 +1278,14 @@ updater 成果物が実際に生成されるか、CI に載せる前に手元で
 - [ ] **Step 1: 開発用鍵を用意する** (Task 1 で作っていなければ)
 
 ```bash
-pnpm tauri signer generate -w ~/.tauri/mekuri-dev.key --ci
+pnpm tauri signer generate -w ~/.tauri/mekuri-dev.key -p devpass --ci
 ```
 
 - [ ] **Step 2: リリースビルドを実行する**
 
 ```bash
 TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/mekuri-dev.key)" \
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="devpass" \
 APPLE_SIGNING_IDENTITY="-" \
 pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg
 ```
@@ -1342,7 +1342,7 @@ git commit -m "Adjust release bundles for updater artifacts"
 
 ```bash
 TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/mekuri-dev.key)" \
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="devpass" \
 APPLE_SIGNING_IDENTITY="-" \
 pnpm tauri build --target aarch64-apple-darwin --bundles app
 rm -rf /Applications/mekuri.app
@@ -1358,7 +1358,7 @@ Expected: 起動する。3 秒後にバナーは出ない (サーバー未起動
 
 ```bash
 TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/mekuri-dev.key)" \
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="devpass" \
 APPLE_SIGNING_IDENTITY="-" \
 pnpm tauri build --target aarch64-apple-darwin --bundles app
 serve=$(mktemp -d)

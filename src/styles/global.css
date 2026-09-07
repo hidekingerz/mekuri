@@ -503,6 +503,13 @@ body {
   border-color: var(--color-border);
 }
 
+.update-banner span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 48ch;
+}
+
 .update-banner__btn {
   padding: 2px 8px;
   border: 1px solid currentColor;
@@ -520,6 +527,7 @@ body {
 }
 
 .update-banner__progress {
+  display: block;
   width: 80px;
   height: 6px;
   border-radius: 3px;
@@ -529,6 +537,7 @@ body {
 }
 
 .update-banner__progress-bar {
+  display: block;
   height: 100%;
   background: var(--color-accent);
   transition: width 0.15s ease;

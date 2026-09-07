@@ -33,7 +33,10 @@ function App() {
     columnsRef,
   );
   const updater = useUpdater();
-  const updaterBusy = updater.state.status === "checking" || updater.state.status === "downloading";
+  const updaterBusy =
+    updater.state.status === "checking" ||
+    updater.state.status === "downloading" ||
+    updater.state.status === "ready";
 
   // Load settings on mount
   useEffect(() => {

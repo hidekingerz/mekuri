@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+import { downloadPercent } from "../../utils/updateProgress";
 import type { UpdateState } from "../../utils/updateState";
 
 export type UpdateBannerProps = {
@@ -8,11 +10,6 @@ export type UpdateBannerProps = {
   onDismiss: () => void;
 };
 
-function percent(downloaded: number, total: number | null): number | null {
-  if (total === null || total <= 0) return null;
-  return Math.min(100, Math.floor((downloaded / total) * 100));
-}
-
 /** ツールバー右側に出すアップデート状態バナー。idle と自動確認中は何も描画しない。 */
 export function UpdateBanner({
   state,
@@ -20,7 +17,7 @@ export function UpdateBanner({
   onRestart,
   onRetry,
   onDismiss,
-}: UpdateBannerProps) {
+}: UpdateBannerProps): ReactElement | null {
   switch (state.status) {
     case "idle":
       return null;
@@ -54,17 +51,17 @@ export function UpdateBanner({
       );
 
     case "downloading": {
-      const pct = percent(state.downloaded, state.total);
+      const pct = downloadPercent({ downloaded: state.downloaded, total: state.total });
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
           <span>
             Downloading v{state.update.version}…{pct !== null ? ` ${pct}%` : ""}
           </span>
-          <div
+          <span
             className={`update-banner__progress ${pct === null ? "update-banner__progress--indeterminate" : ""}`}
           >
-            <div className="update-banner__progress-bar" style={{ width: `${pct ?? 40}%` }} />
-          </div>
+            <span className="update-banner__progress-bar" style={{ width: `${pct ?? 40}%` }} />
+          </span>
         </output>
       );
     }
@@ -84,7 +81,7 @@ export function UpdateBanner({
         <div className="toolbar__error update-banner" role="alert">
           <span>
             {state.retry === null
-              ? `Update failed: ${state.message}. Please restart mekuri manually`
+              ? `Update installed, but the restart failed: ${state.message}. Please restart mekuri manually`
               : `Update failed: ${state.message}`}
           </span>
           {state.retry !== null && (

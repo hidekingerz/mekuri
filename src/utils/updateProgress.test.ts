@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accumulateProgress, INITIAL_PROGRESS } from "./updateProgress";
+import { accumulateProgress, downloadPercent, INITIAL_PROGRESS } from "./updateProgress";
 
 describe("accumulateProgress", () => {
   it("starts with nothing downloaded and unknown total", () => {
@@ -42,5 +42,23 @@ describe("accumulateProgress", () => {
       downloaded: 900,
       total: null,
     });
+  });
+});
+
+describe("downloadPercent", () => {
+  it("returns null when total is null", () => {
+    expect(downloadPercent({ downloaded: 10, total: null })).toBeNull();
+  });
+
+  it("returns null when total is zero", () => {
+    expect(downloadPercent({ downloaded: 0, total: 0 })).toBeNull();
+  });
+
+  it("returns the floored percentage", () => {
+    expect(downloadPercent({ downloaded: 45, total: 100 })).toBe(45);
+  });
+
+  it("clamps to 100 when downloaded exceeds total", () => {
+    expect(downloadPercent({ downloaded: 150, total: 100 })).toBe(100);
   });
 });

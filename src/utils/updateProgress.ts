@@ -8,6 +8,13 @@ export type DownloadEventLike =
 
 export const INITIAL_PROGRESS: DownloadProgress = { downloaded: 0, total: null };
 
+/** ダウンロード進捗をパーセント表示用の整数に変換する。総量が不明・0 以下なら null。 */
+export function downloadPercent(progress: DownloadProgress): number | null {
+  const { downloaded, total } = progress;
+  if (total === null || total <= 0) return null;
+  return Math.min(100, Math.floor((downloaded / total) * 100));
+}
+
 /** updater プラグインのダウンロードイベントを累積して進捗にする。 */
 export function accumulateProgress(
   prev: DownloadProgress,

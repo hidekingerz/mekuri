@@ -14,8 +14,10 @@ let pending: Update | null = null;
 
 /** 最新リリースを確認する。更新が無ければ null。 */
 export async function checkForUpdate(): Promise<AvailableUpdate | null> {
+  const previous = pending;
   const update = await check();
   pending = update;
+  await previous?.close().catch(() => {});
   if (!update) return null;
   return { version: update.version, notes: update.body ?? null };
 }

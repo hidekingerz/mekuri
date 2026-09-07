@@ -129,7 +129,7 @@ export async function relaunch(): Promise<void>;
 - `restart()`: `relaunch()`
 - `dismiss()`
 
-メインウィンドウのマウントから 3 秒後に自動確認を 1 回だけ行う (`useEffect`、Strict Mode の二重実行対策にフラグを持つ)。ビューワーウィンドウ (`viewer.tsx`) ではこのフックを使わない。
+メインウィンドウのマウントから 3 秒後に自動確認を 1 回だけ行う (`useEffect`、Strict Mode の二重実行は `useEffect` のクリーンアップでタイマーを `clearTimeout` することで 1 回に抑える (フラグは持たない))。ビューワーウィンドウ (`viewer.tsx`) ではこのフックを使わない。
 
 ### `src/components/UpdateBanner/UpdateBanner.tsx`
 

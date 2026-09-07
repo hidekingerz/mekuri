@@ -44,6 +44,7 @@ export function useUpdater(): UpdaterControls {
   // 起動時の自動確認。StrictMode の二重実行はクリーンアップでタイマーを消すことで 1 回に抑える。
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (stateRef.current.status !== "idle") return;
       void runCheck(false);
     }, AUTO_CHECK_DELAY_MS);
     return () => clearTimeout(timer);

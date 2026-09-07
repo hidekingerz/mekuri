@@ -30,6 +30,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/icon.icns",
       "icons/icon.ico",
@@ -56,5 +57,12 @@
       }
     ]
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENFRTA3NjFBQjI0MjgwRTEKUldUaGdFS3lHbmJnempqUnk2RVhZSEt3b1lpQmFDeE94RC9HeGxuTFhPLzVPdlloUDFEVGw5Q2IK",
+      "endpoints": [
+        "https://github.com/hidekingerz/mekuri/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }

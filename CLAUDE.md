@@ -54,8 +54,9 @@ src/                    # フロントエンド (React/TypeScript)
     FolderTree/         #   フォルダツリーUI
     FileList/           #   アーカイブファイル一覧
     SpreadViewer/       #   見開きビューワーUI
+    UpdateBanner/       #   アップデート状態バナー
     Icons/              #   カスタム SVG アイコン
-  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, settings, store)
+  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, settings, store, updater)
   hooks/                #   React カスタムフック (useContextMenu, useWindowResize)
   utils/                #   ユーティリティ (spreadLayout, windowLabel)
   types/                #   型定義

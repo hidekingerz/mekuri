@@ -16,6 +16,8 @@
 | `@tauri-apps/api` | Tauri IPC 呼び出し（invoke, event, window） |
 | `@tauri-apps/plugin-dialog` | フォルダ選択ダイアログ |
 | `@tauri-apps/plugin-store` | 設定・お気に入りの永続化 |
+| `@tauri-apps/plugin-updater` | GitHub Releases からのアプリ内アップデート |
+| `@tauri-apps/plugin-process` | アップデート後の再起動 |
 | `pdfjs-dist` | PDF のページレンダリング（CMap/標準フォント対応で CJK 文字表示可能） |
 | `react`, `react-dom` | UI コンポーネント |
 
@@ -36,6 +38,8 @@ pdfjs-dist が必要とする CMap ファイルと標準フォントファイル
 | `tauri` | アプリフレームワーク | v2 |
 | `tauri-plugin-dialog` | ダイアログプラグイン | |
 | `tauri-plugin-store` | キーバリューストアプラグイン | 設定・お気に入りの永続化 |
+| `tauri-plugin-updater` | アップデータプラグイン | `latest.json` の取得・署名検証・差し替え |
+| `tauri-plugin-process` | プロセス操作プラグイン | アップデート後の `relaunch` |
 | `serde`, `serde_json` | JSON シリアライズ / デシリアライズ | IPC データ変換用 |
 | `zip` | ZIP/CBZ ファイル展開 | deflate 機能のみ有効 |
 | `unrar` | RAR/CBR ファイル展開 | |

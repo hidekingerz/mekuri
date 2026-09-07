@@ -9,7 +9,9 @@ import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
+import { UpdateBanner } from "./components/UpdateBanner/UpdateBanner";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useUpdater } from "./hooks/useUpdater";
 import { useWindowResize } from "./hooks/useWindowResize";
 import type { DirectoryEntry } from "./types";
 import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
@@ -30,6 +32,8 @@ function App() {
     DEFAULT_TREE_COLUMN_WIDTH,
     columnsRef,
   );
+  const updater = useUpdater();
+  const updaterBusy = updater.state.status === "checking" || updater.state.status === "downloading";
 
   // Load settings on mount
   useEffect(() => {
@@ -203,6 +207,14 @@ function App() {
         <button type="button" className="toolbar__btn" onClick={handleAddFolder}>
           Add Folder
         </button>
+        <button
+          type="button"
+          className="toolbar__btn"
+          onClick={updater.checkNow}
+          disabled={updaterBusy}
+        >
+          Check for Updates
+        </button>
         <input
           type="text"
           className="toolbar__search"
@@ -223,6 +235,13 @@ function App() {
             </button>
           </div>
         )}
+        <UpdateBanner
+          state={updater.state}
+          onInstall={updater.install}
+          onRestart={updater.restart}
+          onRetry={updater.retry}
+          onDismiss={updater.dismiss}
+        />
       </div>
       <div
         className={`app__columns ${isResizing ? "app__columns--resizing" : ""}`}

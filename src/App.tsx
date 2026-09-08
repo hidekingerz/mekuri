@@ -218,6 +218,13 @@ function App() {
         >
           Check for Updates
         </button>
+        <UpdateBanner
+          state={updater.state}
+          onInstall={updater.install}
+          onRestart={updater.restart}
+          onRetry={updater.retry}
+          onDismiss={updater.dismiss}
+        />
         <input
           type="text"
           className="toolbar__search"
@@ -238,13 +245,6 @@ function App() {
             </button>
           </div>
         )}
-        <UpdateBanner
-          state={updater.state}
-          onInstall={updater.install}
-          onRestart={updater.restart}
-          onRetry={updater.retry}
-          onDismiss={updater.dismiss}
-        />
       </div>
       <div
         className={`app__columns ${isResizing ? "app__columns--resizing" : ""}`}

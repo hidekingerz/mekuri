@@ -497,6 +497,10 @@ body {
 }
 
 /* Update banner (reuses .toolbar__error layout) */
+.update-banner {
+  margin-left: 0;
+}
+
 .update-banner--neutral {
   background: var(--color-bg-muted);
   color: var(--color-text-secondary);

@@ -1,6 +1,6 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
@@ -43,53 +43,34 @@ export function FileList({
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
   const { selected, toggle, selectRange, selectOnly, clear } = useFileSelection();
 
+  // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
+  const requestIdRef = useRef(0);
+
   const loadFiles = useCallback(async (path: string) => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestId === requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const entries = await readDirectoryFiles(path);
-      setFiles(entries);
+      if (isCurrent()) setFiles(entries);
     } catch (err) {
-      setError(errorToString(err));
+      if (isCurrent()) setError(errorToString(err));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadTrigger is intentionally used to force re-fetch
   useEffect(() => {
     if (!folderPath) {
+      requestIdRef.current++;
       setFiles([]);
+      setLoading(false);
       return;
     }
-
-    const path = folderPath;
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const entries = await readDirectoryFiles(path);
-        if (!cancelled) {
-          setFiles(entries);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(errorToString(err));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    setLoading(true);
-    setError(null);
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [folderPath, reloadTrigger]);
+    void loadFiles(folderPath);
+  }, [folderPath, reloadTrigger, loadFiles]);
 
   // Clear selection whenever the displayed list changes
   const [prevList, setPrevList] = useState({ folderPath, searchResults });

@@ -50,8 +50,8 @@ mekuri/
 │   │   ├── updateState.test.ts    #     updateState テスト
 │   │   ├── updateProgress.ts      #     ダウンロード進捗の集計
 │   │   ├── updateProgress.test.ts #     updateProgress テスト
-│   │   ├── treeReload.ts          #     フォルダツリー再読込のマージ処理
-│   │   ├── treeReload.test.ts     #     treeReload テスト
+│   │   ├── folderTree.ts          #     フォルダツリーの純粋操作 (展開・トグル・再読込マージ)
+│   │   ├── folderTree.test.ts     #     folderTree テスト
 │   │   ├── selection.ts           #     選択トグル・範囲選択の純粋ロジック
 │   │   └── selection.test.ts      #     selection テスト
 │   ├── types/                     #   型定義

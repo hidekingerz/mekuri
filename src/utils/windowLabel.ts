@@ -25,3 +25,10 @@ export function viewerLabel(archivePath: string): string {
 export function fileNameFromPath(path: string): string {
   return path.split(/[/\\]/).pop() || "Viewer";
 }
+
+const APP_NAME = "mekuri";
+
+/** ウィンドウタイトル。prefix があれば "prefix - mekuri"、無ければ "mekuri"。 */
+export function appTitle(prefix?: string | null): string {
+  return prefix ? `${prefix} - ${APP_NAME}` : APP_NAME;
+}

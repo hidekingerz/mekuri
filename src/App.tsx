@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { moveFiles } from "./api/directory";
 import { addFavorite } from "./api/favorites";
+import { emitFileMoved } from "./api/fileEvents";
 import { openViewerWindow } from "./api/viewerWindow";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
@@ -13,7 +14,7 @@ import { useFolderSearch } from "./hooks/useFolderSearch";
 import { useMainWindowSetup } from "./hooks/useMainWindowSetup";
 import { useUpdater } from "./hooks/useUpdater";
 import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
-import { fileNameFromPath } from "./utils/windowLabel";
+import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function App() {
   const [selectedFavorite, setSelectedFavorite] = useState<string | null>(null);
@@ -45,12 +46,7 @@ function App() {
 
   // Update main window title
   useEffect(() => {
-    if (selectedFavorite) {
-      const folderName = fileNameFromPath(selectedFavorite);
-      getCurrentWindow().setTitle(`${folderName} - mekuri`);
-    } else {
-      getCurrentWindow().setTitle("mekuri");
-    }
+    getCurrentWindow().setTitle(appTitle(selectedFavorite && fileNameFromPath(selectedFavorite)));
   }, [selectedFavorite]);
 
   const handleAddFolder = useCallback(async () => {
@@ -103,8 +99,7 @@ function App() {
         setMoveError(errors.join(" / "));
       }
       if (moved.length === 0) return;
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("file-moved");
+      await emitFileMoved();
       // Refresh the active search so a moved-out entry doesn't linger stale.
       await rerunSearch();
     },

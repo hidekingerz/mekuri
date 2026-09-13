@@ -507,7 +507,7 @@ body {
   border-color: var(--color-border);
 }
 
-.update-banner span {
+.update-banner__message {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

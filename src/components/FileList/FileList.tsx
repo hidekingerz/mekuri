@@ -1,13 +1,14 @@
-import { emit, listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
+import { emitFileTrashed, onFileChanged } from "../../api/fileEvents";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { encodeDragPaths } from "../../utils/fileDrag";
+import { trashConfirmMessage } from "../../utils/trashConfirm";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
 type FileListProps = {
@@ -17,18 +18,6 @@ type FileListProps = {
   searchResults: DirectoryEntry[] | null;
   reloadTrigger?: number;
 };
-
-const CONFIRM_PREVIEW_COUNT = 5;
-
-function confirmMessage(paths: string[]): string {
-  if (paths.length === 1) {
-    return `Are you sure you want to move this file to the trash?\n\n${paths[0]}`;
-  }
-  const preview = paths.slice(0, CONFIRM_PREVIEW_COUNT).join("\n");
-  const rest = paths.length - CONFIRM_PREVIEW_COUNT;
-  const suffix = rest > 0 ? `\n…and ${rest} more` : "";
-  return `Are you sure you want to move ${paths.length} files to the trash?\n\n${preview}${suffix}`;
-}
 
 export function FileList({
   folderPath,
@@ -83,22 +72,18 @@ export function FileList({
   useEffect(() => {
     if (!folderPath) return;
     const path = folderPath;
-    const unlistenTrash = listen("file-trashed", () => {
-      loadFiles(path);
-    });
-    const unlistenMove = listen("file-moved", () => {
+    const unlisten = onFileChanged(() => {
       loadFiles(path);
     });
     return () => {
-      unlistenTrash.then((fn) => fn());
-      unlistenMove.then((fn) => fn());
+      unlisten.then((fn) => fn());
     };
   }, [folderPath, loadFiles]);
 
   const trashPaths = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0) return;
-      const confirmed = await ask(confirmMessage(paths), {
+      const confirmed = await ask(trashConfirmMessage(paths), {
         title: "Move to Trash",
         kind: "warning",
       });
@@ -111,7 +96,7 @@ export function FileList({
       } finally {
         clear();
         if (folderPath) await loadFiles(folderPath);
-        await emit("file-trashed");
+        await emitFileTrashed();
       }
     },
     [folderPath, loadFiles, clear],

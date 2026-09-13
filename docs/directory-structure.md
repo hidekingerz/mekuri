@@ -47,6 +47,8 @@ mekuri/
 │   │   ├── spreadLayout.test.ts   #     spreadLayout テスト
 │   │   ├── spreadNavigation.ts    #     ページ移動の入力判定 (キー・クリック・ホイール・進捗バー)
 │   │   ├── spreadNavigation.test.ts #   spreadNavigation テスト
+│   │   ├── trashConfirm.ts        #     ゴミ箱移動の確認メッセージ
+│   │   ├── trashConfirm.test.ts   #     trashConfirm テスト
 │   │   ├── pdf.ts                 #     PDF 読み込み・レンダリング（pdfjs-dist）
 │   │   ├── fileType.ts            #     ファイル種別判定
 │   │   ├── fileType.test.ts       #     fileType テスト
@@ -70,7 +72,8 @@ mekuri/
 │   ├── Cargo.toml                 #   Rust 依存定義
 │   ├── tauri.conf.json            #   Tauri 設定（ウィンドウ、権限等）
 │   ├── capabilities/              #   Tauri v2 権限設定
-│   │   └── default.json           #     デフォルト権限
+│   │   ├── default.json           #     全ウィンドウ共通の権限
+│   │   └── updater.json           #     アップデータ・再起動 (main ウィンドウのみ)
 │   ├── src/
 │   │   ├── main.rs                #     エントリポイント
 │   │   ├── lib.rs                 #     ライブラリルート

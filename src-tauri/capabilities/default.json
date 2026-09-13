@@ -14,8 +14,6 @@
     "core:window:allow-show",
     "core:webview:allow-create-webview-window",
     "core:window:allow-get-all-windows",
-    "store:default",
-    "updater:default",
-    "process:default"
+    "store:default"
   ]
 }

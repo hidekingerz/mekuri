@@ -49,8 +49,9 @@ UI の描画とユーザー操作を担当する。Tauri の IPC（`invoke`）�
 
 | モジュール | 責務 |
 |-----------|------|
-| `commands/fs` | ディレクトリ走査、ファイル一覧取得 |
+| `commands/fs` | Tauri IPC コマンドの定義（ファイルシステム操作）。引数変換のみ行い `filesystem` に委譲 |
 | `commands/archive` | Tauri IPC コマンドの定義（アーカイブ操作） |
+| `filesystem` | ディレクトリ走査・検索・移動・ゴミ箱の実装ロジック（Tauri 非依存） |
 | `archive` | アーカイブ処理の実装ロジック（Tauri 非依存） |
 | `archive/zip` | ZIP/CBZ ファイル処理 |
 | `archive/rar` | RAR/CBR ファイル処理 |

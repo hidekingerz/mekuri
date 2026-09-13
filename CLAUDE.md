@@ -9,7 +9,7 @@ Tauri v2（Rust バックエンド + React フロントエンド）で構成さ�
 
 - **メインウィンドウ**: フォルダツリーで圧縮ファイルを探索（`index.html` + `src/main.tsx`）
 - **ビューワーウィンドウ**: 見開き画像表示（`viewer.html` + `src/viewer.tsx`）
-- **Rust 側**: フォルダ走査（`commands/fs.rs`）、アーカイブ画像抽出（`commands/archive.rs`）
+- **Rust 側**: ファイルシステム操作（`filesystem/`）、アーカイブ画像抽出（`archive/`）。`commands/` は薄い IPC 層
 - **React 側**: Tauri IPC（`invoke`）経由で Rust を呼び出す
 
 詳細は `docs/` 配下のドキュメントを参照:
@@ -64,8 +64,9 @@ src/                    # フロントエンド (React/TypeScript)
 src-tauri/              # バックエンド (Rust)
   src/
     commands/           #   Tauri コマンド層（IPC エンドポイント）
-      fs.rs             #     read_directory コマンド
+      fs.rs             #     ファイルシステム操作コマンド（filesystem へ委譲）
       archive.rs        #     アーカイブ操作コマンド（一覧・画像取得・内容分析・ネスト展開）
+    filesystem/         #   ファイルシステム操作ロジック（Tauri 非依存: 走査・検索・移動・ゴミ箱）
     archive/            #   アーカイブ処理ロジック（Tauri 非依存）
       zip.rs            #     ZIP/CBZ 処理
       rar.rs            #     RAR/CBR 処理
@@ -77,7 +78,7 @@ src-tauri/              # バックエンド (Rust)
 
 - `cargo clippy` の警告をすべて解消すること
 - `cargo fmt` でフォーマット済みであること
-- `commands/` と `archive/` を分離する。`archive/` は Tauri に依存しない純粋ロジックとして実装し、単体テスト可能にする
+- `commands/` と実装ロジック（`filesystem/`、`archive/`）を分離する。実装ロジックは Tauri に依存しない純粋ロジックとして実装し、単体テスト可能にする。`commands/` は引数変換と委譲のみ行う
 - エラーは `Result<T, String>` で返す（Tauri コマンドの制約）
 - ファイルパスの操作には `std::path::PathBuf` を使う
 

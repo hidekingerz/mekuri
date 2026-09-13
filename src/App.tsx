@@ -1,75 +1,47 @@
-import { invoke } from "@tauri-apps/api/core";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { moveFiles, searchDirectory } from "./api/directory";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { moveFiles } from "./api/directory";
 import { addFavorite } from "./api/favorites";
-import { getViewerSettings, getWindowSettings, saveWindowSettings } from "./api/settings";
+import { openViewerWindow } from "./api/viewerWindow";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { UpdateBanner } from "./components/UpdateBanner/UpdateBanner";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useFolderSearch } from "./hooks/useFolderSearch";
+import { useMainWindowSetup } from "./hooks/useMainWindowSetup";
 import { useUpdater } from "./hooks/useUpdater";
-import { useWindowResize } from "./hooks/useWindowResize";
-import type { DirectoryEntry } from "./types";
-import { DEFAULT_TREE_COLUMN_WIDTH, VIEWER_MIN_HEIGHT, VIEWER_MIN_WIDTH } from "./utils/constants";
-import { fileNameFromPath, viewerLabel } from "./utils/windowLabel";
+import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
+import { fileNameFromPath } from "./utils/windowLabel";
 
 function App() {
   const [selectedFavorite, setSelectedFavorite] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<DirectoryEntry[] | null>(null);
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
     DEFAULT_TREE_COLUMN_WIDTH,
     columnsRef,
   );
+  useMainWindowSetup(setWidth);
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    results: searchResults,
+    folders: searchFolders,
+    isActive: searchActive,
+    rerun: rerunSearch,
+    clear: clearSearch,
+  } = useFolderSearch(selectedFavorite);
   const updater = useUpdater();
   const updaterBusy =
     updater.state.status === "checking" ||
     updater.state.status === "downloading" ||
     updater.state.status === "ready";
-
-  // Load settings on mount
-  useEffect(() => {
-    async function loadSettings() {
-      const win = getCurrentWindow();
-      // Finder のファイルオープン起動ではメインウィンドウを表示しない
-      let openedViaFile = false;
-      try {
-        openedViaFile = await invoke<boolean>("was_opened_via_file");
-      } catch (err) {
-        console.error("Failed to query launch state:", err);
-      }
-      try {
-        const settings = await getWindowSettings();
-        setWidth(settings.treeColumnWidth);
-        await win.setSize(new LogicalSize(settings.width, settings.height));
-      } catch (err) {
-        console.error("Failed to load settings:", err);
-      } finally {
-        if (!openedViaFile) {
-          await win.show();
-        }
-        setSettingsLoaded(true);
-      }
-    }
-    loadSettings();
-  }, [setWidth]);
-
-  const handleWindowResize = useCallback(async (size: { width: number; height: number }) => {
-    await saveWindowSettings(size);
-  }, []);
-  useWindowResize(handleWindowResize, settingsLoaded);
 
   // Update main window title
   useEffect(() => {
@@ -80,50 +52,6 @@ function App() {
       getCurrentWindow().setTitle("mekuri");
     }
   }, [selectedFavorite]);
-
-  const runSearch = useCallback(async (root: string, query: string) => {
-    try {
-      const results = await searchDirectory(root, query);
-      setSearchResults(results);
-    } catch (err) {
-      console.error("Search failed:", err);
-      setSearchResults([]);
-    }
-  }, []);
-
-  // Debounced search
-  useEffect(() => {
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
-
-    if (!searchQuery || !selectedFavorite) {
-      setSearchResults(null);
-      return;
-    }
-
-    searchTimerRef.current = setTimeout(() => {
-      void runSearch(selectedFavorite, searchQuery);
-    }, 300);
-
-    return () => {
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-      }
-    };
-  }, [searchQuery, selectedFavorite, runSearch]);
-
-  // Reset search when favorite changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: must reset search when selectedFavorite changes
-  useEffect(() => {
-    setSearchQuery("");
-    setSearchResults(null);
-  }, [selectedFavorite]);
-
-  const searchFolders = useMemo(() => {
-    if (searchResults === null) return null;
-    return searchResults.filter((e) => e.is_dir);
-  }, [searchResults]);
 
   const handleAddFolder = useCallback(async () => {
     const selected = await open({ directory: true });
@@ -136,12 +64,12 @@ function App() {
   }, []);
 
   const handleReload = useCallback(() => {
-    if (searchResults !== null && selectedFavorite && searchQuery) {
-      void runSearch(selectedFavorite, searchQuery);
+    if (searchActive) {
+      void rerunSearch();
       return;
     }
     setReloadTrigger((n) => n + 1);
-  }, [searchResults, selectedFavorite, searchQuery, runSearch]);
+  }, [searchActive, rerunSearch]);
 
   const handleFavoriteSelect = useCallback((path: string) => {
     setSelectedFavorite(path);
@@ -154,10 +82,9 @@ function App() {
       if (searchResults !== null) {
         setRevealPath(path);
       }
-      setSearchQuery("");
-      setSearchResults(null);
+      clearSearch();
     },
-    [searchResults],
+    [searchResults, clearSearch],
   );
 
   const handleRevealComplete = useCallback(() => {
@@ -179,39 +106,10 @@ function App() {
       const { emit } = await import("@tauri-apps/api/event");
       await emit("file-moved");
       // Refresh the active search so a moved-out entry doesn't linger stale.
-      if (searchResults !== null && selectedFavorite && searchQuery) {
-        await runSearch(selectedFavorite, searchQuery);
-      }
+      await rerunSearch();
     },
-    [searchResults, selectedFavorite, searchQuery, runSearch],
+    [rerunSearch],
   );
-
-  const handleArchiveSelect = useCallback(async (archivePath: string) => {
-    const label = viewerLabel(archivePath);
-
-    const existing = await WebviewWindow.getByLabel(label);
-    if (existing) {
-      await existing.setFocus();
-      return;
-    }
-
-    const viewerSettings = await getViewerSettings();
-    const webview = new WebviewWindow(label, {
-      url: `viewer.html?archive=${encodeURIComponent(archivePath)}`,
-      title: `${fileNameFromPath(archivePath)} - mekuri`,
-      width: viewerSettings.width,
-      height: viewerSettings.height,
-      minWidth: VIEWER_MIN_WIDTH,
-      minHeight: VIEWER_MIN_HEIGHT,
-      visible: true,
-      // Tauri のネイティブ drag-drop 横取りを無効化しないと、
-      // webview 内の HTML5 D&D（ファイル移動）が発火しない
-      dragDropEnabled: false,
-    });
-    webview.once("tauri://error", (e) => {
-      console.error("Failed to create viewer window:", e);
-    });
-  }, []);
 
   return (
     <div className="app">
@@ -297,7 +195,7 @@ function App() {
         <div className="app__file-column">
           <FileList
             folderPath={selectedFolder || selectedFavorite}
-            onArchiveSelect={handleArchiveSelect}
+            onArchiveSelect={openViewerWindow}
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
             reloadTrigger={reloadTrigger}

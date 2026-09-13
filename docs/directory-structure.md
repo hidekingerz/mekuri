@@ -36,6 +36,8 @@ mekuri/
 │   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
 │   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
+│   │   ├── useFolderSearch.ts     #     お気に入り配下のデバウンス付き検索
+│   │   ├── useMainWindowSetup.ts  #     メインウィンドウの設定復元・表示・リサイズ保存
 │   │   ├── useUpdater.ts          #     アプリ内アップデートの状態と操作
 │   │   └── useWindowResize.ts     #     ウィンドウリサイズ検知
 │   ├── utils/                     #   ユーティリティ

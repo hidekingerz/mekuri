@@ -7,7 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { getViewerSettings, saveViewerSettings } from "../../api/settings";
+import { useElementSize } from "../../hooks/useElementSize";
+import { useViewerSettings } from "../../hooks/useViewerSettings";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import type { PageGroup, ReadingDirection, ViewMode } from "../../utils/spreadLayout";
@@ -17,6 +18,14 @@ import {
   currentPageFromGroup,
   groupIndexForPage,
 } from "../../utils/spreadLayout";
+import {
+  groupIndexFromRatio,
+  type NavigationAction,
+  navigationForClick,
+  navigationForKey,
+  navigationForWheel,
+  progressRatio,
+} from "../../utils/spreadNavigation";
 import {
   FitWindowIcon,
   LtrIcon,
@@ -78,36 +87,11 @@ export function SpreadViewer({
   const [currentPage, setCurrentPage] = useState(initialPage ?? 0);
   const [srcs, setSrcs] = useState<(string | null)[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [viewMode, setViewModeState] = useState<ViewMode>("spread");
-  const [readingDirection, setReadingDirection] =
-    useState<ReadingDirection>(defaultReadingDirection);
+  const { viewMode, readingDirection, setViewMode, toggleReadingDirection } =
+    useViewerSettings(defaultReadingDirection);
   const [pageAspect, setPageAspect] = useState<number | null>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const pagesRef = useRef<HTMLDivElement>(null);
-
-  // Load saved settings on mount
-  useEffect(() => {
-    getViewerSettings().then((settings) => {
-      if (settings.viewMode) {
-        setViewModeState(settings.viewMode);
-      }
-      if (settings.readingDirection) {
-        setReadingDirection(settings.readingDirection);
-      }
-    });
-  }, []);
-
-  // Track the pages container size for the fit mode
-  useEffect(() => {
-    const el = pagesRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ width, height });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const containerSize = useElementSize(pagesRef);
 
   const isRtl = readingDirection === "rtl";
 
@@ -133,19 +117,6 @@ export function SpreadViewer({
   );
   const currentGroup: PageGroup = groups[groupIndex] ?? [];
   const groupKey = currentGroup.join(",");
-
-  const setViewMode = useCallback((mode: ViewMode) => {
-    setViewModeState(mode);
-    saveViewerSettings({ viewMode: mode });
-  }, []);
-
-  const toggleReadingDirection = useCallback(() => {
-    setReadingDirection((prev) => {
-      const next: ReadingDirection = prev === "rtl" ? "ltr" : "rtl";
-      saveViewerSettings({ readingDirection: next });
-      return next;
-    });
-  }, []);
 
   useImperativeHandle(ref, () => ({
     viewMode,
@@ -182,41 +153,36 @@ export function SpreadViewer({
     };
   }, [getPageDataUrl, groupKey]);
 
-  const goNext = useCallback(() => {
-    const next = groups[groupIndex + 1];
-    if (next) setCurrentPage(next[0]);
-  }, [groups, groupIndex]);
+  const navigate = useCallback(
+    (action: NavigationAction) => {
+      const target =
+        action === "next"
+          ? groups[groupIndex + 1]
+          : action === "prev"
+            ? groups[groupIndex - 1]
+            : action === "first"
+              ? groups[0]
+              : groups[groups.length - 1];
+      if (target) setCurrentPage(target[0]);
+    },
+    [groups, groupIndex],
+  );
 
-  const goPrev = useCallback(() => {
-    const prev = groups[groupIndex - 1];
-    if (prev) setCurrentPage(prev[0]);
-  }, [groups, groupIndex]);
+  const goNext = useCallback(() => navigate("next"), [navigate]);
+  const goPrev = useCallback(() => navigate("prev"), [navigate]);
 
   // Keyboard navigation (direction-aware)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === " ") {
-        e.preventDefault();
-        goNext();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        isRtl ? goNext() : goPrev();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        isRtl ? goPrev() : goNext();
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        setCurrentPage(0);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        const last = groups[groups.length - 1];
-        if (last) setCurrentPage(last[0]);
-      }
+      const action = navigationForKey(e.key, isRtl);
+      if (!action) return;
+      e.preventDefault();
+      navigate(action);
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goNext, goPrev, groups, isRtl]);
+  }, [navigate, isRtl]);
 
   // Mouse wheel navigation
   useEffect(() => {
@@ -229,16 +195,13 @@ export function SpreadViewer({
       if (now - lastWheelTime < wheelThrottleMs) return;
       lastWheelTime = now;
 
-      if (e.deltaY > 0) {
-        goNext();
-      } else if (e.deltaY < 0) {
-        goPrev();
-      }
+      const action = navigationForWheel(e.deltaY);
+      if (action) navigate(action);
     }
 
     window.addEventListener("wheel", handleWheel, { passive: false });
     return () => window.removeEventListener("wheel", handleWheel);
-  }, [goNext, goPrev]);
+  }, [navigate]);
 
   const isFirst = groupIndex === 0;
   const isLast = groupIndex >= groups.length - 1;
@@ -246,13 +209,8 @@ export function SpreadViewer({
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ratio = isRtl
-        ? (rect.right - e.clientX) / rect.width
-        : (e.clientX - rect.left) / rect.width;
-      const newIndex = Math.round(ratio * (groups.length - 1));
-      const clamped = Math.max(0, Math.min(newIndex, groups.length - 1));
-      const group = groups[clamped];
+      const ratio = progressRatio(e.clientX, e.currentTarget.getBoundingClientRect(), isRtl);
+      const group = groups[groupIndexFromRatio(ratio, groups.length)];
       if (group) setCurrentPage(group[0]);
     },
     [groups, isRtl],
@@ -262,13 +220,9 @@ export function SpreadViewer({
   const handlePagesClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const isLeftHalf = e.clientX < window.innerWidth / 2;
-      if (isLeftHalf) {
-        isRtl ? goNext() : goPrev();
-      } else {
-        isRtl ? goPrev() : goNext();
-      }
+      navigate(navigationForClick(isLeftHalf, isRtl));
     },
-    [isRtl, goNext, goPrev],
+    [isRtl, navigate],
   );
 
   // Measure the real page aspect for the fit mode

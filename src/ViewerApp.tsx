@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
 import { saveViewerSettings } from "./api/settings";
+import { showViewerContextMenu } from "./api/viewerContextMenu";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
 import { SubfolderPanel } from "./components/SubfolderPanel/SubfolderPanel";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
@@ -13,6 +14,7 @@ import { useWindowResize } from "./hooks/useWindowResize";
 import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
 import type { ReadingDirection } from "./utils/spreadLayout";
+import { siblingAfterRemoval } from "./utils/spreadNavigation";
 import { fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -64,10 +66,7 @@ function Viewer() {
     try {
       // Resolve next sibling before trashing so the deleted file is still listed.
       const { archives, currentIndex } = await getSiblingArchives(currentPath);
-      const nextPath =
-        currentIndex >= 0
-          ? (archives[currentIndex + 1] ?? archives[currentIndex - 1] ?? null)
-          : null;
+      const nextPath = siblingAfterRemoval(archives, currentIndex);
 
       await trashFile(currentPath);
       const { emit } = await import("@tauri-apps/api/event");
@@ -120,64 +119,10 @@ function Viewer() {
   }, [handleTrash]);
 
   useEffect(() => {
-    async function handleContextMenu(e: MouseEvent) {
+    function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
-      const currentPath = archivePathRef.current;
-      if (!currentPath) return;
-
-      const { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } = await import(
-        "@tauri-apps/api/menu"
-      );
-      const handle = spreadViewerRef.current;
-
-      const modeEntries = [
-        ["single", "単ページ表示"],
-        ["spread", "見開き表示"],
-        ["triple", "3ページ表示"],
-        ["fit", "ウィンドウ追従表示"],
-      ] as const;
-
-      const modeItems = await Promise.all(
-        modeEntries.map(([mode, text]) =>
-          CheckMenuItem.new({
-            text,
-            checked: handle?.viewMode === mode,
-            action: () => handle?.setViewMode(mode),
-          }),
-        ),
-      );
-
-      const directionItem = await MenuItem.new({
-        text: handle?.readingDirection === "rtl" ? "左→右 (LTR) に切替" : "右→左 (RTL) に切替",
-        action: () => handle?.toggleReadingDirection(),
-      });
-
-      const separator0 = await PredefinedMenuItem.new({ item: "Separator" });
-      const separator1 = await PredefinedMenuItem.new({ item: "Separator" });
-      const separator2 = await PredefinedMenuItem.new({ item: "Separator" });
-
-      const trashItem = await MenuItem.new({
-        text: "Move to Trash",
-        action: handleTrash,
-      });
-
-      const closeItem = await MenuItem.new({
-        text: "Close Window",
-        action: () => getCurrentWindow().close(),
-      });
-
-      const menu = await Menu.new({
-        items: [
-          ...modeItems,
-          separator0,
-          directionItem,
-          separator1,
-          trashItem,
-          separator2,
-          closeItem,
-        ],
-      });
-      await menu.popup();
+      if (!archivePathRef.current) return;
+      void showViewerContextMenu(spreadViewerRef.current, () => void handleTrash());
     }
 
     window.addEventListener("contextmenu", handleContextMenu);

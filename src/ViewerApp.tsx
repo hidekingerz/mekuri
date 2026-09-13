@@ -3,6 +3,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
+import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
 import { saveViewerSettings } from "./api/settings";
 import { showViewerContextMenu } from "./api/viewerContextMenu";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
@@ -15,7 +16,8 @@ import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
 import type { ReadingDirection } from "./utils/spreadLayout";
 import { siblingAfterRemoval } from "./utils/spreadNavigation";
-import { fileNameFromPath } from "./utils/windowLabel";
+import { trashConfirmMessage } from "./utils/trashConfirm";
+import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
   const [archivePath, setArchivePath] = useState<string | null>(null);
@@ -57,10 +59,10 @@ function Viewer() {
     const currentPath = archivePathRef.current;
     if (!currentPath) return;
 
-    const confirmed = await ask(
-      `Are you sure you want to move this file to the trash?\n\n${currentPath}`,
-      { title: "Move to Trash", kind: "warning" },
-    );
+    const confirmed = await ask(trashConfirmMessage([currentPath]), {
+      title: "Move to Trash",
+      kind: "warning",
+    });
     if (!confirmed) return;
 
     try {
@@ -69,12 +71,11 @@ function Viewer() {
       const nextPath = siblingAfterRemoval(archives, currentIndex);
 
       await trashFile(currentPath);
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("file-trashed");
+      await emitFileTrashed();
 
       if (nextPath) {
         navigateToArchive(nextPath);
-        await getCurrentWindow().setTitle(`${fileNameFromPath(nextPath)} - mekuri`);
+        await getCurrentWindow().setTitle(appTitle(fileNameFromPath(nextPath)));
       } else {
         await getCurrentWindow().close();
       }
@@ -93,8 +94,7 @@ function Viewer() {
     setMoveError(null);
     try {
       const newPath = await moveFile(currentPath, destDir);
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("file-moved");
+      await emitFileMoved();
       // 新パスで再読込しても同じページ位置から再開する
       setResumePage(spreadViewerRef.current?.currentPage ?? 0);
       setMovePanelOpen(false);
@@ -164,8 +164,7 @@ function Viewer() {
     (spreadIndex: number, totalSpreads: number) => {
       if (!archivePath) return;
       const fileName = fileNameFromPath(archivePath);
-      const title = `${fileName} [${spreadIndex + 1}/${totalSpreads}] - mekuri`;
-      getCurrentWindow().setTitle(title);
+      getCurrentWindow().setTitle(appTitle(`${fileName} [${spreadIndex + 1}/${totalSpreads}]`));
     },
     [archivePath],
   );

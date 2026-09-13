@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileNameFromPath, hashCode, viewerLabel } from "./windowLabel";
+import { appTitle, fileNameFromPath, hashCode, viewerLabel } from "./windowLabel";
 
 describe("hashCode", () => {
   it("returns a string", () => {
@@ -63,5 +63,20 @@ describe("fileNameFromPath", () => {
 
   it("returns 'Viewer' for empty string", () => {
     expect(fileNameFromPath("")).toBe("Viewer");
+  });
+});
+
+describe("appTitle", () => {
+  it("returns the bare app name without a prefix", () => {
+    expect(appTitle()).toBe("mekuri");
+  });
+
+  it("prefixes the app name with the given title", () => {
+    expect(appTitle("Comics")).toBe("Comics - mekuri");
+  });
+
+  it("treats an empty or null prefix as no prefix", () => {
+    expect(appTitle("")).toBe("mekuri");
+    expect(appTitle(null)).toBe("mekuri");
   });
 });

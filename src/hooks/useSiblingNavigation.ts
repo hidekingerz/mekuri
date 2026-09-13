@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 import { getSiblingArchives } from "../api/directory";
-import { fileNameFromPath } from "../utils/windowLabel";
+import { appTitle, fileNameFromPath } from "../utils/windowLabel";
 
 export function useSiblingNavigation(
   archivePath: string | null,
@@ -31,8 +31,7 @@ export function useSiblingNavigation(
         const newPath = archives[newIndex];
         onNavigate(newPath);
 
-        const fileName = fileNameFromPath(newPath);
-        await getCurrentWindow().setTitle(`${fileName} - mekuri`);
+        await getCurrentWindow().setTitle(appTitle(fileNameFromPath(newPath)));
       } catch (err) {
         console.error("Failed to navigate to sibling archive:", err);
       }

@@ -4,7 +4,14 @@ import { addFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry, TreeNodeData } from "../../types";
 import { errorToString } from "../../utils/errorToString";
-import { mergeNodes, replaceChildren } from "../../utils/treeReload";
+import {
+  expandPaths,
+  getAncestorPaths,
+  mergeNodes,
+  replaceChildren,
+  toggleNode as toggleTreeNode,
+  toNodes,
+} from "../../utils/folderTree";
 import { FolderIcon } from "../Icons/Icons";
 import { TreeNode } from "./TreeNode";
 
@@ -19,56 +26,6 @@ type FolderTreeProps = {
   onFileDrop: (srcPaths: string[], destDir: string) => void;
   reloadTrigger?: number;
 };
-
-// rootPath から targetPath までの各階層のパスを返す
-function getAncestorPaths(rootPath: string, targetPath: string): string[] {
-  if (!targetPath.startsWith(rootPath)) return [];
-  const relative = targetPath.slice(rootPath.length);
-  const segments = relative.split("/").filter(Boolean);
-  const paths: string[] = [];
-  let current = rootPath;
-  // 最後のセグメント（targetPath自身）は展開不要なので除外
-  for (let i = 0; i < segments.length - 1; i++) {
-    current = `${current}/${segments[i]}`;
-    paths.push(current);
-  }
-  return paths;
-}
-
-// ツリーノードを再帰的に展開する
-async function expandPaths(
-  nodes: TreeNodeData[],
-  pathsToExpand: Set<string>,
-): Promise<TreeNodeData[]> {
-  const result: TreeNodeData[] = [];
-  for (const node of nodes) {
-    if (pathsToExpand.has(node.entry.path)) {
-      let children = node.children;
-      if (children === null) {
-        try {
-          const entries = await readDirectoryFolders(node.entry.path);
-          children = entries.map((entry) => ({
-            entry,
-            children: null,
-            isOpen: false,
-          }));
-        } catch {
-          children = [];
-        }
-      }
-      const expandedChildren = await expandPaths(children, pathsToExpand);
-      result.push({ ...node, isOpen: true, children: expandedChildren });
-    } else if (node.children && node.isOpen) {
-      result.push({
-        ...node,
-        children: await expandPaths(node.children, pathsToExpand),
-      });
-    } else {
-      result.push(node);
-    }
-  }
-  return result;
-}
 
 export function FolderTree({
   rootPath,
@@ -93,7 +50,7 @@ export function FolderTree({
     setError(null);
     try {
       const entries = await readDirectoryFolders(rootPath);
-      setNodes(entries.map((entry) => ({ entry, children: null, isOpen: false })));
+      setNodes(toNodes(entries));
       setLoaded(true);
     } catch (err) {
       setError(errorToString(err));
@@ -149,7 +106,7 @@ export function FolderTree({
 
     const pathsToExpand = new Set(ancestors);
     setNodes((prev) => {
-      expandPaths(prev, pathsToExpand).then((expanded) => {
+      expandPaths(prev, pathsToExpand, readDirectoryFolders).then((expanded) => {
         setNodes(expanded);
         onRevealComplete();
       });
@@ -157,43 +114,9 @@ export function FolderTree({
     });
   }, [revealPath, loaded, rootPath, onRevealComplete]);
 
-  const toggleNode = useCallback(async (path: string) => {
-    const toggle = async (items: TreeNodeData[]): Promise<TreeNodeData[]> => {
-      const result: TreeNodeData[] = [];
-      for (const node of items) {
-        if (node.entry.path === path) {
-          if (node.isOpen) {
-            result.push({ ...node, isOpen: false });
-          } else {
-            let children = node.children;
-            if (children === null) {
-              try {
-                const entries = await readDirectoryFolders(path);
-                children = entries.map((entry) => ({
-                  entry,
-                  children: null,
-                  isOpen: false,
-                }));
-              } catch {
-                children = [];
-              }
-            }
-            result.push({ ...node, isOpen: true, children });
-          }
-        } else if (node.children && node.isOpen) {
-          result.push({
-            ...node,
-            children: await toggle(node.children),
-          });
-        } else {
-          result.push(node);
-        }
-      }
-      return result;
-    };
-
+  const toggleNode = useCallback((path: string) => {
     setNodes((prev) => {
-      toggle(prev).then(setNodes);
+      toggleTreeNode(prev, path, readDirectoryFolders).then(setNodes);
       return prev;
     });
   }, []);

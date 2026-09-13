@@ -35,14 +35,18 @@ mekuri/
 │   │   ├── usePdfLoader.ts        #     PDF 読み込み・ページレンダリング
 │   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
+│   │   ├── useElementSize.ts      #     要素サイズの追跡 (ResizeObserver)
 │   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
 │   │   ├── useFolderSearch.ts     #     お気に入り配下のデバウンス付き検索
 │   │   ├── useMainWindowSetup.ts  #     メインウィンドウの設定復元・表示・リサイズ保存
 │   │   ├── useUpdater.ts          #     アプリ内アップデートの状態と操作
+│   │   ├── useViewerSettings.ts   #     表示モード・読み方向の復元と永続化
 │   │   └── useWindowResize.ts     #     ウィンドウリサイズ検知
 │   ├── utils/                     #   ユーティリティ
 │   │   ├── spreadLayout.ts        #     見開きレイアウト計算（RTL/LTR 対応）
 │   │   ├── spreadLayout.test.ts   #     spreadLayout テスト
+│   │   ├── spreadNavigation.ts    #     ページ移動の入力判定 (キー・クリック・ホイール・進捗バー)
+│   │   ├── spreadNavigation.test.ts #   spreadNavigation テスト
 │   │   ├── pdf.ts                 #     PDF 読み込み・レンダリング（pdfjs-dist）
 │   │   ├── fileType.ts            #     ファイル種別判定
 │   │   ├── fileType.test.ts       #     fileType テスト

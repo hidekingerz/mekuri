@@ -1,5 +1,6 @@
 mod archive;
 mod commands;
+mod filesystem;
 pub mod launch;
 pub mod window_label;
 

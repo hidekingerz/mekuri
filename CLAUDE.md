@@ -56,8 +56,8 @@ src/                    # フロントエンド (React/TypeScript)
     SpreadViewer/       #   見開きビューワーUI
     UpdateBanner/       #   アップデート状態バナー
     Icons/              #   カスタム SVG アイコン
-  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, settings, store, updater)
-  hooks/                #   React カスタムフック (useContextMenu, useWindowResize)
+  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, launch, settings, store, updater, viewerWindow)
+  hooks/                #   React カスタムフック (useFolderSearch, useMainWindowSetup, useUpdater, useWindowResize など)
   utils/                #   ユーティリティ (spreadLayout, windowLabel)
   types/                #   型定義
 

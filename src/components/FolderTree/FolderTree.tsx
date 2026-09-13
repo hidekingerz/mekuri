@@ -4,6 +4,7 @@ import { addFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import type { DirectoryEntry, TreeNodeData } from "../../types";
 import { errorToString } from "../../utils/errorToString";
+import { mergeNodes, replaceChildren } from "../../utils/treeReload";
 import { FolderIcon } from "../Icons/Icons";
 import { TreeNode } from "./TreeNode";
 
@@ -16,6 +17,7 @@ type FolderTreeProps = {
   revealPath: string | null;
   onRevealComplete: () => void;
   onFileDrop: (srcPaths: string[], destDir: string) => void;
+  reloadTrigger?: number;
 };
 
 // rootPath から targetPath までの各階層のパスを返す
@@ -77,6 +79,7 @@ export function FolderTree({
   revealPath,
   onRevealComplete,
   onFileDrop,
+  reloadTrigger,
 }: FolderTreeProps) {
   const [nodes, setNodes] = useState<TreeNodeData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,6 +115,27 @@ export function FolderTree({
     setLoaded(false);
     setError(null);
   }
+
+  // Reload ボタン: 選択中フォルダ (未選択ならルート) の子フォルダを再取得し、展開状態を保ってマージする
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadTrigger is intentionally used to force re-fetch
+  useEffect(() => {
+    if (!reloadTrigger || !loaded) return;
+    const target = selectedPath ?? rootPath;
+    let cancelled = false;
+    readDirectoryFolders(target)
+      .then((fresh) => {
+        if (cancelled) return;
+        setNodes((prev) =>
+          target === rootPath ? mergeNodes(prev, fresh) : replaceChildren(prev, target, fresh),
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to reload folder tree:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadTrigger]);
 
   // revealPath が設定されたらツリーを自動展開
   useEffect(() => {

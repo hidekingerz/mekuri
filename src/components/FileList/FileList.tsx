@@ -15,6 +15,7 @@ type FileListProps = {
   onArchiveSelect: (path: string) => void;
   onFolderSelect: (path: string) => void;
   searchResults: DirectoryEntry[] | null;
+  reloadTrigger?: number;
 };
 
 const CONFIRM_PREVIEW_COUNT = 5;
@@ -34,6 +35,7 @@ export function FileList({
   onArchiveSelect,
   onFolderSelect,
   searchResults,
+  reloadTrigger,
 }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,7 @@ export function FileList({
     }
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadTrigger is intentionally used to force re-fetch
   useEffect(() => {
     if (!folderPath) {
       setFiles([]);
@@ -86,7 +89,7 @@ export function FileList({
     return () => {
       cancelled = true;
     };
-  }, [folderPath]);
+  }, [folderPath, reloadTrigger]);
 
   // Clear selection whenever the displayed list changes
   const [prevList, setPrevList] = useState({ folderPath, searchResults });

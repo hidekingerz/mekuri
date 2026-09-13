@@ -26,6 +26,7 @@ function App() {
   const [searchResults, setSearchResults] = useState<DirectoryEntry[] | null>(null);
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
@@ -134,6 +135,14 @@ function App() {
     }
   }, []);
 
+  const handleReload = useCallback(() => {
+    if (searchResults !== null && selectedFavorite && searchQuery) {
+      void runSearch(selectedFavorite, searchQuery);
+      return;
+    }
+    setReloadTrigger((n) => n + 1);
+  }, [searchResults, selectedFavorite, searchQuery, runSearch]);
+
   const handleFavoriteSelect = useCallback((path: string) => {
     setSelectedFavorite(path);
     setSelectedFolder(null);
@@ -213,6 +222,14 @@ function App() {
         <button
           type="button"
           className="toolbar__btn"
+          onClick={handleReload}
+          disabled={!selectedFavorite}
+        >
+          Reload
+        </button>
+        <button
+          type="button"
+          className="toolbar__btn"
           onClick={updater.checkNow}
           disabled={updaterBusy}
         >
@@ -267,6 +284,7 @@ function App() {
               revealPath={revealPath}
               onRevealComplete={handleRevealComplete}
               onFileDrop={handleFileDrop}
+              reloadTrigger={reloadTrigger}
             />
           ) : (
             <div className="column-empty">
@@ -282,6 +300,7 @@ function App() {
             onArchiveSelect={handleArchiveSelect}
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
+            reloadTrigger={reloadTrigger}
           />
         </div>
       </div>

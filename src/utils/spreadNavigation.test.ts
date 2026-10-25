@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adjacentSibling,
   groupIndexFromRatio,
   navigationForClick,
   navigationForKey,
@@ -95,5 +96,27 @@ describe("siblingAfterRemoval", () => {
   it("returns null when the item is alone or not in the list", () => {
     expect(siblingAfterRemoval(["only"], 0)).toBeNull();
     expect(siblingAfterRemoval(list, -1)).toBeNull();
+  });
+});
+
+describe("adjacentSibling", () => {
+  const list = ["a", "b", "c"];
+
+  it("returns the following item for next", () => {
+    expect(adjacentSibling(list, 0, "next")).toBe("b");
+  });
+
+  it("returns the preceding item for prev", () => {
+    expect(adjacentSibling(list, 2, "prev")).toBe("b");
+  });
+
+  it("returns null at the ends of the list", () => {
+    expect(adjacentSibling(list, 2, "next")).toBeNull();
+    expect(adjacentSibling(list, 0, "prev")).toBeNull();
+  });
+
+  it("returns null when the current item is not in the list", () => {
+    expect(adjacentSibling(list, -1, "next")).toBeNull();
+    expect(adjacentSibling(list, -1, "prev")).toBeNull();
   });
 });

@@ -45,6 +45,27 @@ export function ChevronDown({ size = 16, className }: IconProps) {
   );
 }
 
+export function ChevronUp({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <path
+        d="M4 10L8 6L12 10"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function FolderIcon({ size = 16, className }: IconProps) {
   return (
     <svg

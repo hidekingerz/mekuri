@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { SiblingNavigation } from "../types";
 import type { ReadingDirection, ViewMode } from "../utils/spreadLayout";
 
 export type ViewerMenuState = {
@@ -15,9 +16,10 @@ const VIEW_MODE_ITEMS: ReadonlyArray<readonly [ViewMode, string]> = [
   ["fit", "ウィンドウ追従表示"],
 ];
 
-/** ビューワーのネイティブコンテキストメニューを表示する (表示モード・読み方向・ゴミ箱・閉じる)。 */
+/** ビューワーのネイティブコンテキストメニューを表示する (表示モード・前後ファイル・読み方向・ゴミ箱・閉じる)。 */
 export async function showViewerContextMenu(
   state: ViewerMenuState | null,
+  siblingNav: SiblingNavigation,
   onTrash: () => void,
 ): Promise<void> {
   const { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem } = await import(
@@ -33,6 +35,17 @@ export async function showViewerContextMenu(
       }),
     ),
   );
+
+  const nextFileItem = await MenuItem.new({
+    text: "次のファイル",
+    enabled: siblingNav.hasNext,
+    action: siblingNav.goNext,
+  });
+  const prevFileItem = await MenuItem.new({
+    text: "前のファイル",
+    enabled: siblingNav.hasPrev,
+    action: siblingNav.goPrev,
+  });
 
   const directionItem = await MenuItem.new({
     text: state?.readingDirection === "rtl" ? "左→右 (LTR) に切替" : "右→左 (RTL) に切替",
@@ -50,6 +63,9 @@ export async function showViewerContextMenu(
   const menu = await Menu.new({
     items: [
       ...modeItems,
+      await separator(),
+      nextFileItem,
+      prevFileItem,
       await separator(),
       directionItem,
       await separator(),

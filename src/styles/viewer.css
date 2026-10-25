@@ -189,6 +189,13 @@ body {
   gap: 4px;
 }
 
+.spread-viewer__toggles-separator {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--viewer-color-border-button);
+}
+
 .spread-viewer__mode-toggle {
   display: flex;
   align-items: center;

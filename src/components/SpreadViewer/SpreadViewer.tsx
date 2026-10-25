@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useElementSize } from "../../hooks/useElementSize";
 import { useViewerSettings } from "../../hooks/useViewerSettings";
+import type { SiblingNavigation } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import type { PageGroup, ReadingDirection, ViewMode } from "../../utils/spreadLayout";
@@ -27,6 +28,8 @@ import {
   progressRatio,
 } from "../../utils/spreadNavigation";
 import {
+  ChevronDown,
+  ChevronUp,
   FitWindowIcon,
   LtrIcon,
   MoveFolderIcon,
@@ -60,6 +63,8 @@ type SpreadViewerProps = {
     onToggle: () => void;
     dragData: string;
   };
+  /** 同一フォルダ内の前後ファイルへの移動（指定時のみボタンを表示） */
+  siblingNav?: SiblingNavigation;
   ref?: Ref<SpreadViewerHandle>;
 };
 
@@ -82,6 +87,7 @@ export function SpreadViewer({
   defaultReadingDirection = "rtl",
   initialPage,
   movePanel,
+  siblingNav,
   ref,
 }: SpreadViewerProps) {
   const [currentPage, setCurrentPage] = useState(initialPage ?? 0);
@@ -315,6 +321,29 @@ export function SpreadViewer({
             →
           </button>
           <div className="spread-viewer__toggles">
+            {siblingNav && (
+              <>
+                <button
+                  type="button"
+                  className="spread-viewer__mode-toggle"
+                  onClick={siblingNav.goPrev}
+                  disabled={!siblingNav.hasPrev}
+                  title="前のファイル (Alt+↓)"
+                >
+                  <ChevronDown size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="spread-viewer__mode-toggle"
+                  onClick={siblingNav.goNext}
+                  disabled={!siblingNav.hasNext}
+                  title="次のファイル (Alt+↑)"
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <span className="spread-viewer__toggles-separator" />
+              </>
+            )}
             <button
               type="button"
               className={`spread-viewer__mode-toggle${viewMode === "single" ? " spread-viewer__mode-toggle--active" : ""}`}

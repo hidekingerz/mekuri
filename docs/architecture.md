@@ -270,7 +270,7 @@ Tauri のマルチウィンドウ機能を使用する。
 | `useArchiveLoader` | アーカイブの読み込み・内容分析・ネストアーカイブ展開 |
 | `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
 | `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
-| `useSiblingNavigation` | Alt+矢印キーによる兄弟ファイル間のナビゲーション |
+| `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーの登録、ボタン・メニュー向けの移動関数と端判定の提供） |
 | `useUpdater` | アプリ内アップデートの状態管理・自動確認・ダウンロード/インストール・再起動（メインウィンドウのみ） |
 
 ## ユーティリティ

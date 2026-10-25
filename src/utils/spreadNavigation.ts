@@ -54,3 +54,13 @@ export function siblingAfterRemoval<T>(items: T[], index: number): T | null {
   if (index < 0 || index >= items.length) return null;
   return items[index + 1] ?? items[index - 1] ?? null;
 }
+
+/** index の隣の要素 (next は後ろ、prev は前)。端や範囲外なら null。 */
+export function adjacentSibling<T>(
+  items: T[],
+  index: number,
+  direction: "next" | "prev",
+): T | null {
+  if (index < 0 || index >= items.length) return null;
+  return items[direction === "next" ? index + 1 : index - 1] ?? null;
+}

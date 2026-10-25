@@ -49,7 +49,7 @@ function Viewer() {
     setArchivePath(path);
   }, []);
 
-  useSiblingNavigation(archivePath, navigateToArchive);
+  const siblingNav = useSiblingNavigation(archivePath, navigateToArchive);
 
   // Native OS context menu with "Move to Trash"
   const archivePathRef = useRef(archivePath);
@@ -122,12 +122,12 @@ function Viewer() {
     function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
       if (!archivePathRef.current) return;
-      void showViewerContextMenu(spreadViewerRef.current, () => void handleTrash());
+      void showViewerContextMenu(spreadViewerRef.current, siblingNav, () => void handleTrash());
     }
 
     window.addEventListener("contextmenu", handleContextMenu);
     return () => window.removeEventListener("contextmenu", handleContextMenu);
-  }, [handleTrash]);
+  }, [handleTrash, siblingNav]);
 
   // Archive loader (only active for archive files)
   const archive = useArchiveLoader(isPdf ? null : archivePath);
@@ -250,6 +250,7 @@ function Viewer() {
         onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         defaultReadingDirection={defaultReadingDirection}
         initialPage={resumePage}
+        siblingNav={siblingNav}
         movePanel={
           canMoveFile
             ? {

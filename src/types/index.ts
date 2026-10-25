@@ -12,3 +12,11 @@ export type TreeNodeData = {
   children: TreeNodeData[] | null;
   isOpen: boolean;
 };
+
+/** ビューワーの同一フォルダ内の前後ファイルへの移動操作 */
+export type SiblingNavigation = {
+  hasNext: boolean;
+  hasPrev: boolean;
+  goNext: () => void;
+  goPrev: () => void;
+};

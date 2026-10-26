@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSiblingArchives } from "../api/directory";
 import { onFileChanged } from "../api/fileEvents";
 import type { SiblingNavigation } from "../types";
-import { adjacentSibling } from "../utils/spreadNavigation";
+import { adjacentSibling, siblingDirectionForMouseButton } from "../utils/spreadNavigation";
 import { appTitle, fileNameFromPath } from "../utils/windowLabel";
 
 type Siblings = { archives: string[]; currentIndex: number };
@@ -11,8 +11,8 @@ type Siblings = { archives: string[]; currentIndex: number };
 const NO_SIBLINGS: Siblings = { archives: [], currentIndex: -1 };
 
 /**
- * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↑/↓ のキー操作を登録し、
- * ボタンやメニューから呼ぶための移動関数と端判定を返す。
+ * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↑/↓ のキー操作と
+ * マウスの戻る/進むボタンを登録し、ボタンやメニューから呼ぶための移動関数と端判定を返す。
  */
 export function useSiblingNavigation(
   archivePath: string | null,
@@ -77,8 +77,27 @@ export function useSiblingNavigation(
       else goPrev();
     };
 
+    const handleMouseUp = (e: MouseEvent) => {
+      const direction = siblingDirectionForMouseButton(e.button);
+      if (!direction) return;
+      e.preventDefault();
+      if (direction === "next") goNext();
+      else goPrev();
+    };
+
+    // WebView 既定の履歴移動を抑止するため、mousedown も止める
+    const suppressHistoryNavigation = (e: MouseEvent) => {
+      if (siblingDirectionForMouseButton(e.button)) e.preventDefault();
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousedown", suppressHistoryNavigation);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousedown", suppressHistoryNavigation);
+    };
   }, [archivePath, goNext, goPrev]);
 
   return useMemo(

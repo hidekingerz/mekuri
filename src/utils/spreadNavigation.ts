@@ -64,3 +64,10 @@ export function adjacentSibling<T>(
   if (index < 0 || index >= items.length) return null;
   return items[direction === "next" ? index + 1 : index - 1] ?? null;
 }
+
+/** マウスの戻る (button 3) / 進む (button 4) ボタンを兄弟ファイルの移動方向に対応づける。他のボタンは null。 */
+export function siblingDirectionForMouseButton(button: number): "next" | "prev" | null {
+  if (button === 3) return "prev";
+  if (button === 4) return "next";
+  return null;
+}

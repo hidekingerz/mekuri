@@ -210,7 +210,7 @@ Tauri のマルチウィンドウ機能を使用する。
   → Rust: archive::get_image_base64 → data URL 返却
   → React (ビューワー): <img src={dataUrl}> で表示
 
-ユーザー操作: Alt+矢印で兄弟ファイル移動
+ユーザー操作: Alt+矢印・マウスの戻る/進むボタンで兄弟ファイル移動
   → React: invoke("read_directory", { path: 親フォルダ })
   → React: 兄弟ファイルリストから次/前のファイルを特定
   → React: 新しいファイルで閲覧を再開
@@ -270,7 +270,7 @@ Tauri のマルチウィンドウ機能を使用する。
 | `useArchiveLoader` | アーカイブの読み込み・内容分析・ネストアーカイブ展開 |
 | `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
 | `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
-| `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーの登録、ボタン・メニュー向けの移動関数と端判定の提供） |
+| `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーとマウスの戻る/進むボタンの登録、ボタン・メニュー向けの移動関数と端判定の提供） |
 | `useUpdater` | アプリ内アップデートの状態管理・自動確認・ダウンロード/インストール・再起動（メインウィンドウのみ） |
 
 ## ユーティリティ

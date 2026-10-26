@@ -7,6 +7,7 @@ import {
   navigationForWheel,
   progressRatio,
   siblingAfterRemoval,
+  siblingDirectionForMouseButton,
 } from "./spreadNavigation";
 
 describe("navigationForKey", () => {
@@ -118,5 +119,21 @@ describe("adjacentSibling", () => {
   it("returns null when the current item is not in the list", () => {
     expect(adjacentSibling(list, -1, "next")).toBeNull();
     expect(adjacentSibling(list, -1, "prev")).toBeNull();
+  });
+});
+
+describe("siblingDirectionForMouseButton", () => {
+  it("maps the mouse back button to the previous file", () => {
+    expect(siblingDirectionForMouseButton(3)).toBe("prev");
+  });
+
+  it("maps the mouse forward button to the next file", () => {
+    expect(siblingDirectionForMouseButton(4)).toBe("next");
+  });
+
+  it("ignores the primary, middle, and secondary buttons", () => {
+    expect(siblingDirectionForMouseButton(0)).toBeNull();
+    expect(siblingDirectionForMouseButton(1)).toBeNull();
+    expect(siblingDirectionForMouseButton(2)).toBeNull();
   });
 });

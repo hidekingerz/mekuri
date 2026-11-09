@@ -13,6 +13,8 @@ type ArchiveLoaderState = {
   nestedArchives: string[] | null;
   loading: boolean;
   error: string | null;
+  /** 解析できたが画像もネストしたアーカイブも無い */
+  isEmpty: boolean;
   hasNestedCache: boolean;
 };
 
@@ -23,6 +25,7 @@ export function useArchiveLoader(archivePath: string | null) {
   const [cachedNestedArchives, setCachedNestedArchives] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
 
   // Analyze archive contents when archive path changes
   useEffect(() => {
@@ -34,6 +37,8 @@ export function useArchiveLoader(archivePath: string | null) {
     setNestedArchives(null);
     setImageNames([]);
     setEffectivePath(null);
+    setError(null);
+    setIsEmpty(false);
 
     async function analyze() {
       try {
@@ -48,7 +53,7 @@ export function useArchiveLoader(archivePath: string | null) {
           setNestedArchives(contents.names);
           setCachedNestedArchives(contents.names);
         } else {
-          setError("このアーカイブに画像がありません");
+          setIsEmpty(true);
         }
       } catch (err) {
         if (!cancelled) {
@@ -102,6 +107,7 @@ export function useArchiveLoader(archivePath: string | null) {
     nestedArchives,
     loading,
     error,
+    isEmpty,
     hasNestedCache: cachedNestedArchives !== null,
   };
 

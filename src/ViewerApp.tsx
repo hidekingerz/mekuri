@@ -6,6 +6,7 @@ import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
 import { saveViewerSettings } from "./api/settings";
 import { showViewerContextMenu } from "./api/viewerContextMenu";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
+import { ViewerNotice } from "./components/SpreadViewer/ViewerNotice";
 import { SubfolderPanel } from "./components/SubfolderPanel/SubfolderPanel";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { usePdfLoader } from "./hooks/usePdfLoader";
@@ -14,6 +15,7 @@ import { useTrashConfirm } from "./hooks/useTrashConfirm";
 import { useWindowResize } from "./hooks/useWindowResize";
 import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
+import { describeOpenError } from "./utils/openErrorMessage";
 import type { ReadingDirection } from "./utils/spreadLayout";
 import { siblingAfterRemoval } from "./utils/spreadNavigation";
 import { isTrashShortcut } from "./utils/trashShortcut";
@@ -166,11 +168,19 @@ function Viewer() {
     [archivePath],
   );
 
-  if (error || trashError) {
+  const closeWindow = () => void getCurrentWindow().close();
+
+  if (error) {
+    const described = describeOpenError(error, isPdf ? "pdf" : "archive");
     return (
-      <div className="viewer viewer--error">
-        <p>{isPdf ? "PDF" : "アーカイブ"}を開けませんでした</p>
-        <p className="viewer__error-detail">{error || trashError}</p>
+      <div className="viewer">
+        <ViewerNotice
+          tone="error"
+          title={described.summary}
+          detail={described.detail}
+          siblingNav={siblingNav}
+          onClose={closeWindow}
+        />
       </div>
     );
   }
@@ -219,10 +229,15 @@ function Viewer() {
   // selector, dropping page position and selection — disable move in that flow.
   const canMoveFile = isPdf || !archive.hasNestedCache;
 
-  if (pageCount === 0) {
+  if (pageCount === 0 || (!isPdf && archive.isEmpty)) {
     return (
-      <div className="viewer viewer--empty">
-        <p>この{isPdf ? "PDF にページ" : "アーカイブに画像"}がありません</p>
+      <div className="viewer">
+        <ViewerNotice
+          tone="empty"
+          title={isPdf ? "この PDF にはページがありません" : "このアーカイブには画像がありません"}
+          siblingNav={siblingNav}
+          onClose={closeWindow}
+        />
       </div>
     );
   }
@@ -231,9 +246,17 @@ function Viewer() {
     <div className="viewer">
       {trashDialog}
       {moveError && (
-        <div className="viewer__move-error" role="alert">
+        <div className="viewer__banner" role="alert">
           <span>ファイルを移動できませんでした: {moveError}</span>
-          <button type="button" onClick={() => setMoveError(null)}>
+          <button type="button" aria-label="閉じる" onClick={() => setMoveError(null)}>
+            ×
+          </button>
+        </div>
+      )}
+      {trashError && (
+        <div className="viewer__banner" role="alert">
+          <span>ゴミ箱に移動できませんでした: {trashError}</span>
+          <button type="button" aria-label="閉じる" onClick={() => setTrashError(null)}>
             ×
           </button>
         </div>

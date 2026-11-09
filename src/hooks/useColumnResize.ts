@@ -1,5 +1,6 @@
 import { type RefObject, useCallback, useEffect, useState } from "react";
 import { saveWindowSettings } from "../api/settings";
+import { clampTreeColumnWidth } from "../utils/columnLayout";
 import { FAVORITES_SIDEBAR_WIDTH, MIN_COLUMN_WIDTH } from "../utils/constants";
 
 export function useColumnResize(
@@ -14,10 +15,30 @@ export function useColumnResize(
     setIsResizing(true);
   }, []);
 
-  // Sync initial width from settings
-  const setWidth = useCallback((width: number) => {
-    setTreeColumnWidth(width);
-  }, []);
+  // Sync initial width from settings (clamped to the current window)
+  const setWidth = useCallback(
+    (width: number) => {
+      const containerWidth = columnsRef.current?.getBoundingClientRect().width ?? 0;
+      setTreeColumnWidth(
+        clampTreeColumnWidth(width, containerWidth, FAVORITES_SIDEBAR_WIDTH, MIN_COLUMN_WIDTH),
+      );
+    },
+    [columnsRef],
+  );
+
+  // Keep the file column visible when the window gets narrower than the saved tree width
+  useEffect(() => {
+    const el = columnsRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      const containerWidth = el.getBoundingClientRect().width;
+      setTreeColumnWidth((prev) =>
+        clampTreeColumnWidth(prev, containerWidth, FAVORITES_SIDEBAR_WIDTH, MIN_COLUMN_WIDTH),
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [columnsRef]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -28,9 +49,11 @@ export function useColumnResize(
       if (!columnsRef.current) return;
       const columnsRect = columnsRef.current.getBoundingClientRect();
       const newWidth = e.clientX - columnsRect.left - FAVORITES_SIDEBAR_WIDTH;
-      const clampedWidth = Math.max(
+      const clampedWidth = clampTreeColumnWidth(
+        newWidth,
+        columnsRect.width,
+        FAVORITES_SIDEBAR_WIDTH,
         MIN_COLUMN_WIDTH,
-        Math.min(newWidth, columnsRect.width - FAVORITES_SIDEBAR_WIDTH - MIN_COLUMN_WIDTH),
       );
       currentWidth = clampedWidth;
       setTreeColumnWidth(clampedWidth);

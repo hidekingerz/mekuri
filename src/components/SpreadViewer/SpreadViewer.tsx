@@ -308,28 +308,37 @@ export function SpreadViewer({
           />
         </div>
         <div className="spread-viewer__nav">
-          {onBack && (
-            <button type="button" className="spread-viewer__back" onClick={onBack}>
-              ≡
+          <div className="spread-viewer__nav-side">
+            {onBack && (
+              <button
+                type="button"
+                className="spread-viewer__back"
+                onClick={onBack}
+                title="アーカイブ一覧に戻る"
+              >
+                ≡
+              </button>
+            )}
+          </div>
+          <div className="spread-viewer__pager">
+            <button
+              type="button"
+              disabled={isRtl ? isLast : isFirst}
+              onClick={isRtl ? goNext : goPrev}
+            >
+              ←
             </button>
-          )}
-          <button
-            type="button"
-            disabled={isRtl ? isLast : isFirst}
-            onClick={isRtl ? goNext : goPrev}
-          >
-            ←
-          </button>
-          <span className="spread-viewer__info">
-            {groupIndex + 1} / {groups.length}
-          </span>
-          <button
-            type="button"
-            disabled={isRtl ? isFirst : isLast}
-            onClick={isRtl ? goPrev : goNext}
-          >
-            →
-          </button>
+            <span className="spread-viewer__info">
+              {groupIndex + 1} / {groups.length}
+            </span>
+            <button
+              type="button"
+              disabled={isRtl ? isFirst : isLast}
+              onClick={isRtl ? goPrev : goNext}
+            >
+              →
+            </button>
+          </div>
           <div className="spread-viewer__toggles">
             {siblingNav && (
               <>
@@ -390,6 +399,7 @@ export function SpreadViewer({
             >
               <FitWindowIcon size={16} />
             </button>
+            <span className="spread-viewer__toggles-separator" />
             <button
               type="button"
               className="spread-viewer__mode-toggle"

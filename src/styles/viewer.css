@@ -138,14 +138,42 @@ body {
   opacity: 1;
 }
 
-/* Navigation bar */
+/* Navigation bar: [back] [pager] [toggles] as a 3-column grid so nothing overlaps */
 .spread-viewer__nav {
-  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 12px;
+}
+
+.spread-viewer__nav-side {
+  display: flex;
+  justify-self: start;
+}
+
+.spread-viewer__pager {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 16px;
-  padding: 6px;
+}
+
+/* Narrow window: pager on top, toggles wrap underneath */
+@media (max-width: 760px) {
+  .spread-viewer__nav {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .spread-viewer__nav-side:empty {
+    display: none;
+  }
+
+  .spread-viewer__toggles {
+    justify-self: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
 .spread-viewer__nav button {
@@ -175,17 +203,14 @@ body {
 }
 
 .spread-viewer__back {
-  position: absolute;
-  left: 12px;
   padding: 4px 10px;
   font-size: 16px;
 }
 
 .spread-viewer__toggles {
-  position: absolute;
-  right: 12px;
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: 4px;
 }
 
@@ -203,10 +228,12 @@ body {
   padding: 4px 8px;
 }
 
-.spread-viewer__mode-toggle--active {
-  background: var(--viewer-color-bg-hover);
-  border-color: var(--viewer-color-accent-hover);
-  color: var(--viewer-color-text);
+/* Active mode: filled so the current state is visible at a glance */
+.spread-viewer__mode-toggle--active,
+.spread-viewer__nav button.spread-viewer__mode-toggle--active:hover:not(:disabled) {
+  background: var(--viewer-color-text);
+  border-color: var(--viewer-color-text);
+  color: var(--viewer-color-bg);
 }
 
 /* Nested archive selector */

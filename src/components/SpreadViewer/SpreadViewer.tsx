@@ -288,8 +288,16 @@ export function SpreadViewer({
         ))}
       </div>
       <div className="spread-viewer__footer">
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: mouse interaction for progress bar */}
-        <div className="spread-viewer__progress" onClick={handleProgressClick}>
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard page navigation is handled at window level */}
+        <div
+          className="spread-viewer__progress"
+          onClick={handleProgressClick}
+          role="progressbar"
+          aria-label="読み進めた位置"
+          aria-valuemin={1}
+          aria-valuemax={groups.length}
+          aria-valuenow={groupIndex + 1}
+        >
           <div
             className="spread-viewer__progress-fill"
             style={
@@ -315,6 +323,7 @@ export function SpreadViewer({
                 className="spread-viewer__back"
                 onClick={onBack}
                 title="アーカイブ一覧に戻る"
+                aria-label="アーカイブ一覧に戻る"
               >
                 ≡
               </button>
@@ -325,6 +334,7 @@ export function SpreadViewer({
               type="button"
               disabled={isRtl ? isLast : isFirst}
               onClick={isRtl ? goNext : goPrev}
+              aria-label={isRtl ? "次の見開き" : "前の見開き"}
             >
               ←
             </button>
@@ -335,6 +345,7 @@ export function SpreadViewer({
               type="button"
               disabled={isRtl ? isFirst : isLast}
               onClick={isRtl ? goPrev : goNext}
+              aria-label={isRtl ? "前の見開き" : "次の見開き"}
             >
               →
             </button>
@@ -348,6 +359,7 @@ export function SpreadViewer({
                   onClick={siblingNav.goPrev}
                   disabled={!siblingNav.hasPrev}
                   title="前のファイル (Alt+↓)"
+                  aria-label="前のファイル"
                 >
                   <ChevronDown size={16} />
                 </button>
@@ -357,6 +369,7 @@ export function SpreadViewer({
                   onClick={siblingNav.goNext}
                   disabled={!siblingNav.hasNext}
                   title="次のファイル (Alt+↑)"
+                  aria-label="次のファイル"
                 >
                   <ChevronUp size={16} />
                 </button>
@@ -368,6 +381,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "single" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("single")}
               title={VIEW_MODE_LABELS.single}
+              aria-label={VIEW_MODE_LABELS.single}
               aria-pressed={viewMode === "single"}
             >
               <SinglePageIcon size={16} />
@@ -377,6 +391,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "spread" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("spread")}
               title={VIEW_MODE_LABELS.spread}
+              aria-label={VIEW_MODE_LABELS.spread}
               aria-pressed={viewMode === "spread"}
             >
               <SpreadViewIcon size={16} />
@@ -386,6 +401,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "triple" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("triple")}
               title={VIEW_MODE_LABELS.triple}
+              aria-label={VIEW_MODE_LABELS.triple}
               aria-pressed={viewMode === "triple"}
             >
               <TriplePageIcon size={16} />
@@ -395,6 +411,7 @@ export function SpreadViewer({
               className={`spread-viewer__mode-toggle${viewMode === "fit" ? " spread-viewer__mode-toggle--active" : ""}`}
               onClick={() => setViewMode("fit")}
               title={VIEW_MODE_LABELS.fit}
+              aria-label={VIEW_MODE_LABELS.fit}
               aria-pressed={viewMode === "fit"}
             >
               <FitWindowIcon size={16} />
@@ -405,6 +422,11 @@ export function SpreadViewer({
               className="spread-viewer__mode-toggle"
               onClick={toggleReadingDirection}
               title={isRtl ? "右→左 (RTL)" : "左→右 (LTR)"}
+              aria-label={
+                isRtl
+                  ? "読み方向: 右から左。クリックで左から右に切替"
+                  : "読み方向: 左から右。クリックで右から左に切替"
+              }
             >
               {isRtl ? <RtlIcon size={16} /> : <LtrIcon size={16} />}
             </button>
@@ -414,6 +436,7 @@ export function SpreadViewer({
                 className={`spread-viewer__mode-toggle${movePanel.open ? " spread-viewer__mode-toggle--active" : ""}`}
                 onClick={movePanel.onToggle}
                 title="ファイルを移動"
+                aria-label="ファイルを移動"
                 aria-pressed={movePanel.open}
               >
                 <MoveFolderIcon size={16} />

@@ -88,6 +88,9 @@ export function TreeNode({
           }
         }}
         role="treeitem"
+        aria-selected={isSelected}
+        aria-expanded={hasChildren ? node.isOpen : undefined}
+        aria-level={depth + 1}
         tabIndex={0}
       >
         {depth > 0 && (
@@ -110,6 +113,7 @@ export function TreeNode({
               onToggle(entry.path);
             }}
             tabIndex={-1}
+            aria-label={node.isOpen ? "折りたたむ" : "展開する"}
           >
             {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>

@@ -12,6 +12,7 @@ import {
   toggleNode as toggleTreeNode,
   toNodes,
 } from "../../utils/folderTree";
+import { moveListIndex } from "../../utils/listKeyboard";
 import { FolderIcon } from "../Icons/Icons";
 import { TreeNode } from "./TreeNode";
 
@@ -129,13 +130,30 @@ export function FolderTree({
     }
   }, [contextMenu, closeContextMenu, onFavoriteAdded]);
 
+  // ↑↓ / Home / End で表示中の項目間を移動する（開閉と選択は各項目が処理する）
+  const handleTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next = moveListIndex(items.length, current, e.key);
+    if (next === null) return;
+    e.preventDefault();
+    items[next]?.focus();
+    items[next]?.scrollIntoView({ block: "nearest" });
+  };
+
   // 検索中はフラットリストで表示
   if (searchFolders !== null) {
     if (searchFolders.length === 0) {
       return <div className="folder-tree-loading">一致するフォルダがありません</div>;
     }
     return (
-      <div className="folder-tree">
+      <div
+        className="folder-tree"
+        role="tree"
+        aria-label="検索に一致したフォルダ"
+        onKeyDown={handleTreeKeyDown}
+      >
         {searchFolders.map((folder) => (
           <div
             key={folder.path}
@@ -149,6 +167,7 @@ export function FolderTree({
               }
             }}
             role="treeitem"
+            aria-selected={folder.path === selectedPath}
             tabIndex={0}
           >
             <span className="tree-node__icon">
@@ -175,7 +194,12 @@ export function FolderTree({
   }
 
   return (
-    <div className="folder-tree">
+    <div
+      className="folder-tree"
+      role="tree"
+      aria-label="フォルダツリー"
+      onKeyDown={handleTreeKeyDown}
+    >
       {nodes.map((node) => (
         <TreeNode
           key={node.entry.path}

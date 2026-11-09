@@ -423,3 +423,13 @@ body {
   border-color: #a05050;
   color: #f0c0c0;
 }
+
+/* Visible keyboard focus for every interactive element */
+.spread-viewer__nav button:focus-visible,
+.viewer-notice__actions button:focus-visible,
+.nested-selector__item:focus-visible,
+.subfolder-panel__chip:focus-visible,
+.viewer__banner button:focus-visible {
+  outline: 2px solid var(--viewer-color-accent-hover);
+  outline-offset: 2px;
+}

@@ -8,6 +8,12 @@ import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { encodeDragPaths } from "../../utils/fileDrag";
+import {
+  SORT_KEY_LABELS,
+  type SortDirection,
+  type SortKey,
+  sortEntries,
+} from "../../utils/fileSort";
 import { moveListIndex } from "../../utils/listKeyboard";
 import { isTrashShortcut } from "../../utils/trashShortcut";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
@@ -35,6 +41,8 @@ export function FileList({
   const { confirm: confirmTrash, dialog: trashDialog } = useTrashConfirm();
   // キーボード操作の現在位置（最後にクリックまたは矢印で選んだ項目）
   const [cursorPath, setCursorPath] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const listRef = useRef<HTMLDivElement>(null);
 
   // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
@@ -203,12 +211,46 @@ export function FileList({
       </div>
     );
 
+  const renderHeader = (label: string, count: number | null) => (
+    <div className="file-list__header">
+      <span className="file-list__header-title">
+        {label}
+        {count !== null && <span className="file-list__count">{count} 件</span>}
+      </span>
+      {count !== null && count > 1 && (
+        <span className="file-list__sort">
+          <select
+            className="file-list__sort-select"
+            aria-label="並び順"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+          >
+            {(Object.keys(SORT_KEY_LABELS) as SortKey[]).map((key) => (
+              <option key={key} value={key}>
+                {SORT_KEY_LABELS[key]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="file-list__sort-dir"
+            aria-label={sortDirection === "asc" ? "昇順。クリックで降順" : "降順。クリックで昇順"}
+            title={sortDirection === "asc" ? "昇順" : "降順"}
+            onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+          >
+            {sortDirection === "asc" ? "↑" : "↓"}
+          </button>
+        </span>
+      )}
+    </div>
+  );
+
   // 検索結果表示モード
   if (searchResults !== null) {
     if (searchResults.length === 0) {
       return (
         <div className="file-list">
-          <div className="file-list__header">検索結果</div>
+          {renderHeader("検索結果", 0)}
           <div className="file-list__message file-list__message--empty">
             <p>一致するものがありません</p>
           </div>
@@ -217,7 +259,11 @@ export function FileList({
     }
 
     const resultFolders = searchResults.filter((e) => e.is_dir);
-    const resultFiles = searchResults.filter((e) => !e.is_dir);
+    const resultFiles = sortEntries(
+      searchResults.filter((e) => !e.is_dir),
+      sortKey,
+      sortDirection,
+    );
     const order = resultFiles.map((f) => f.path);
 
     return (
@@ -228,7 +274,7 @@ export function FileList({
         tabIndex={-1}
         onKeyDown={(e) => handleListKeyDown(e, order)}
       >
-        <div className="file-list__header">検索結果</div>
+        {renderHeader("検索結果", searchResults.length)}
         <div className="file-list__items" role="listbox" aria-multiselectable="true">
           {resultFolders.map((folder) => (
             <button
@@ -254,7 +300,7 @@ export function FileList({
 
   const renderMessage = (text: string, modifier: "empty" | "loading" | "error") => (
     <div className="file-list">
-      <div className="file-list__header">ファイル</div>
+      {renderHeader("ファイル", null)}
       <div className={`file-list__message file-list__message--${modifier}`}>
         <p>{text}</p>
       </div>
@@ -268,7 +314,8 @@ export function FileList({
     return renderMessage("このフォルダにアーカイブや PDF はありません", "empty");
   }
 
-  const order = files.map((f) => f.path);
+  const sortedFiles = sortEntries(files, sortKey, sortDirection);
+  const order = sortedFiles.map((f) => f.path);
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
@@ -278,9 +325,9 @@ export function FileList({
       tabIndex={-1}
       onKeyDown={(e) => handleListKeyDown(e, order)}
     >
-      <div className="file-list__header">ファイル</div>
+      {renderHeader("ファイル", files.length)}
       <div className="file-list__items" role="listbox" aria-multiselectable="true">
-        {files.map((file) => renderFileItem(file, order))}
+        {sortedFiles.map((file) => renderFileItem(file, order))}
       </div>
       {renderContextMenu()}
       {trashDialog}

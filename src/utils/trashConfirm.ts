@@ -1,12 +1,15 @@
 const PREVIEW_COUNT = 5;
 
-/** ゴミ箱移動の確認ダイアログ本文。複数件はパスを最大 5 件までプレビューする。 */
-export function trashConfirmMessage(paths: string[]): string {
-  if (paths.length === 1) {
-    return `このファイルをゴミ箱に移動しますか?\n\n${paths[0]}`;
-  }
-  const preview = paths.slice(0, PREVIEW_COUNT).join("\n");
+/** ゴミ箱移動の確認ダイアログの見出し。 */
+export function trashConfirmTitle(count: number): string {
+  return count === 1
+    ? "ファイルをゴミ箱に移動しますか?"
+    : `${count} 件のファイルをゴミ箱に移動しますか?`;
+}
+
+/** 確認ダイアログの本文。ファイル名を最大 5 件まで並べ、残りは件数で示す。 */
+export function trashConfirmLines(paths: string[]): string[] {
+  const names = paths.slice(0, PREVIEW_COUNT).map((p) => p.split("/").pop() || p);
   const rest = paths.length - PREVIEW_COUNT;
-  const suffix = rest > 0 ? `\n…ほか ${rest} 件` : "";
-  return `${paths.length} 件のファイルをゴミ箱に移動しますか?\n\n${preview}${suffix}`;
+  return rest > 0 ? [...names, `…ほか ${rest} 件`] : names;
 }

@@ -1,14 +1,14 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
 import { emitFileTrashed, onFileChanged } from "../../api/fileEvents";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
+import { useTrashConfirm } from "../../hooks/useTrashConfirm";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { encodeDragPaths } from "../../utils/fileDrag";
-import { trashConfirmMessage } from "../../utils/trashConfirm";
+import { isTrashShortcut } from "../../utils/trashShortcut";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
 type FileListProps = {
@@ -31,6 +31,7 @@ export function FileList({
   const [error, setError] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
   const { selected, toggle, selectRange, selectOnly, clear } = useFileSelection();
+  const { confirm: confirmTrash, dialog: trashDialog } = useTrashConfirm();
 
   // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
   const requestIdRef = useRef(0);
@@ -83,10 +84,7 @@ export function FileList({
   const trashPaths = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0) return;
-      const confirmed = await ask(trashConfirmMessage(paths), {
-        title: "ゴミ箱に移動",
-        kind: "warning",
-      });
+      const confirmed = await confirmTrash(paths);
       if (!confirmed) return;
 
       try {
@@ -99,7 +97,7 @@ export function FileList({
         await emitFileTrashed();
       }
     },
-    [folderPath, loadFiles, clear],
+    [folderPath, loadFiles, clear, confirmTrash],
   );
 
   // Right-click on a selected item targets the whole selection; otherwise only that item
@@ -121,7 +119,7 @@ export function FileList({
         clear();
         return;
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+      if (isTrashShortcut(e) && selected.size > 0) {
         e.preventDefault();
         trashPaths([...selected]);
       }
@@ -214,6 +212,7 @@ export function FileList({
           {resultFiles.map((file) => renderFileItem(file, order))}
         </div>
         {renderContextMenu()}
+        {trashDialog}
       </div>
     );
   }
@@ -258,6 +257,7 @@ export function FileList({
       <div className="file-list__header">ファイル</div>
       <div className="file-list__items">{files.map((file) => renderFileItem(file, order))}</div>
       {renderContextMenu()}
+      {trashDialog}
     </div>
   );
 }

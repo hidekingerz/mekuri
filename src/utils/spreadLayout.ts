@@ -18,6 +18,7 @@ export type ReadingDirection = "rtl" | "ltr";
 export type PageGroup = number[];
 
 const DEFAULT_FIT_PAGE_COUNT = 2;
+const EMPTY_SET: ReadonlySet<number> = new Set();
 
 /**
  * Build page groups for a view mode.
@@ -25,11 +26,15 @@ const DEFAULT_FIT_PAGE_COUNT = 2;
  * - "spread": first page alone (cover), then pairs
  * - "triple": three pages per group, no cover
  * - "fit":   fitPageCount pages per group, no cover
+ *
+ * Pages listed in widePages (landscape scans that already contain a spread) are
+ * always shown alone; grouping resumes after them.
  */
 export function buildPageGroups(
   totalPages: number,
   mode: ViewMode = "spread",
   fitPageCount: number = DEFAULT_FIT_PAGE_COUNT,
+  widePages: ReadonlySet<number> = EMPTY_SET,
 ): PageGroup[] {
   if (totalPages <= 0) return [];
 
@@ -58,8 +63,13 @@ export function buildPageGroups(
     i = 1;
   }
   while (i < totalPages) {
+    if (widePages.has(i)) {
+      groups.push([i]);
+      i++;
+      continue;
+    }
     const group: PageGroup = [];
-    for (let k = 0; k < groupSize && i < totalPages; k++, i++) {
+    for (let k = 0; k < groupSize && i < totalPages && !widePages.has(i); k++, i++) {
       group.push(i);
     }
     groups.push(group);
@@ -95,4 +105,9 @@ export function computeFitPageCount(
   }
   if (containerWidth <= 0 || containerHeight <= 0 || pageAspect <= 0) return 1;
   return Math.max(1, Math.floor(containerWidth / (containerHeight * pageAspect)));
+}
+
+/** 幅が高さより大きいページは、1 枚に見開きが入ったスキャンとみなす。 */
+export function isWidePage(aspect: number): boolean {
+  return Number.isFinite(aspect) && aspect > 1;
 }

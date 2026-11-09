@@ -165,6 +165,7 @@ function App() {
           onSelect={handleFavoriteSelect}
           refreshTrigger={favoritesRefresh}
           onFileDrop={handleFileDrop}
+          onAddFolder={handleAddFolder}
         />
         <div className="app__tree-column" style={{ width: treeColumnWidth, flexShrink: 0 }}>
           {selectedFavorite ? (
@@ -181,7 +182,7 @@ function App() {
             />
           ) : (
             <div className="column-empty">
-              <p>お気に入りのフォルダを選んでください</p>
+              <p>左の一覧からお気に入りのフォルダを選ぶと、ここにフォルダツリーが表示されます</p>
             </div>
           )}
         </div>

@@ -1,5 +1,4 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
@@ -11,12 +10,13 @@ import { SubfolderPanel } from "./components/SubfolderPanel/SubfolderPanel";
 import { useArchiveLoader } from "./hooks/useArchiveLoader";
 import { usePdfLoader } from "./hooks/usePdfLoader";
 import { useSiblingNavigation } from "./hooks/useSiblingNavigation";
+import { useTrashConfirm } from "./hooks/useTrashConfirm";
 import { useWindowResize } from "./hooks/useWindowResize";
 import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
 import type { ReadingDirection } from "./utils/spreadLayout";
 import { siblingAfterRemoval } from "./utils/spreadNavigation";
-import { trashConfirmMessage } from "./utils/trashConfirm";
+import { isTrashShortcut } from "./utils/trashShortcut";
 import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -26,6 +26,7 @@ function Viewer() {
   const [movePanelOpen, setMovePanelOpen] = useState(false);
   const [resumePage, setResumePage] = useState(0);
   const spreadViewerRef = useRef<SpreadViewerHandle>(null);
+  const { confirm: confirmTrash, dialog: trashDialog } = useTrashConfirm();
 
   // Read archive path from URL query parameter
   useEffect(() => {
@@ -59,10 +60,7 @@ function Viewer() {
     const currentPath = archivePathRef.current;
     if (!currentPath) return;
 
-    const confirmed = await ask(trashConfirmMessage([currentPath]), {
-      title: "ゴミ箱に移動",
-      kind: "warning",
-    });
+    const confirmed = await confirmTrash([currentPath]);
     if (!confirmed) return;
 
     try {
@@ -82,7 +80,7 @@ function Viewer() {
     } catch (err) {
       setTrashError(errorToString(err));
     }
-  }, [navigateToArchive]);
+  }, [navigateToArchive, confirmTrash]);
 
   const handleToggleMovePanel = useCallback(() => {
     setMovePanelOpen((v) => !v);
@@ -106,9 +104,8 @@ function Viewer() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // macOS keyboards send "Backspace" for the main Delete key;
-      // "Delete" is fn+Delete (forward delete) on Mac and Del on other platforms.
-      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // fn+Delete か Cmd/Ctrl+Backspace のみ。Backspace 単独では発火しない
+      if (!isTrashShortcut(e)) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       e.preventDefault();
@@ -232,6 +229,7 @@ function Viewer() {
 
   return (
     <div className="viewer">
+      {trashDialog}
       {moveError && (
         <div className="viewer__move-error" role="alert">
           <span>ファイルを移動できませんでした: {moveError}</span>

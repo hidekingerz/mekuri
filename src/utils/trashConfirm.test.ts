@@ -1,22 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { trashConfirmMessage } from "./trashConfirm";
+import { trashConfirmLines, trashConfirmTitle } from "./trashConfirm";
 
-describe("trashConfirmMessage", () => {
-  it("names the single file", () => {
-    expect(trashConfirmMessage(["/a/b.zip"])).toBe(
-      "このファイルをゴミ箱に移動しますか?\n\n/a/b.zip",
-    );
+describe("trashConfirmTitle", () => {
+  it("describes one file or a count", () => {
+    expect(trashConfirmTitle(1)).toBe("ファイルをゴミ箱に移動しますか?");
+    expect(trashConfirmTitle(3)).toBe("3 件のファイルをゴミ箱に移動しますか?");
+  });
+});
+
+describe("trashConfirmLines", () => {
+  it("shows file names, not full paths", () => {
+    expect(trashConfirmLines(["/a/b/score.zip"])).toEqual(["score.zip"]);
   });
 
-  it("lists up to five files with the count", () => {
-    const paths = ["/1", "/2", "/3"];
-    expect(trashConfirmMessage(paths)).toBe("3 件のファイルをゴミ箱に移動しますか?\n\n/1\n/2\n/3");
-  });
-
-  it("truncates the preview after five files", () => {
-    const paths = ["/1", "/2", "/3", "/4", "/5", "/6", "/7"];
-    expect(trashConfirmMessage(paths)).toBe(
-      "7 件のファイルをゴミ箱に移動しますか?\n\n/1\n/2\n/3\n/4\n/5\n…ほか 2 件",
-    );
+  it("caps the preview at 5 and counts the rest", () => {
+    const paths = ["/1.zip", "/2.zip", "/3.zip", "/4.zip", "/5.zip", "/6.zip", "/7.zip"];
+    expect(trashConfirmLines(paths)).toEqual([
+      "1.zip",
+      "2.zip",
+      "3.zip",
+      "4.zip",
+      "5.zip",
+      "…ほか 2 件",
+    ]);
   });
 });

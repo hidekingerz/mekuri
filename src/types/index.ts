@@ -5,6 +5,10 @@ export type DirectoryEntry = {
   is_archive: boolean;
   is_pdf: boolean;
   has_subfolders: boolean;
+  /** 最終更新日時（UNIX ミリ秒）。取得できなければ null */
+  modified_ms?: number | null;
+  /** ファイルサイズ（バイト）。フォルダは null */
+  size?: number | null;
 };
 
 export type TreeNodeData = {

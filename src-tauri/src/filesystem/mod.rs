@@ -14,6 +14,25 @@ pub struct DirectoryEntry {
     pub is_archive: bool,
     pub is_pdf: bool,
     pub has_subfolders: bool,
+    /// 最終更新日時（UNIX エポックからのミリ秒）。取得できなければ None
+    pub modified_ms: Option<u64>,
+    /// ファイルサイズ（バイト）。フォルダは None
+    pub size: Option<u64>,
+}
+
+/// メタデータから更新日時（ミリ秒）とサイズを取り出す。フォルダのサイズは None。
+fn entry_stats(metadata: &std::fs::Metadata) -> (Option<u64>, Option<u64>) {
+    let modified_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64);
+    let size = if metadata.is_dir() {
+        None
+    } else {
+        Some(metadata.len())
+    };
+    (modified_ms, size)
 }
 
 /// ディレクトリ直下のフォルダ・アーカイブ・PDF を列挙する。隠しファイルは除外し、
@@ -43,6 +62,7 @@ pub fn read_directory(dir_path: &Path) -> Result<Vec<DirectoryEntry>, String> {
             }
 
             let has_subfolders = is_dir && has_subdirectories(&entry_path);
+            let (modified_ms, size) = entry_stats(&metadata);
 
             Some(DirectoryEntry {
                 name,
@@ -51,6 +71,8 @@ pub fn read_directory(dir_path: &Path) -> Result<Vec<DirectoryEntry>, String> {
                 is_archive,
                 is_pdf,
                 has_subfolders,
+                modified_ms,
+                size,
             })
         })
         .collect();
@@ -185,6 +207,7 @@ fn search_recursive(
         if is_dir {
             if name.to_lowercase().contains(query) {
                 let has_subfolders = has_subdirectories(&entry_path);
+                let (modified_ms, size) = entry_stats(&metadata);
                 result.push(DirectoryEntry {
                     name,
                     path: entry_path.to_string_lossy().to_string(),
@@ -192,6 +215,8 @@ fn search_recursive(
                     is_archive: false,
                     is_pdf: false,
                     has_subfolders,
+                    modified_ms,
+                    size,
                 });
             }
             // 再帰的にサブディレクトリを検索
@@ -201,6 +226,7 @@ fn search_recursive(
             let is_pdf = !is_archive && archive::is_pdf_file(&name);
 
             if (is_archive || is_pdf) && name.to_lowercase().contains(query) {
+                let (modified_ms, size) = entry_stats(&metadata);
                 result.push(DirectoryEntry {
                     name,
                     path: entry_path.to_string_lossy().to_string(),
@@ -208,6 +234,8 @@ fn search_recursive(
                     is_archive,
                     is_pdf,
                     has_subfolders: false,
+                    modified_ms,
+                    size,
                 });
             }
         }
@@ -295,6 +323,20 @@ mod tests {
         assert!(result[0].is_dir);
         assert!(result[1].is_pdf);
         assert!(result[2].is_archive);
+    }
+
+    #[test]
+    fn read_directory_reports_size_and_modified_time() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir(dir.path().join("folder")).unwrap();
+        fs::write(dir.path().join("a.zip"), vec![0u8; 1234]).unwrap();
+
+        let result = read_directory(dir.path()).unwrap();
+        let folder = result.iter().find(|e| e.name == "folder").unwrap();
+        let file = result.iter().find(|e| e.name == "a.zip").unwrap();
+        assert_eq!(folder.size, None);
+        assert_eq!(file.size, Some(1234));
+        assert!(file.modified_ms.unwrap() > 1_600_000_000_000);
     }
 
     #[test]

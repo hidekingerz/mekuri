@@ -11,7 +11,7 @@
   --viewer-color-bg-active: #3a3a3a;
   --viewer-color-border: #444;
   --viewer-color-border-button: #555;
-  --viewer-color-accent: #666;
+  --viewer-color-accent: #8c8c8c; /* progress fill: 3.6:1 on the track */
   --viewer-color-accent-hover: #999;
 }
 
@@ -101,12 +101,21 @@ body {
   background-color: var(--viewer-color-bg-footer);
 }
 
-/* Progress bar */
+/* Progress bar: 6px visible, 20px hit area */
 .spread-viewer__progress {
   position: relative;
   height: 6px;
   background-color: var(--viewer-color-bg-elevated);
   cursor: pointer;
+}
+
+.spread-viewer__progress::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  bottom: -6px;
 }
 
 .spread-viewer__progress:hover {
@@ -131,7 +140,7 @@ body {
   border-radius: 50%;
   transform: translate(50%, -50%);
   transition: right 0.1s ease-out;
-  opacity: 0;
+  opacity: 0.6;
 }
 
 .spread-viewer__progress:hover .spread-viewer__progress-thumb {
@@ -191,7 +200,9 @@ body {
 }
 
 .spread-viewer__nav button:disabled {
-  opacity: 0.3;
+  background: #262626;
+  border-color: #3a3a3a;
+  color: #7a7a7a; /* 3.9:1 on the button: readable as disabled */
   cursor: default;
 }
 

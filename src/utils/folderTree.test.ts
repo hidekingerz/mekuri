@@ -4,6 +4,7 @@ import {
   expandPaths,
   getAncestorPaths,
   mergeNodes,
+  relativeParent,
   replaceChildren,
   toggleNode,
   toNodes,
@@ -186,5 +187,19 @@ describe("expandPaths", () => {
     const result = await expandPaths([a], new Set(["/root/a"]), load);
     expect(result).toEqual([{ ...a, isOpen: true }]);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("relativeParent", () => {
+  it("returns the parent folders between the root and the path", () => {
+    expect(relativeParent("/root", "/root/a/b/target")).toBe("a/b");
+  });
+
+  it("returns an empty string for a direct child of the root", () => {
+    expect(relativeParent("/root", "/root/target")).toBe("");
+  });
+
+  it("returns an empty string when the path is outside the root", () => {
+    expect(relativeParent("/root", "/other/a/target")).toBe("");
   });
 });

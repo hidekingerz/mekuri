@@ -7,34 +7,33 @@ export function useColumnResize(
   initialWidth: number,
   columnsRef: RefObject<HTMLDivElement | null>,
 ) {
-  const [treeColumnWidth, setTreeColumnWidth] = useState(initialWidth);
+  // 利用者が選んだ幅（保存値）。表示時にだけウィンドウ幅で制限し、広げ直せば元に戻る
+  const [preferredWidth, setTreeColumnWidth] = useState(initialWidth);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
+  const treeColumnWidth = clampTreeColumnWidth(
+    preferredWidth,
+    containerWidth,
+    FAVORITES_SIDEBAR_WIDTH,
+    MIN_COLUMN_WIDTH,
+  );
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
   }, []);
 
-  // Sync initial width from settings (clamped to the current window)
-  const setWidth = useCallback(
-    (width: number) => {
-      const containerWidth = columnsRef.current?.getBoundingClientRect().width ?? 0;
-      setTreeColumnWidth(
-        clampTreeColumnWidth(width, containerWidth, FAVORITES_SIDEBAR_WIDTH, MIN_COLUMN_WIDTH),
-      );
-    },
-    [columnsRef],
-  );
+  // Sync initial width from settings
+  const setWidth = useCallback((width: number) => {
+    setTreeColumnWidth(width);
+  }, []);
 
-  // Keep the file column visible when the window gets narrower than the saved tree width
+  // Track the container so the displayed width keeps the file column visible
   useEffect(() => {
     const el = columnsRef.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      const containerWidth = el.getBoundingClientRect().width;
-      setTreeColumnWidth((prev) =>
-        clampTreeColumnWidth(prev, containerWidth, FAVORITES_SIDEBAR_WIDTH, MIN_COLUMN_WIDTH),
-      );
+      setContainerWidth(el.getBoundingClientRect().width);
     });
     observer.observe(el);
     return () => observer.disconnect();

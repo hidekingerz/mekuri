@@ -8,6 +8,7 @@ import {
   expandPaths,
   getAncestorPaths,
   mergeNodes,
+  relativeParent,
   replaceChildren,
   toggleNode as toggleTreeNode,
   toNodes,
@@ -144,8 +145,19 @@ export function FolderTree({
 
   // 検索中はフラットリストで表示
   if (searchFolders !== null) {
+    const header = (
+      <div className="folder-tree__search-header">
+        一致したフォルダ{" "}
+        <span className="folder-tree__search-count">{searchFolders.length} 件</span>
+      </div>
+    );
     if (searchFolders.length === 0) {
-      return <div className="folder-tree-loading">一致するフォルダがありません</div>;
+      return (
+        <>
+          {header}
+          <div className="folder-tree-loading">一致するフォルダがありません</div>
+        </>
+      );
     }
     return (
       <div
@@ -154,6 +166,7 @@ export function FolderTree({
         aria-label="検索に一致したフォルダ"
         onKeyDown={handleTreeKeyDown}
       >
+        {header}
         {searchFolders.map((folder) => (
           <div
             key={folder.path}
@@ -173,7 +186,12 @@ export function FolderTree({
             <span className="tree-node__icon">
               <FolderIcon size={16} />
             </span>
-            <span className="tree-node__name">{folder.name}</span>
+            <span className="tree-node__name">
+              {folder.name}
+              {relativeParent(rootPath, folder.path) && (
+                <span className="tree-node__location">{relativeParent(rootPath, folder.path)}</span>
+              )}
+            </span>
           </div>
         ))}
       </div>

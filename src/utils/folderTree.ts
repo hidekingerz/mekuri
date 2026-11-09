@@ -120,3 +120,12 @@ export async function expandPaths(
   }
   return result;
 }
+
+/** root から path の親までの相対パス（例: "a/b"）。直下や root の外なら空文字。 */
+export function relativeParent(rootPath: string, targetPath: string): string {
+  return (
+    getAncestorPaths(rootPath, targetPath)
+      .map((p) => p.slice(rootPath.length).replace(/^\/+/, ""))
+      .pop() ?? ""
+  );
+}

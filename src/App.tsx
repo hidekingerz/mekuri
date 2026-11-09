@@ -135,14 +135,36 @@ function App() {
           onRetry={updater.retry}
           onDismiss={updater.dismiss}
         />
-        <input
-          type="text"
-          className="toolbar__search"
-          placeholder="検索..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          disabled={!selectedFavorite}
-        />
+        <div className="toolbar__search-box">
+          <input
+            type="text"
+            className="toolbar__search"
+            placeholder={
+              selectedFavorite ? `${fileNameFromPath(selectedFavorite)} 内を検索...` : "検索..."
+            }
+            aria-label="フォルダとファイルを検索"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && searchQuery) {
+                e.preventDefault();
+                clearSearch();
+              }
+            }}
+            disabled={!selectedFavorite}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="toolbar__search-clear"
+              aria-label="検索をクリア"
+              title="検索をクリア (Esc)"
+              onClick={clearSearch}
+            >
+              ×
+            </button>
+          )}
+        </div>
         {moveError && (
           <div className="toolbar__banner toolbar__banner--error" role="alert">
             <span>移動できませんでした: {moveError}</span>

@@ -447,6 +447,8 @@ body {
 
 /* Confirm dialog (viewer palette) */
 .confirm-dialog {
+  /* reset.css zeroes every margin; restore the centering <dialog> relies on */
+  margin: auto;
   min-width: 360px;
   max-width: 480px;
   padding: 20px 22px;

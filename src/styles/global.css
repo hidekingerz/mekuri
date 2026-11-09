@@ -86,10 +86,16 @@ body {
   cursor: not-allowed;
 }
 
-.toolbar__search {
+.toolbar__search-box {
+  position: relative;
   margin-left: auto;
-  width: 200px;
-  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+}
+
+.toolbar__search {
+  width: 260px;
+  padding: 5px 26px 5px 10px;
   font-size: 13px;
   color: var(--color-text-primary);
   background-color: var(--color-bg-input, var(--color-bg-main));
@@ -100,6 +106,47 @@ body {
 
 .toolbar__search:focus {
   border-color: var(--color-text-link);
+}
+
+.toolbar__search-clear {
+  position: absolute;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-bg-active);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toolbar__search-clear:hover {
+  background: var(--color-border-input);
+}
+
+.toolbar__search-clear:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.folder-tree__search-header {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.folder-tree__search-count {
+  font-weight: 500;
+}
+
+.tree-node__location {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted);
 }
 
 .toolbar__search::placeholder {
@@ -632,6 +679,8 @@ body {
 
 /* Confirm dialog (in-app, so Esc cancels and the default focus is on キャンセル) */
 .confirm-dialog {
+  /* reset.css zeroes every margin; restore the centering <dialog> relies on */
+  margin: auto;
   min-width: 360px;
   max-width: 480px;
   padding: 20px 22px;

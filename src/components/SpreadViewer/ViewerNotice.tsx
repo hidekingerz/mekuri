@@ -35,18 +35,18 @@ export function ViewerNotice({ title, detail, tone, siblingNav, onClose }: Viewe
           type="button"
           onClick={siblingNav.goPrev}
           disabled={!siblingNav.hasPrev}
-          title="前のファイル (Alt+↓)"
+          title="前のファイル (Alt+↑)"
         >
-          <ChevronDown size={16} />
+          <ChevronUp size={16} />
           前のファイル
         </button>
         <button
           type="button"
           onClick={siblingNav.goNext}
           disabled={!siblingNav.hasNext}
-          title="次のファイル (Alt+↑)"
+          title="次のファイル (Alt+↓)"
         >
-          <ChevronUp size={16} />
+          <ChevronDown size={16} />
           次のファイル
         </button>
         <button type="button" onClick={onClose}>

@@ -358,20 +358,20 @@ export function SpreadViewer({
                   className="spread-viewer__mode-toggle"
                   onClick={siblingNav.goPrev}
                   disabled={!siblingNav.hasPrev}
-                  title="前のファイル (Alt+↓)"
+                  title="前のファイル (Alt+↑)"
                   aria-label="前のファイル"
                 >
-                  <ChevronDown size={16} />
+                  <ChevronUp size={16} />
                 </button>
                 <button
                   type="button"
                   className="spread-viewer__mode-toggle"
                   onClick={siblingNav.goNext}
                   disabled={!siblingNav.hasNext}
-                  title="次のファイル (Alt+↑)"
+                  title="次のファイル (Alt+↓)"
                   aria-label="次のファイル"
                 >
-                  <ChevronUp size={16} />
+                  <ChevronDown size={16} />
                 </button>
                 <span className="spread-viewer__toggles-separator" />
               </>

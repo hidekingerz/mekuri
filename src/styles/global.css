@@ -244,17 +244,18 @@ body {
   flex-direction: column;
 }
 
-.file-list--empty,
-.file-list--loading,
-.file-list--error {
+.file-list__message {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-placeholder);
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
-.file-list--error {
+.file-list__message--error {
   color: var(--color-text-error);
 }
 
@@ -479,27 +480,33 @@ body {
   outline-offset: -2px;
 }
 
-.toolbar__error {
+.toolbar__banner {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-left: 12px;
   padding: 4px 10px;
-  background: #fef2f2;
-  color: var(--color-text-error);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
   font-size: 12px;
   min-width: 0;
 }
 
-.toolbar__error span {
+.toolbar__banner--error {
+  background: #fef2f2;
+  color: var(--color-text-error);
+  border-color: #fecaca;
+}
+
+.toolbar__banner span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.toolbar__error-close {
+.toolbar__banner-close {
   background: none;
   border: none;
   color: inherit;
@@ -509,15 +516,9 @@ body {
   line-height: 1;
 }
 
-/* Update banner (reuses .toolbar__error layout) */
+/* Update banner (a .toolbar__banner next to the buttons) */
 .update-banner {
   margin-left: 0;
-}
-
-.update-banner--neutral {
-  background: var(--color-bg-muted);
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
 }
 
 .update-banner__message {

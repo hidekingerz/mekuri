@@ -144,11 +144,12 @@ function App() {
           disabled={!selectedFavorite}
         />
         {moveError && (
-          <div className="toolbar__error" role="alert">
+          <div className="toolbar__banner toolbar__banner--error" role="alert">
             <span>移動できませんでした: {moveError}</span>
             <button
               type="button"
-              className="toolbar__error-close"
+              className="toolbar__banner-close"
+              aria-label="閉じる"
               onClick={() => setMoveError(null)}
             >
               ×

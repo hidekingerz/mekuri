@@ -207,8 +207,11 @@ export function FileList({
   if (searchResults !== null) {
     if (searchResults.length === 0) {
       return (
-        <div className="file-list file-list--empty">
-          <p>一致するものがありません</p>
+        <div className="file-list">
+          <div className="file-list__header">検索結果</div>
+          <div className="file-list__message file-list__message--empty">
+            <p>一致するものがありません</p>
+          </div>
         </div>
       );
     }
@@ -249,36 +252,20 @@ export function FileList({
     );
   }
 
-  if (!folderPath) {
-    return (
-      <div className="file-list file-list--empty">
-        <p>フォルダを選んでください</p>
+  const renderMessage = (text: string, modifier: "empty" | "loading" | "error") => (
+    <div className="file-list">
+      <div className="file-list__header">ファイル</div>
+      <div className={`file-list__message file-list__message--${modifier}`}>
+        <p>{text}</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="file-list file-list--loading">
-        <p>読み込み中...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="file-list file-list--error">
-        <p>読み込めませんでした: {error}</p>
-      </div>
-    );
-  }
-
+  if (!folderPath) return renderMessage("フォルダを選んでください", "empty");
+  if (loading) return renderMessage("読み込み中...", "loading");
+  if (error) return renderMessage(`読み込めませんでした: ${error}`, "error");
   if (files.length === 0) {
-    return (
-      <div className="file-list file-list--empty">
-        <p>このフォルダにアーカイブや PDF はありません</p>
-      </div>
-    );
+    return renderMessage("このフォルダにアーカイブや PDF はありません", "empty");
   }
 
   const order = files.map((f) => f.path);

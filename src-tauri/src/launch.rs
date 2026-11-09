@@ -74,11 +74,10 @@ mod macos {
                     urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
                 open_files(app, paths);
             }
-            RunEvent::Reopen {
-                has_visible_windows,
-                ..
-            } => {
-                if !has_visible_windows {
+            // Dock アイコンのクリック。ビューワーだけが残っていてメインが閉じられている
+            // 場合でも、メインウィンドウを呼び戻せるようにする
+            RunEvent::Reopen { .. } => {
+                if !main_window_is_visible(app) {
                     show_main_window(app);
                 }
             }
@@ -131,6 +130,13 @@ mod macos {
             }
         }
         (DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT)
+    }
+
+    /// メインウィンドウが存在して表示中か。
+    fn main_window_is_visible(app: &AppHandle) -> bool {
+        app.get_webview_window("main")
+            .map(|w| w.is_visible().unwrap_or(false))
+            .unwrap_or(false)
     }
 
     /// メインウィンドウを表示する。破棄済みなら tauri.conf.json の定義から再生成。

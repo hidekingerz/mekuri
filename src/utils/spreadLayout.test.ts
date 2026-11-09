@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPageGroups,
-  isWidePage,
   computeFitPageCount,
   currentPageFromGroup,
   groupIndexForPage,
+  isWidePage,
 } from "./spreadLayout";
 
 describe("buildPageGroups (single)", () => {

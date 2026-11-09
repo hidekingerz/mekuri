@@ -7,6 +7,7 @@ import {
   navigationForWheel,
   progressRatio,
   siblingAfterRemoval,
+  siblingDirectionForKey,
   siblingDirectionForMouseButton,
 } from "./spreadNavigation";
 
@@ -135,5 +136,17 @@ describe("siblingDirectionForMouseButton", () => {
     expect(siblingDirectionForMouseButton(0)).toBeNull();
     expect(siblingDirectionForMouseButton(1)).toBeNull();
     expect(siblingDirectionForMouseButton(2)).toBeNull();
+  });
+});
+
+describe("siblingDirectionForKey", () => {
+  it("follows the file list order: Alt+↓ is the next file, Alt+↑ the previous", () => {
+    expect(siblingDirectionForKey({ key: "ArrowDown", altKey: true })).toBe("next");
+    expect(siblingDirectionForKey({ key: "ArrowUp", altKey: true })).toBe("prev");
+  });
+
+  it("ignores arrows without Alt and other keys", () => {
+    expect(siblingDirectionForKey({ key: "ArrowDown", altKey: false })).toBeNull();
+    expect(siblingDirectionForKey({ key: "ArrowLeft", altKey: true })).toBeNull();
   });
 });

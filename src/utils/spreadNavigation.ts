@@ -71,3 +71,14 @@ export function siblingDirectionForMouseButton(button: number): "next" | "prev" 
   if (button === 4) return "next";
   return null;
 }
+
+/** Alt+↓ を次のファイル、Alt+↑ を前のファイルに対応づける（ファイル一覧の上下と同じ向き）。 */
+export function siblingDirectionForKey(e: {
+  key: string;
+  altKey: boolean;
+}): "next" | "prev" | null {
+  if (!e.altKey) return null;
+  if (e.key === "ArrowDown") return "next";
+  if (e.key === "ArrowUp") return "prev";
+  return null;
+}

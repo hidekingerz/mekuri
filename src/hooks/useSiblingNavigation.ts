@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSiblingArchives } from "../api/directory";
 import { onFileChanged } from "../api/fileEvents";
 import type { SiblingNavigation } from "../types";
-import { adjacentSibling, siblingDirectionForMouseButton } from "../utils/spreadNavigation";
+import {
+  adjacentSibling,
+  siblingDirectionForKey,
+  siblingDirectionForMouseButton,
+} from "../utils/spreadNavigation";
 import { appTitle, fileNameFromPath } from "../utils/windowLabel";
 
 type Siblings = { archives: string[]; currentIndex: number };
@@ -11,7 +15,7 @@ type Siblings = { archives: string[]; currentIndex: number };
 const NO_SIBLINGS: Siblings = { archives: [], currentIndex: -1 };
 
 /**
- * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↑/↓ のキー操作と
+ * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↓/↑ のキー操作と
  * マウスの戻る/進むボタンを登録し、ボタンやメニューから呼ぶための移動関数と端判定を返す。
  */
 export function useSiblingNavigation(
@@ -71,9 +75,10 @@ export function useSiblingNavigation(
     if (!archivePath) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+      const direction = siblingDirectionForKey(e);
+      if (!direction) return;
       e.preventDefault();
-      if (e.key === "ArrowUp") goNext();
+      if (direction === "next") goNext();
       else goPrev();
     };
 

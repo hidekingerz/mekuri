@@ -155,7 +155,7 @@ Tauri のマルチウィンドウ機能を使用する。
 ### お気に入りフォルダの管理
 
 ```
-ユーザー操作: 「Add Folder」ボタンクリック
+ユーザー操作: 「フォルダを追加」ボタンクリック
   → React: open() でフォルダ選択ダイアログを表示
   → React: useFavorites.addFavorite() で tauri-plugin-store に保存
   → React: FavoritesSidebar を更新

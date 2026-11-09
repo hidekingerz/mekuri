@@ -110,7 +110,7 @@ function App() {
     <div className="app">
       <div className="toolbar">
         <button type="button" className="toolbar__btn" onClick={handleAddFolder}>
-          Add Folder
+          フォルダを追加
         </button>
         <button
           type="button"
@@ -118,7 +118,7 @@ function App() {
           onClick={handleReload}
           disabled={!selectedFavorite}
         >
-          Reload
+          再読み込み
         </button>
         <button
           type="button"
@@ -126,7 +126,7 @@ function App() {
           onClick={updater.checkNow}
           disabled={updaterBusy}
         >
-          Check for Updates
+          アップデートを確認
         </button>
         <UpdateBanner
           state={updater.state}
@@ -138,14 +138,14 @@ function App() {
         <input
           type="text"
           className="toolbar__search"
-          placeholder="Search..."
+          placeholder="検索..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           disabled={!selectedFavorite}
         />
         {moveError && (
           <div className="toolbar__error" role="alert">
-            <span>Failed to move: {moveError}</span>
+            <span>移動できませんでした: {moveError}</span>
             <button
               type="button"
               className="toolbar__error-close"
@@ -181,7 +181,7 @@ function App() {
             />
           ) : (
             <div className="column-empty">
-              <p>Select a favorite folder</p>
+              <p>お気に入りのフォルダを選んでください</p>
             </div>
           )}
         </div>

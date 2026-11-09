@@ -84,7 +84,7 @@ export function FileList({
     async (paths: string[]) => {
       if (paths.length === 0) return;
       const confirmed = await ask(trashConfirmMessage(paths), {
-        title: "Move to Trash",
+        title: "ゴミ箱に移動",
         kind: "warning",
       });
       if (!confirmed) return;
@@ -172,9 +172,7 @@ export function FileList({
           className="context-menu__item context-menu__item--danger"
           onClick={handleTrashFromMenu}
         >
-          {contextTargets.length > 1
-            ? `Move ${contextTargets.length} files to Trash`
-            : "Move to Trash"}
+          {contextTargets.length > 1 ? `${contextTargets.length} 件をゴミ箱に移動` : "ゴミ箱に移動"}
         </button>
       </div>
     );
@@ -184,7 +182,7 @@ export function FileList({
     if (searchResults.length === 0) {
       return (
         <div className="file-list file-list--empty">
-          <p>No matches found</p>
+          <p>一致するものがありません</p>
         </div>
       );
     }
@@ -196,7 +194,7 @@ export function FileList({
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
       <div className="file-list" tabIndex={-1} onKeyDown={handleKeyDown}>
-        <div className="file-list__header">Search Results</div>
+        <div className="file-list__header">検索結果</div>
         <div className="file-list__items">
           {resultFolders.map((folder) => (
             <button
@@ -220,7 +218,7 @@ export function FileList({
   if (!folderPath) {
     return (
       <div className="file-list file-list--empty">
-        <p>Select a folder</p>
+        <p>フォルダを選んでください</p>
       </div>
     );
   }
@@ -228,7 +226,7 @@ export function FileList({
   if (loading) {
     return (
       <div className="file-list file-list--loading">
-        <p>Loading...</p>
+        <p>読み込み中...</p>
       </div>
     );
   }
@@ -236,7 +234,7 @@ export function FileList({
   if (error) {
     return (
       <div className="file-list file-list--error">
-        <p>Error: {error}</p>
+        <p>読み込めませんでした: {error}</p>
       </div>
     );
   }
@@ -244,7 +242,7 @@ export function FileList({
   if (files.length === 0) {
     return (
       <div className="file-list file-list--empty">
-        <p>No archives or PDFs in this folder</p>
+        <p>このフォルダにアーカイブや PDF はありません</p>
       </div>
     );
   }
@@ -254,7 +252,7 @@ export function FileList({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
     <div className="file-list" tabIndex={-1} onKeyDown={handleKeyDown}>
-      <div className="file-list__header">Files</div>
+      <div className="file-list__header">ファイル</div>
       <div className="file-list__items">{files.map((file) => renderFileItem(file, order))}</div>
       {renderContextMenu()}
     </div>

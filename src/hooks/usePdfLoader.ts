@@ -69,7 +69,7 @@ export function usePdfLoader(pdfPath: string | null): PdfLoaderResult {
     return renderPageToDataUrl(doc, pageIndex + 1);
   }, []);
 
-  const pageNames = Array.from({ length: pageCount }, (_, i) => `Page ${i + 1}`);
+  const pageNames = Array.from({ length: pageCount }, (_, i) => `${i + 1} ページ`);
 
   return { pageCount, pageNames, loading, error, getPageDataUrl };
 }

@@ -249,7 +249,7 @@ export function SpreadViewer({
     <div className="spread-viewer">
       {loadError && (
         <div className="spread-viewer__error">
-          <p>Failed to load image: {loadError}</p>
+          <p>画像を読み込めませんでした: {loadError}</p>
         </div>
       )}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: keyboard nav handled at window level */}

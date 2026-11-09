@@ -154,7 +154,10 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--color-text-placeholder);
+  padding: 24px;
+  text-align: center;
+  line-height: 1.6;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -185,10 +188,19 @@ body {
 }
 
 .favorites-sidebar__empty {
-  padding: 16px 12px;
-  color: var(--color-text-placeholder);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 12px;
+  color: var(--color-text-muted);
   font-size: 12px;
   text-align: center;
+}
+
+.favorites-sidebar__empty-hint {
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 .favorites-sidebar__item {

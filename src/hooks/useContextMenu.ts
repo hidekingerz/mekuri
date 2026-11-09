@@ -18,12 +18,21 @@ export function useContextMenu() {
     setContextMenu(null);
   }, []);
 
+  // 外側のクリック、Esc、ウィンドウのフォーカス喪失で閉じる
   useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => closeContextMenu();
-      window.addEventListener("click", handleClick);
-      return () => window.removeEventListener("click", handleClick);
-    }
+    if (!contextMenu) return;
+    const handleClick = () => closeContextMenu();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeContextMenu();
+    };
+    window.addEventListener("click", handleClick);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", closeContextMenu);
+    return () => {
+      window.removeEventListener("click", handleClick);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", closeContextMenu);
+    };
   }, [contextMenu, closeContextMenu]);
 
   return { contextMenu, openContextMenu, closeContextMenu };

@@ -11,6 +11,8 @@ type FavoritesSidebarProps = {
   onSelect: (path: string) => void;
   refreshTrigger?: number;
   onFileDrop?: (srcPaths: string[], destDir: string) => void;
+  /** 空状態の「フォルダを追加」ボタンから呼ぶ */
+  onAddFolder?: () => void;
 };
 
 export function FavoritesSidebar({
@@ -18,6 +20,7 @@ export function FavoritesSidebar({
   onSelect,
   refreshTrigger,
   onFileDrop,
+  onAddFolder,
 }: FavoritesSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
@@ -46,7 +49,17 @@ export function FavoritesSidebar({
       <div className="favorites-sidebar__header">お気に入り</div>
       <div className="favorites-sidebar__list">
         {favorites.length === 0 ? (
-          <div className="favorites-sidebar__empty">お気に入りはまだありません</div>
+          <div className="favorites-sidebar__empty">
+            <p>お気に入りはまだありません</p>
+            <p className="favorites-sidebar__empty-hint">
+              よく使うフォルダを登録すると、ここから開けます
+            </p>
+            {onAddFolder && (
+              <button type="button" className="toolbar__btn" onClick={onAddFolder}>
+                フォルダを追加
+              </button>
+            )}
+          </div>
         ) : (
           favorites.map((path) => (
             <button

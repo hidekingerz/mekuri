@@ -149,7 +149,10 @@ export function FileList({
       className={`file-list__item${selected.has(file.path) ? " file-list__item--selected" : ""}`}
       onClick={(e) => handleItemClick(e, file, order)}
       onDoubleClick={() => onArchiveSelect(file.path)}
-      onContextMenu={(e) => openContextMenu(e, file.path)}
+      onContextMenu={(e) => {
+        if (!selected.has(file.path)) selectOnly(file.path);
+        openContextMenu(e, file.path);
+      }}
       title={file.path}
       draggable
       onDragStart={(e) => {

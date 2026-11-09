@@ -48,7 +48,7 @@ export function useArchiveLoader(archivePath: string | null) {
           setNestedArchives(contents.names);
           setCachedNestedArchives(contents.names);
         } else {
-          setError("No images found in this archive");
+          setError("このアーカイブに画像がありません");
         }
       } catch (err) {
         if (!cancelled) {

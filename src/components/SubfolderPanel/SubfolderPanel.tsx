@@ -58,7 +58,7 @@ export function SubfolderPanel({ archivePath, onMove }: SubfolderPanelProps) {
   if (error) {
     return (
       <div className="subfolder-panel">
-        <p className="subfolder-panel__empty">Failed to load subfolders: {error}</p>
+        <p className="subfolder-panel__empty">サブフォルダを読み込めませんでした: {error}</p>
       </div>
     );
   }
@@ -76,7 +76,7 @@ export function SubfolderPanel({ archivePath, onMove }: SubfolderPanelProps) {
         </button>
       )}
       {folders.length === 0 && !hasParentTarget ? (
-        <p className="subfolder-panel__empty">No subfolders in this folder</p>
+        <p className="subfolder-panel__empty">このフォルダにサブフォルダはありません</p>
       ) : (
         folders.map((folder) => (
           <button

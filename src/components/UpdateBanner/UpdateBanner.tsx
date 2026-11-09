@@ -26,23 +26,23 @@ export function UpdateBanner({
       if (!state.manual) return null;
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
-          <span className="update-banner__message">Checking for updates…</span>
+          <span className="update-banner__message">アップデートを確認中…</span>
         </output>
       );
 
     case "upToDate":
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
-          <span className="update-banner__message">You're up to date</span>
+          <span className="update-banner__message">最新の状態です</span>
         </output>
       );
 
     case "available":
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
-          <span className="update-banner__message">v{state.update.version} is available</span>
+          <span className="update-banner__message">v{state.update.version} が利用できます</span>
           <button type="button" className="update-banner__btn" onClick={onInstall}>
-            Update
+            更新
           </button>
           <button type="button" className="toolbar__error-close" onClick={onDismiss}>
             ×
@@ -55,7 +55,7 @@ export function UpdateBanner({
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
           <span className="update-banner__message">
-            Downloading v{state.update.version}…{pct !== null ? ` ${pct}%` : ""}
+            v{state.update.version} をダウンロード中…{pct !== null ? ` ${pct}%` : ""}
           </span>
           <span
             className={`update-banner__progress ${pct === null ? "update-banner__progress--indeterminate" : ""}`}
@@ -70,10 +70,10 @@ export function UpdateBanner({
       return (
         <output className="toolbar__error update-banner update-banner--neutral">
           <span className="update-banner__message">
-            v{state.update.version} installed. Restart to finish
+            v{state.update.version} をインストールしました。再起動して完了します
           </span>
           <button type="button" className="update-banner__btn" onClick={onRestart}>
-            Restart
+            再起動
           </button>
         </output>
       );
@@ -83,12 +83,12 @@ export function UpdateBanner({
         <div className="toolbar__error update-banner" role="alert">
           <span className="update-banner__message">
             {state.retry === null
-              ? `Update installed, but the restart failed: ${state.message}. Please restart mekuri manually`
-              : `Update failed: ${state.message}`}
+              ? `アップデートは完了しましたが再起動に失敗しました: ${state.message}。mekuri を手動で再起動してください`
+              : `アップデートに失敗しました: ${state.message}`}
           </span>
           {state.retry !== null && (
             <button type="button" className="update-banner__btn" onClick={onRetry}>
-              Retry
+              再試行
             </button>
           )}
           <button type="button" className="toolbar__error-close" onClick={onDismiss}>

@@ -132,7 +132,7 @@ export function FolderTree({
   // 検索中はフラットリストで表示
   if (searchFolders !== null) {
     if (searchFolders.length === 0) {
-      return <div className="folder-tree-loading">No folders found</div>;
+      return <div className="folder-tree-loading">一致するフォルダがありません</div>;
     }
     return (
       <div className="folder-tree">
@@ -162,13 +162,13 @@ export function FolderTree({
   }
 
   if (loading && nodes.length === 0) {
-    return <div className="folder-tree-loading">Loading...</div>;
+    return <div className="folder-tree-loading">読み込み中...</div>;
   }
 
   if (error) {
     return (
       <div className="folder-tree-error">
-        <p>Failed to read directory</p>
+        <p>フォルダを読み込めませんでした</p>
         <p className="folder-tree-error__detail">{error}</p>
       </div>
     );
@@ -192,7 +192,7 @@ export function FolderTree({
       {contextMenu && (
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" className="context-menu__item" onClick={handleAddFavorite}>
-            Add to favorites
+            お気に入りに追加
           </button>
         </div>
       )}

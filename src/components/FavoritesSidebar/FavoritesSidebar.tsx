@@ -43,10 +43,10 @@ export function FavoritesSidebar({
 
   return (
     <div className="favorites-sidebar">
-      <div className="favorites-sidebar__header">Favorites</div>
+      <div className="favorites-sidebar__header">お気に入り</div>
       <div className="favorites-sidebar__list">
         {favorites.length === 0 ? (
-          <div className="favorites-sidebar__empty">No favorites</div>
+          <div className="favorites-sidebar__empty">お気に入りはまだありません</div>
         ) : (
           favorites.map((path) => (
             <button
@@ -83,7 +83,7 @@ export function FavoritesSidebar({
       {contextMenu && (
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" className="context-menu__item" onClick={handleRemove}>
-            Remove from favorites
+            お気に入りから削除
           </button>
         </div>
       )}

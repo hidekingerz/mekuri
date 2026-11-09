@@ -54,9 +54,9 @@ export async function showViewerContextMenu(
 
   const separator = () => PredefinedMenuItem.new({ item: "Separator" });
 
-  const trashItem = await MenuItem.new({ text: "Move to Trash", action: onTrash });
+  const trashItem = await MenuItem.new({ text: "ゴミ箱に移動", action: onTrash });
   const closeItem = await MenuItem.new({
-    text: "Close Window",
+    text: "ウィンドウを閉じる",
     action: () => getCurrentWindow().close(),
   });
 

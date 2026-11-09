@@ -60,7 +60,7 @@ function Viewer() {
     if (!currentPath) return;
 
     const confirmed = await ask(trashConfirmMessage([currentPath]), {
-      title: "Move to Trash",
+      title: "ゴミ箱に移動",
       kind: "warning",
     });
     if (!confirmed) return;
@@ -172,7 +172,7 @@ function Viewer() {
   if (error || trashError) {
     return (
       <div className="viewer viewer--error">
-        <p>Failed to open {isPdf ? "PDF" : "archive"}</p>
+        <p>{isPdf ? "PDF" : "アーカイブ"}を開けませんでした</p>
         <p className="viewer__error-detail">{error || trashError}</p>
       </div>
     );
@@ -181,7 +181,7 @@ function Viewer() {
   if (!archivePath || loading) {
     return (
       <div className="viewer viewer--loading">
-        <p>Loading...</p>
+        <p>読み込み中...</p>
       </div>
     );
   }
@@ -191,8 +191,10 @@ function Viewer() {
     return (
       <div className="viewer viewer--nested">
         <div className="nested-selector">
-          <h2 className="nested-selector__title">Select Archive</h2>
-          <p className="nested-selector__desc">This archive contains multiple archives:</p>
+          <h2 className="nested-selector__title">アーカイブを選択</h2>
+          <p className="nested-selector__desc">
+            このアーカイブには複数のアーカイブが含まれています:
+          </p>
           <ul className="nested-selector__list">
             {archive.nestedArchives.map((name) => (
               <li key={name}>
@@ -223,9 +225,7 @@ function Viewer() {
   if (pageCount === 0) {
     return (
       <div className="viewer viewer--empty">
-        <p>
-          No {isPdf ? "pages" : "images"} found in this {isPdf ? "PDF" : "archive"}
-        </p>
+        <p>この{isPdf ? "PDF にページ" : "アーカイブに画像"}がありません</p>
       </div>
     );
   }
@@ -234,7 +234,7 @@ function Viewer() {
     <div className="viewer">
       {moveError && (
         <div className="viewer__move-error" role="alert">
-          <span>Failed to move file: {moveError}</span>
+          <span>ファイルを移動できませんでした: {moveError}</span>
           <button type="button" onClick={() => setMoveError(null)}>
             ×
           </button>

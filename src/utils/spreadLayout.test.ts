@@ -4,6 +4,7 @@ import {
   computeFitPageCount,
   currentPageFromGroup,
   groupIndexForPage,
+  isWidePage,
 } from "./spreadLayout";
 
 describe("buildPageGroups (single)", () => {
@@ -138,5 +139,41 @@ describe("computeFitPageCount", () => {
     expect(computeFitPageCount(Number.NaN, 1080, Math.SQRT1_2)).toBe(1);
     expect(computeFitPageCount(Number.POSITIVE_INFINITY, 1080, Math.SQRT1_2)).toBe(1);
     expect(computeFitPageCount(1920, 1080, Number.NaN)).toBe(1);
+  });
+});
+
+describe("buildPageGroups (wide pages)", () => {
+  const wide = new Set([2]);
+
+  it("shows a wide page alone in spread mode and resumes pairing after it", () => {
+    expect(buildPageGroups(6, "spread", 2, wide)).toEqual([[0], [1], [2], [3, 4], [5]]);
+  });
+
+  it("shows a wide page alone in triple mode", () => {
+    expect(buildPageGroups(5, "triple", 2, new Set([1]))).toEqual([[0], [1], [2, 3, 4]]);
+  });
+
+  it("shows a wide page alone in fit mode", () => {
+    expect(buildPageGroups(4, "fit", 3, new Set([0]))).toEqual([[0], [1, 2, 3]]);
+  });
+
+  it("does not change single mode", () => {
+    expect(buildPageGroups(3, "single", 2, wide)).toEqual([[0], [1], [2]]);
+  });
+
+  it("keeps a wide cover alone without duplicating it", () => {
+    expect(buildPageGroups(3, "spread", 2, new Set([0]))).toEqual([[0], [1, 2]]);
+  });
+});
+
+describe("isWidePage", () => {
+  it("treats landscape pages as wide", () => {
+    expect(isWidePage(3000 / 1000)).toBe(true);
+  });
+
+  it("treats portrait and square pages as not wide", () => {
+    expect(isWidePage(1240 / 1754)).toBe(false);
+    expect(isWidePage(1)).toBe(false);
+    expect(isWidePage(Number.NaN)).toBe(false);
   });
 });

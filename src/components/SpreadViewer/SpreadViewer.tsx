@@ -18,6 +18,7 @@ import {
   computeFitPageCount,
   currentPageFromGroup,
   groupIndexForPage,
+  isWidePage,
 } from "../../utils/spreadLayout";
 import {
   groupIndexFromRatio,
@@ -96,6 +97,8 @@ export function SpreadViewer({
   const { viewMode, readingDirection, setViewMode, toggleReadingDirection } =
     useViewerSettings(defaultReadingDirection);
   const [pageAspect, setPageAspect] = useState<number | null>(null);
+  // 横長（見開きスキャン）と判明したページ。常に単独で表示する
+  const [widePages, setWidePages] = useState<ReadonlySet<number>>(() => new Set());
   const pagesRef = useRef<HTMLDivElement>(null);
   const containerSize = useElementSize(pagesRef);
 
@@ -111,8 +114,8 @@ export function SpreadViewer({
       : 2;
 
   const groups: PageGroup[] = useMemo(
-    () => buildPageGroups(pageCount, viewMode, fitPageCount),
-    [pageCount, viewMode, fitPageCount],
+    () => buildPageGroups(pageCount, viewMode, fitPageCount, widePages),
+    [pageCount, viewMode, fitPageCount, widePages],
   );
 
   // Derive the group index from the canonical currentPage so that position is
@@ -231,15 +234,22 @@ export function SpreadViewer({
     [isRtl, navigate],
   );
 
-  // Measure the real page aspect for the fit mode
-  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
-    const aspect = img.naturalWidth / img.naturalHeight;
-    // Latch the first measured page aspect (spec: measure the first displayed page).
-    // Updating on every load can oscillate fitPageCount on mixed-aspect archives.
-    setPageAspect((prev) => prev ?? aspect);
-  }, []);
+  // Measure the real page aspect for the fit mode and detect wide (landscape) pages
+  const handleImageLoad = useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement>, pageIndex: number) => {
+      const img = e.currentTarget;
+      if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+      const aspect = img.naturalWidth / img.naturalHeight;
+      if (isWidePage(aspect)) {
+        setWidePages((prev) => (prev.has(pageIndex) ? prev : new Set(prev).add(pageIndex)));
+        return;
+      }
+      // Latch the first measured portrait page aspect (spec: measure the first displayed page).
+      // Updating on every load can oscillate fitPageCount on mixed-aspect archives.
+      setPageAspect((prev) => prev ?? aspect);
+    },
+    [],
+  );
 
   const displayPages = isRtl ? [...currentGroup].reverse() : currentGroup;
   const displaySrcs = isRtl ? [...srcs].reverse() : srcs;
@@ -272,7 +282,7 @@ export function SpreadViewer({
             <PageImage
               src={displaySrcs[i] ?? null}
               alt={pageNames[pageIndex] ?? ""}
-              onLoad={handleImageLoad}
+              onLoad={(e) => handleImageLoad(e, pageIndex)}
             />
           </div>
         ))}

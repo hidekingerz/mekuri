@@ -1,19 +1,23 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { moveFiles } from "./api/directory";
+import { countFiles, moveFiles, trashFolder } from "./api/directory";
 import { addFavorite } from "./api/favorites";
-import { emitFileMoved } from "./api/fileEvents";
+import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
 import { openViewerWindow } from "./api/viewerWindow";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
 import { UpdateBanner } from "./components/UpdateBanner/UpdateBanner";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useConfirmDialog } from "./hooks/useConfirmDialog";
 import { useFolderSearch } from "./hooks/useFolderSearch";
 import { useMainWindowSetup } from "./hooks/useMainWindowSetup";
 import { useUpdater } from "./hooks/useUpdater";
 import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
+import { errorToString } from "./utils/errorToString";
+import { selectionAfterRemoval } from "./utils/folderTree";
+import { folderTrashConfirmLines, folderTrashConfirmTitle } from "./utils/trashConfirm";
 import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function App() {
@@ -22,6 +26,8 @@ function App() {
   const [favoritesRefresh, setFavoritesRefresh] = useState(0);
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [trashError, setTrashError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
   const { treeColumnWidth, setWidth, isResizing, startResize } = useColumnResize(
@@ -106,6 +112,31 @@ function App() {
     [rerunSearch],
   );
 
+  const handleTrashFolder = useCallback(
+    async (path: string) => {
+      if (!selectedFavorite) return false;
+      setTrashError(null);
+      try {
+        const fileCount = await countFiles(path);
+        const ok = await confirm({
+          title: folderTrashConfirmTitle(path),
+          lines: folderTrashConfirmLines(fileCount),
+          confirmLabel: "ゴミ箱に移動",
+          danger: true,
+        });
+        if (!ok) return false;
+        await trashFolder(path);
+      } catch (err) {
+        setTrashError(errorToString(err));
+        return false;
+      }
+      setSelectedFolder((current) => selectionAfterRemoval(current, path, selectedFavorite));
+      await emitFileTrashed();
+      return true;
+    },
+    [selectedFavorite, confirm],
+  );
+
   return (
     <div className="app">
       <div className="toolbar">
@@ -178,6 +209,19 @@ function App() {
             </button>
           </div>
         )}
+        {trashError && (
+          <div className="toolbar__banner toolbar__banner--error" role="alert">
+            <span>ゴミ箱に移動できませんでした: {trashError}</span>
+            <button
+              type="button"
+              className="toolbar__banner-close"
+              aria-label="閉じる"
+              onClick={() => setTrashError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
       <div
         className={`app__columns ${isResizing ? "app__columns--resizing" : ""}`}
@@ -201,6 +245,7 @@ function App() {
               revealPath={revealPath}
               onRevealComplete={handleRevealComplete}
               onFileDrop={handleFileDrop}
+              onTrashFolder={handleTrashFolder}
               reloadTrigger={reloadTrigger}
             />
           ) : (
@@ -221,6 +266,7 @@ function App() {
           />
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

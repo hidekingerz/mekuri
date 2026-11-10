@@ -121,6 +121,49 @@ pub fn trash_files(paths: &[PathBuf]) -> Result<(), String> {
     trash::delete_all(&targets).map_err(|e| format!("Failed to move files to trash: {e}"))
 }
 
+fn validate_folder(path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Err(format!("Folder does not exist: {}", path.display()));
+    }
+    if !path.is_dir() {
+        return Err(format!("Path is not a folder: {}", path.display()));
+    }
+    Ok(())
+}
+
+/// フォルダ内のファイル数をサブフォルダまで数える。フォルダ自体とシンボリックリンク先は数えない。
+pub fn count_files(dir_path: &Path) -> Result<u64, String> {
+    validate_folder(dir_path)?;
+    let mut count = 0;
+    let mut stack = vec![dir_path.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let entries = std::fs::read_dir(&dir).map_err(|e| format!("Failed to read folder: {e}"))?;
+        for entry in entries.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_dir() {
+                stack.push(entry.path());
+            } else {
+                count += 1;
+            }
+        }
+    }
+    Ok(count)
+}
+
+/// フォルダを中身ごとゴミ箱へ移動する。ファイルや、ルートのように親を持たないパスは拒否する。
+pub fn trash_folder(path: &Path) -> Result<(), String> {
+    validate_folder(path)?;
+    if path.parent().is_none() {
+        return Err(format!(
+            "Refusing to trash a root folder: {}",
+            path.display()
+        ));
+    }
+    trash::delete(path).map_err(|e| format!("Failed to move folder to trash: {e}"))
+}
+
 /// ファイルを別フォルダへ移動し、移動後のパスを返す。同名ファイルがあればエラー。
 pub fn move_file(src_path: &Path, dest_dir_path: &Path) -> Result<PathBuf, String> {
     if !src_path.exists() {
@@ -500,5 +543,59 @@ mod tests {
         let result = move_file(&src, dir.path());
         assert!(result.unwrap_err().contains("same"));
         assert!(src.exists());
+    }
+
+    #[test]
+    fn count_files_counts_nested_files_but_not_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("a.zip"), "").unwrap();
+        fs::create_dir(dir.path().join("sub")).unwrap();
+        fs::write(dir.path().join("sub").join("b.pdf"), "").unwrap();
+        fs::write(dir.path().join("sub").join("notes.txt"), "").unwrap();
+        fs::create_dir(dir.path().join("empty")).unwrap();
+
+        assert_eq!(count_files(dir.path()).unwrap(), 3);
+    }
+
+    #[test]
+    fn count_files_rejects_a_file_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.zip");
+        fs::write(&file, "").unwrap();
+        assert!(count_files(&file).unwrap_err().contains("not a folder"));
+    }
+
+    #[test]
+    fn trash_folder_rejects_missing_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = trash_folder(&dir.path().join("missing"));
+        assert!(result.unwrap_err().contains("does not exist"));
+    }
+
+    #[test]
+    fn trash_folder_rejects_a_file_and_keeps_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.zip");
+        fs::write(&file, "").unwrap();
+        assert!(trash_folder(&file).unwrap_err().contains("not a folder"));
+        assert!(file.exists());
+    }
+
+    #[test]
+    fn trash_folder_rejects_filesystem_root() {
+        assert!(trash_folder(Path::new("/")).is_err());
+    }
+
+    #[test]
+    #[ignore] // Requires Finder interaction on macOS; run manually with `cargo test -- --ignored`
+    fn trash_folder_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("unused");
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("a.zip"), "").unwrap();
+
+        let result = trash_folder(&folder);
+        assert!(result.is_ok(), "trash_folder failed: {:?}", result);
+        assert!(!folder.exists());
     }
 }

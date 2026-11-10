@@ -443,6 +443,12 @@ body {
   color: var(--color-text-error);
 }
 
+.context-menu__separator {
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
 /* Tree nodes */
 .folder-tree {
   padding: 4px 0;

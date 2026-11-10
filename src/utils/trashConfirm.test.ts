@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { trashConfirmLines, trashConfirmTitle } from "./trashConfirm";
+import {
+  folderTrashConfirmLines,
+  folderTrashConfirmTitle,
+  trashConfirmLines,
+  trashConfirmTitle,
+} from "./trashConfirm";
 
 describe("trashConfirmTitle", () => {
   it("describes one file or a count", () => {
@@ -23,5 +28,23 @@ describe("trashConfirmLines", () => {
       "5.zip",
       "…ほか 2 件",
     ]);
+  });
+});
+
+describe("folderTrashConfirmTitle", () => {
+  it("names the folder", () => {
+    expect(folderTrashConfirmTitle("/scores/old")).toBe("フォルダ「old」をゴミ箱に移動しますか?");
+  });
+});
+
+describe("folderTrashConfirmLines", () => {
+  it("says how many files go with the folder", () => {
+    expect(folderTrashConfirmLines(12)).toEqual([
+      "中のファイル 12 件（サブフォルダを含む）も一緒に移動します",
+    ]);
+  });
+
+  it("says when the folder has no files", () => {
+    expect(folderTrashConfirmLines(0)).toEqual(["フォルダの中にファイルはありません"]);
   });
 });

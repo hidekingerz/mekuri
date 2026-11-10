@@ -5,7 +5,9 @@ import {
   getAncestorPaths,
   mergeNodes,
   relativeParent,
+  removeNode,
   replaceChildren,
+  selectionAfterRemoval,
   toggleNode,
   toNodes,
 } from "./folderTree";
@@ -201,5 +203,42 @@ describe("relativeParent", () => {
 
   it("returns an empty string when the path is outside the root", () => {
     expect(relativeParent("/root", "/other/a/target")).toBe("");
+  });
+});
+
+describe("removeNode", () => {
+  it("removes a top-level node", () => {
+    expect(removeNode([node("/root/a"), node("/root/b")], "/root/a")).toEqual([node("/root/b")]);
+  });
+
+  it("removes a nested node and collapses the parent when it has no subfolders left", () => {
+    const tree = [node("/root/a", { isOpen: true, children: [node("/root/a/x")] }, true)];
+    expect(removeNode(tree, "/root/a/x")).toEqual([
+      node("/root/a", { isOpen: false, children: [] }, false),
+    ]);
+  });
+
+  it("returns the same array when the path is not in the tree", () => {
+    const tree = [node("/root/a")];
+    expect(removeNode(tree, "/root/zzz")).toBe(tree);
+  });
+});
+
+describe("selectionAfterRemoval", () => {
+  it("moves the selection to the removed folder's parent", () => {
+    expect(selectionAfterRemoval("/root/a/x", "/root/a/x", "/root")).toBe("/root/a");
+  });
+
+  it("moves a selection inside the removed folder to its parent", () => {
+    expect(selectionAfterRemoval("/root/a/x/y", "/root/a/x", "/root")).toBe("/root/a");
+  });
+
+  it("clears the selection when the parent is the favorite root", () => {
+    expect(selectionAfterRemoval("/root/a", "/root/a", "/root")).toBeNull();
+  });
+
+  it("keeps an unrelated selection, including a sibling with a shared prefix", () => {
+    expect(selectionAfterRemoval("/root/ab", "/root/a", "/root")).toBe("/root/ab");
+    expect(selectionAfterRemoval(null, "/root/a", "/root")).toBeNull();
   });
 });

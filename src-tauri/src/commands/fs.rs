@@ -25,6 +25,16 @@ pub fn trash_files(paths: Vec<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn trash_folder(path: String) -> Result<(), String> {
+    filesystem::trash_folder(Path::new(&path))
+}
+
+#[tauri::command]
+pub fn count_files(path: String) -> Result<u64, String> {
+    filesystem::count_files(Path::new(&path))
+}
+
+#[tauri::command]
 pub fn move_file(src: String, dest_dir: String) -> Result<String, String> {
     let dest_path = filesystem::move_file(Path::new(&src), Path::new(&dest_dir))?;
     dest_path

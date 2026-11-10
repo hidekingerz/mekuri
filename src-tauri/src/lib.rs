@@ -17,6 +17,8 @@ pub fn run() {
             commands::fs::read_file_base64,
             commands::fs::trash_file,
             commands::fs::trash_files,
+            commands::fs::trash_folder,
+            commands::fs::count_files,
             commands::fs::move_file,
             commands::fs::search_directory,
             commands::archive::list_archive_images,

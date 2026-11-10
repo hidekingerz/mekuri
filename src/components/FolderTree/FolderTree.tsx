@@ -9,6 +9,7 @@ import {
   getAncestorPaths,
   mergeNodes,
   relativeParent,
+  removeNode,
   replaceChildren,
   toggleNode as toggleTreeNode,
   toNodes,
@@ -26,6 +27,8 @@ type FolderTreeProps = {
   revealPath: string | null;
   onRevealComplete: () => void;
   onFileDrop: (srcPaths: string[], destDir: string) => void;
+  /** フォルダをゴミ箱に移す。確認して移したときだけ true を返す */
+  onTrashFolder: (path: string) => Promise<boolean>;
   reloadTrigger?: number;
 };
 
@@ -38,6 +41,7 @@ export function FolderTree({
   revealPath,
   onRevealComplete,
   onFileDrop,
+  onTrashFolder,
   reloadTrigger,
 }: FolderTreeProps) {
   const [nodes, setNodes] = useState<TreeNodeData[]>([]);
@@ -130,6 +134,15 @@ export function FolderTree({
       onFavoriteAdded?.();
     }
   }, [contextMenu, closeContextMenu, onFavoriteAdded]);
+
+  const handleTrashFolder = useCallback(async () => {
+    if (!contextMenu) return;
+    const path = contextMenu.path;
+    closeContextMenu();
+    if (await onTrashFolder(path)) {
+      setNodes((prev) => removeNode(prev, path));
+    }
+  }, [contextMenu, closeContextMenu, onTrashFolder]);
 
   // ↑↓ / Home / End で表示中の項目間を移動する（開閉と選択は各項目が処理する）
   const handleTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -235,6 +248,14 @@ export function FolderTree({
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" className="context-menu__item" onClick={handleAddFavorite}>
             お気に入りに追加
+          </button>
+          <hr className="context-menu__separator" />
+          <button
+            type="button"
+            className="context-menu__item context-menu__item--danger"
+            onClick={handleTrashFolder}
+          >
+            ゴミ箱に移動
           </button>
         </div>
       )}

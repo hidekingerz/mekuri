@@ -68,3 +68,13 @@ export async function moveFiles(srcPaths: string[], destDir: string): Promise<Mo
   }
   return { moved, errors };
 }
+
+/** フォルダを中身ごとゴミ箱へ移す。 */
+export async function trashFolder(path: string): Promise<void> {
+  return invoke<void>("trash_folder", { path });
+}
+
+/** フォルダ内のファイル数をサブフォルダまで数える。 */
+export async function countFiles(path: string): Promise<number> {
+  return invoke<number>("count_files", { path });
+}

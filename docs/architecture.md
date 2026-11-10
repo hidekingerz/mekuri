@@ -137,6 +137,20 @@ Output:  void
 `trash_files` は全パスを事前検証し、無効なものがあれば何も削除せずエラーを改行区切りでまとめて `Err` として返す。検証を通った場合は `trash::delete_all` で 1 回の操作としてゴミ箱へ送る（macOS では Finder 呼び出しが 1 回で済み、逐次削除より高速）。
 完了後はフロントエンドが `file-trashed` イベントを emit し、他ウィンドウのファイルリストが再読込される。
 
+### フォルダのゴミ箱移動
+
+```
+Command: count_files
+Input:   { path: string }
+Output:  number   // サブフォルダを含むファイル数（フォルダとシンボリックリンク先は数えない）
+
+Command: trash_folder
+Input:   { path: string }
+Output:  void
+```
+
+フォルダツリーのコンテキストメニューから使う。確認ダイアログに出す件数を `count_files` で取ってから、`trash_folder` で中身ごとゴミ箱へ送る。`trash_folder` は、存在しないパス・ファイル・親を持たないパス（`/` など）を拒否する。ファイル用の `trash_file` / `trash_files` はフォルダを受け付けないまま変えていない。
+
 ## ウィンドウ管理
 
 Tauri のマルチウィンドウ機能を使用する。

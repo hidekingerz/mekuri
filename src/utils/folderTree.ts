@@ -129,3 +129,44 @@ export function relativeParent(rootPath: string, targetPath: string): string {
       .pop() ?? ""
   );
 }
+
+/** ツリーから path のノードを取り除く。親の子が空になったら、親を閉じて展開マークも消す。 */
+export function removeNode(nodes: TreeNodeData[], path: string): TreeNodeData[] {
+  let changed = false;
+  const result: TreeNodeData[] = [];
+  for (const node of nodes) {
+    if (node.entry.path === path) {
+      changed = true;
+      continue;
+    }
+    if (node.children) {
+      const children = removeNode(node.children, path);
+      if (children !== node.children) {
+        changed = true;
+        result.push(
+          children.length === 0
+            ? { entry: { ...node.entry, has_subfolders: false }, children, isOpen: false }
+            : { ...node, children },
+        );
+        continue;
+      }
+    }
+    result.push(node);
+  }
+  return changed ? result : nodes;
+}
+
+/**
+ * フォルダを消したあとの選択先。消したフォルダかその中を選んでいたら親へ移し、
+ * 親がお気に入りのルートなら選択を外す。
+ */
+export function selectionAfterRemoval(
+  selected: string | null,
+  removed: string,
+  rootPath: string,
+): string | null {
+  if (selected === null) return null;
+  if (selected !== removed && !selected.startsWith(`${removed}/`)) return selected;
+  const parent = removed.slice(0, removed.lastIndexOf("/"));
+  return parent === rootPath || parent === "" ? null : parent;
+}

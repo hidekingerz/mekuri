@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveListIndex } from "./listKeyboard";
+import { isListKeySource, moveListIndex } from "./listKeyboard";
 
 describe("moveListIndex", () => {
   it("moves down and up by one", () => {
@@ -25,5 +25,25 @@ describe("moveListIndex", () => {
   it("returns null for keys it does not handle and for empty lists", () => {
     expect(moveListIndex(5, 2, "a")).toBeNull();
     expect(moveListIndex(0, -1, "ArrowDown")).toBeNull();
+  });
+});
+
+/** closest() だけを持つ要素の代わり。祖先に data-path を持つ項目があるかを渡す */
+function fakeTarget(insideItem: boolean) {
+  return { closest: (selector: string) => (insideItem && selector === "[data-path]" ? {} : null) };
+}
+
+describe("isListKeySource", () => {
+  it("handles keys pressed on the list container itself", () => {
+    const container = fakeTarget(false);
+    expect(isListKeySource(container, container)).toBe(true);
+  });
+
+  it("handles keys pressed on a file item", () => {
+    expect(isListKeySource(fakeTarget(true), fakeTarget(false))).toBe(true);
+  });
+
+  it("ignores keys from other controls inside the list, such as the confirm dialog buttons", () => {
+    expect(isListKeySource(fakeTarget(false), fakeTarget(false))).toBe(false);
   });
 });

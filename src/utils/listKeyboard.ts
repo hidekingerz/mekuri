@@ -17,3 +17,14 @@ export function moveListIndex(count: number, current: number, key: string): numb
       return null;
   }
 }
+
+type KeySource = { closest(selector: string): unknown };
+
+/**
+ * ファイル一覧のキー操作（Enter で開く・↑↓・削除）を受け持つ押下か。
+ * 一覧そのものかファイル項目で押されたときだけ扱い、確認ダイアログや並び替えの
+ * ボタンなど一覧の中にあるほかの操作部品のキーは、その部品の既定動作に任せる。
+ */
+export function isListKeySource(target: KeySource, container: unknown): boolean {
+  return target === container || target.closest("[data-path]") !== null;
+}

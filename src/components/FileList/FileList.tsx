@@ -14,7 +14,7 @@ import {
   type SortKey,
   sortEntries,
 } from "../../utils/fileSort";
-import { moveListIndex } from "../../utils/listKeyboard";
+import { isListKeySource, moveListIndex } from "../../utils/listKeyboard";
 import { isTrashShortcut } from "../../utils/trashShortcut";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 
@@ -132,6 +132,7 @@ export function FileList({
   }, []);
 
   const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, order: string[]) => {
+    if (!(e.target instanceof Element) || !isListKeySource(e.target, e.currentTarget)) return;
     if (e.key === "Escape") {
       clear();
       return;

@@ -11,7 +11,8 @@
     "lint": "biome check src/",
     "format": "biome format --write src/",
     "format:check": "biome format src/",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:mutation": "mutator"
   },
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",
@@ -27,13 +28,14 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.14",
+    "@mizchi/mutator": "0.4.0",
     "@tauri-apps/cli": "^2.10.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.3",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vitest": "^5.1.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

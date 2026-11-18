@@ -45,4 +45,31 @@ describe("sortEntries", () => {
     ]);
     expect(names(withMissing)).toEqual(["a.zip", "b.zip", "c.zip", "d.zip"]);
   });
+
+  it("keeps entries without the value in their original order, after the others, in both directions", () => {
+    const mixed = [
+      entry("m1.zip"),
+      entry("a.zip", { size: 10 }),
+      entry("m2.zip"),
+      entry("b.zip", { size: 30 }),
+      entry("m3.zip"),
+      entry("c.zip", { size: 20 }),
+    ];
+    expect(names(sortEntries(mixed, "size", "asc"))).toEqual([
+      "a.zip",
+      "c.zip",
+      "b.zip",
+      "m1.zip",
+      "m2.zip",
+      "m3.zip",
+    ]);
+    expect(names(sortEntries(mixed, "size", "desc"))).toEqual([
+      "b.zip",
+      "c.zip",
+      "a.zip",
+      "m1.zip",
+      "m2.zip",
+      "m3.zip",
+    ]);
+  });
 });

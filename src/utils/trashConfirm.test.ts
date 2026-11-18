@@ -18,6 +18,11 @@ describe("trashConfirmLines", () => {
     expect(trashConfirmLines(["/a/b/score.zip"])).toEqual(["score.zip"]);
   });
 
+  it("lists exactly 5 files without a remainder line", () => {
+    const paths = ["/1.zip", "/2.zip", "/3.zip", "/4.zip", "/5.zip"];
+    expect(trashConfirmLines(paths)).toEqual(["1.zip", "2.zip", "3.zip", "4.zip", "5.zip"]);
+  });
+
   it("caps the preview at 5 and counts the rest", () => {
     const paths = ["/1.zip", "/2.zip", "/3.zip", "/4.zip", "/5.zip", "/6.zip", "/7.zip"];
     expect(trashConfirmLines(paths)).toEqual([

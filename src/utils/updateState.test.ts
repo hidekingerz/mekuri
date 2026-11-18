@@ -144,6 +144,13 @@ describe("updateReducer", () => {
       const checkErr: UpdateState = { status: "error", message: "x", retry: "check" };
       expect(updateReducer(checkErr, { type: "RETRY_INSTALL" })).toBe(checkErr);
       expect(updateReducer(available, { type: "RETRY_INSTALL" })).toBe(available);
+      const checkErrWithUpdate: UpdateState = {
+        status: "error",
+        message: "x",
+        retry: "check",
+        update,
+      };
+      expect(updateReducer(checkErrWithUpdate, { type: "RETRY_INSTALL" })).toBe(checkErrWithUpdate);
     });
   });
 

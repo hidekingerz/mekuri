@@ -32,6 +32,10 @@ describe("rangeBetween", () => {
     expect(rangeBetween(order, "zzz", "c")).toEqual(["c"]);
   });
 
+  it("returns only the target when the target is missing from order", () => {
+    expect(rangeBetween(order, "b", "zzz")).toEqual(["zzz"]);
+  });
+
   it("returns only the target when anchor is null", () => {
     expect(rangeBetween(order, null, "c")).toEqual(["c"]);
   });

@@ -65,3 +65,25 @@ jobs:
 
       - name: Test
         run: cargo test
+
+  mutation:
+    name: Mutation testing (src/utils)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install
+
+      # PR では差分にある変異だけを調べる。main への push では全体を回してキャッシュを温める。
+      # まずは警告（PR の注釈）だけにして、ゲートはまだかけない。
+      - uses: mizchi/mutator@9ac21194d9c682a4160fe5f232e19790c4cd9f29 # v0.4.0
+        with:
+          version: "0.4.0"
+          args: --time-budget 600

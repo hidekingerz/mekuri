@@ -34,6 +34,7 @@ pnpm dev              # 開発サーバー起動（Tauri 経由）
 pnpm build            # プロダクションビルド
 pnpm lint             # Biome リント実行
 pnpm format           # Biome フォーマット実行
+pnpm test:mutation    # ミューテーションテスト（mutator、対象は src/utils。`--since main` を付けると差分だけ）
 
 # Rust (src-tauri/ 配下で実行)
 cargo clippy           # リンタ

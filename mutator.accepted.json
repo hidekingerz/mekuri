@@ -1,0 +1,54 @@
+{
+  "10iieo4ay28": {
+    "reason": "equivalent: getAncestorPaths yields normalized paths with a single slash after the root",
+    "where": "src/utils/folderTree.ts:128:52 /^\\/+/ -> /^\\//"
+  },
+  "11psgxdsmzj": {
+    "reason": "equivalent: with groupCount = 0 the clamp Math.max(0, Math.min(index, -1)) already returns 0",
+    "where": "src/utils/spreadNavigation.ts:47:7 groupCount <= 0 -> groupCount < 0"
+  },
+  "12xbfweeuos": {
+    "reason": "equivalent: when anchorIndex equals targetIndex both branches give the same one-item range",
+    "where": "src/utils/selection.ts:17:5 anchorIndex <= targetIndex -> anchorIndex < targetIndex"
+  },
+  "1futf9vs1im": {
+    "reason": "equivalent: any string that is not a known extension makes detectFileType return unknown",
+    "where": "src/utils/fileType.ts:6:30 \"\" -> \"Stryker was here!\""
+  },
+  "1g29x6h06zr": {
+    "reason": "equivalent: a width of 0 gives a quotient of 0, which Math.max(1, ...) turns into 1",
+    "where": "src/utils/spreadLayout.ts:106:7 containerWidth <= 0 -> containerWidth < 0"
+  },
+  "1u6xwm7qwjj": {
+    "reason": "equivalent: current is -1 here, and Math.min(count - 1, current + 1) is 0 as well",
+    "where": "src/utils/listKeyboard.ts:9:14 current < 0 -> false"
+  },
+  "21sfm6m9dvw": {
+    "reason": "equivalent: the hash only needs to be deterministic and distinct per path; labels are not persisted",
+    "where": "src/utils/windowLabel.ts:9:12 (hash << 5) - hash + char -> (hash << 5) - hash - char"
+  },
+  "23caui0u1w1": {
+    "reason": "equivalent: with groupCount <= 0 the clamp Math.max(0, Math.min(index, groupCount - 1)) already returns 0",
+    "where": "src/utils/spreadNavigation.ts:47:7 groupCount <= 0 -> false"
+  },
+  "2tfok86x1d": {
+    "reason": "equivalent: for current = -1, Math.max(0, current - 1) is 0 as well",
+    "where": "src/utils/listKeyboard.ts:11:14 current < 0 -> false"
+  },
+  "ljrxwkijbz": {
+    "reason": "equivalent: for current = 0, Math.max(0, current - 1) is 0 as well",
+    "where": "src/utils/listKeyboard.ts:11:14 current < 0 -> current <= 0"
+  },
+  "mbmz7ufts0": {
+    "reason": "equivalent: the sliced path always starts with the only slash run, so the anchor does not change the match",
+    "where": "src/utils/folderTree.ts:128:52 /^\\/+/ -> /\\/+/"
+  },
+  "mtmbgfu5be": {
+    "reason": "equivalent: a width of 0 or less makes the quotient 0 or negative, which Math.max(1, ...) turns into 1",
+    "where": "src/utils/spreadLayout.ts:106:7 containerWidth <= 0 -> false"
+  },
+  "rdhpzvuwfn": {
+    "reason": "equivalent: sign is always 1 or -1, so multiplying and dividing by it give the same result",
+    "where": "src/utils/fileSort.ts:33:12 (va - vb) * sign -> (va - vb) / sign"
+  }
+}

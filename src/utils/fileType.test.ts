@@ -21,4 +21,13 @@ describe("detectFileType", () => {
     expect(detectFileType("image.png")).toBe("unknown");
     expect(detectFileType("noext")).toBe("unknown");
   });
+
+  it("does not take a whole name without a dot as the extension", () => {
+    expect(detectFileType("pdf")).toBe("unknown");
+    expect(detectFileType("zip")).toBe("unknown");
+  });
+
+  it("reads the extension of a one-letter name", () => {
+    expect(detectFileType("a.zip")).toBe("archive");
+  });
 });

@@ -91,6 +91,13 @@ describe("replaceChildren", () => {
     const nodes = [node("/root/a")];
     expect(replaceChildren(nodes, "/root/missing", [dir("/root/missing/x")])).toBe(nodes);
   });
+
+  it("keeps untouched branches as the same objects", () => {
+    const untouched = node("/root/b", { isOpen: true, children: [node("/root/b/y")] });
+    const a = node("/root/a", { isOpen: true, children: [node("/root/a/x")] });
+    const result = replaceChildren([a, untouched], "/root/a/x", [dir("/root/a/x/new")]);
+    expect(result[1]).toBe(untouched);
+  });
 });
 
 /** 呼び出されたパスを記録し、あらかじめ用意した子エントリを返す読み込み関数 */
@@ -155,6 +162,13 @@ describe("toggleNode", () => {
     expect(result).toEqual([node("/root/a", { isOpen: true, children: [] })]);
   });
 
+  it("leaves the other nodes as they are", async () => {
+    const { load } = fakeLoader({ "/root/a": [] });
+    const b = node("/root/b");
+    const result = await toggleNode([node("/root/a"), b], "/root/a", load);
+    expect(result[1]).toBe(b);
+  });
+
   it("toggles a nested node inside an open parent", async () => {
     const { load } = fakeLoader({ "/root/a/x": [dir("/root/a/x/deep")] });
     const a = node("/root/a", { isOpen: true, children: [node("/root/a/x")] });
@@ -181,6 +195,15 @@ describe("expandPaths", () => {
       node("/root/z"),
     ]);
     expect(calls).toEqual(["/root/a", "/root/a/b"]);
+  });
+
+  it("expands listed paths inside an open node that is not listed itself", async () => {
+    const { load } = fakeLoader({ "/root/a/b": [dir("/root/a/b/c")] });
+    const a = node("/root/a", { isOpen: true, children: [node("/root/a/b")] });
+    const result = await expandPaths([a], new Set(["/root/a/b"]), load);
+    expect(result).toEqual([
+      { ...a, children: [node("/root/a/b", { isOpen: true, children: [node("/root/a/b/c")] })] },
+    ]);
   });
 
   it("does not reload children that are already loaded", async () => {
@@ -218,9 +241,25 @@ describe("removeNode", () => {
     ]);
   });
 
+  it("keeps the parent open when other subfolders remain", () => {
+    const a = node(
+      "/root/a",
+      { isOpen: true, children: [node("/root/a/x"), node("/root/a/y")] },
+      true,
+    );
+    expect(removeNode([a], "/root/a/x")).toEqual([{ ...a, children: [node("/root/a/y")] }]);
+  });
+
   it("returns the same array when the path is not in the tree", () => {
     const tree = [node("/root/a")];
     expect(removeNode(tree, "/root/zzz")).toBe(tree);
+  });
+
+  it("keeps untouched branches as the same objects", () => {
+    const untouched = node("/root/b", { isOpen: true, children: [node("/root/b/y")] });
+    const a = node("/root/a", { isOpen: true, children: [node("/root/a/x"), node("/root/a/z")] });
+    const result = removeNode([a, untouched], "/root/a/x");
+    expect(result[1]).toBe(untouched);
   });
 });
 
@@ -235,6 +274,10 @@ describe("selectionAfterRemoval", () => {
 
   it("clears the selection when the parent is the favorite root", () => {
     expect(selectionAfterRemoval("/root/a", "/root/a", "/root")).toBeNull();
+  });
+
+  it("clears the selection when the removed folder sits at the top of the file system", () => {
+    expect(selectionAfterRemoval("/a", "/a", "/root")).toBeNull();
   });
 
   it("keeps an unrelated selection, including a sibling with a shared prefix", () => {

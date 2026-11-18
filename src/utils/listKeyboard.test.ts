@@ -5,6 +5,8 @@ describe("moveListIndex", () => {
   it("moves down and up by one", () => {
     expect(moveListIndex(5, 1, "ArrowDown")).toBe(2);
     expect(moveListIndex(5, 1, "ArrowUp")).toBe(0);
+    expect(moveListIndex(5, 0, "ArrowDown")).toBe(1);
+    expect(moveListIndex(5, 3, "ArrowUp")).toBe(2);
   });
 
   it("starts at the first item when nothing is focused yet", () => {

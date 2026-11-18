@@ -95,9 +95,14 @@ describe("siblingAfterRemoval", () => {
     expect(siblingAfterRemoval(list, 2)).toBe("b");
   });
 
+  it("moves to the second item when the first one is removed", () => {
+    expect(siblingAfterRemoval(list, 0)).toBe("b");
+  });
+
   it("returns null when the item is alone or not in the list", () => {
     expect(siblingAfterRemoval(["only"], 0)).toBeNull();
     expect(siblingAfterRemoval(list, -1)).toBeNull();
+    expect(siblingAfterRemoval(list, list.length)).toBeNull();
   });
 });
 
@@ -120,6 +125,8 @@ describe("adjacentSibling", () => {
   it("returns null when the current item is not in the list", () => {
     expect(adjacentSibling(list, -1, "next")).toBeNull();
     expect(adjacentSibling(list, -1, "prev")).toBeNull();
+    expect(adjacentSibling(list, list.length, "prev")).toBeNull();
+    expect(adjacentSibling(list, list.length + 1, "prev")).toBeNull();
   });
 });
 

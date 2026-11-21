@@ -13,10 +13,12 @@ import { useColumnResize } from "./hooks/useColumnResize";
 import { useConfirmDialog } from "./hooks/useConfirmDialog";
 import { useFolderSearch } from "./hooks/useFolderSearch";
 import { useMainWindowSetup } from "./hooks/useMainWindowSetup";
+import { useRecentFolders } from "./hooks/useRecentFolders";
 import { useUpdater } from "./hooks/useUpdater";
 import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
 import { errorToString } from "./utils/errorToString";
 import { selectionAfterRemoval } from "./utils/folderTree";
+import type { ResolvedRecentFolder } from "./utils/recentFolders";
 import { folderTrashConfirmLines, folderTrashConfirmTitle } from "./utils/trashConfirm";
 import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
@@ -87,6 +89,21 @@ function App() {
       clearSearch();
     },
     [searchResults, clearSearch],
+  );
+
+  const shownFolder = selectedFolder || selectedFavorite;
+  const recentFolders = useRecentFolders(favoritesRefresh, shownFolder);
+
+  // 履歴から選んだフォルダへ移る。お気に入りを切り替え、ツリーをそこまで開く
+  const handleRecentSelect = useCallback(
+    (entry: ResolvedRecentFolder) => {
+      clearSearch();
+      setSelectedFavorite(entry.favorite);
+      const isRoot = entry.folder === entry.favorite;
+      setSelectedFolder(isRoot ? null : entry.folder);
+      setRevealPath(isRoot ? null : entry.folder);
+    },
+    [clearSearch],
   );
 
   const handleRevealComplete = useCallback(() => {
@@ -264,6 +281,8 @@ function App() {
             searchResults={searchResults}
             reloadTrigger={reloadTrigger}
             onFileDrop={handleFileDrop}
+            recentFolders={recentFolders}
+            onRecentSelect={handleRecentSelect}
           />
         </div>
       </div>

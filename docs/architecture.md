@@ -298,6 +298,24 @@ Tauri のマルチウィンドウ機能を使用する。
 | `updateState` | アップデート UI の状態遷移（副作用なし。`useUpdater` から利用） |
 | `updateProgress` | ダウンロード進捗イベントの累積・パーセント計算（Tauri 非依存） |
 
+## Finder からのドラッグ＆ドロップ（macOS）
+
+メインウィンドウとビューワーは、アプリ内のドラッグ移動（HTML5 D&D）を動かすために
+Tauri のネイティブ drag-drop を無効にしている（`dragDropEnabled: false`）。
+有効にすると wry が macOS のドラッグを横取りし、WebView の drop イベントが発火しないため。
+
+この状態でも Finder からのドラッグで drop イベントは発火するが、WebKit の `File` からは
+絶対パスが取れない。そこで drop の処理中に `read_dragged_paths` コマンドを呼び、
+Rust（`src-tauri/src/drag_pasteboard.rs`）がドラッグ用ペーストボード（`NSPasteboardNameDrag`）の
+ファイル URL を読んでパスを返す。Finder はファイル参照 URL（`file:///.file/id=...`）を
+載せるので、`filePathURL` で通常のパスに直す。
+
+フロントの `readDroppedPaths`（`src/api/fileDrop.ts`）は、アプリ内のドラッグなら
+`FILE_DRAG_MIME` のパスを、外からのドラッグならペーストボードのパスを返す。
+ペーストボードに前のドラッグが残っている場合に備え、落とされた `File` の名前
+（NFC に正規化）と一致したときだけパスを使う（`matchDroppedPaths`）。移動そのものは
+アプリ内のドラッグと同じ `move_file` を使う。
+
 ## Finder からのファイルオープン（macOS）
 
 `bundle.fileAssociations`（zip/cbz/rar/cbr/pdf, role=Viewer）により、バンドルされた

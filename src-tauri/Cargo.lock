@@ -1737,6 +1737,9 @@ version = "1.14.1"
 dependencies = [
  "base64 0.22.1",
  "natord",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "percent-encoding",
  "serde",
  "serde_json",

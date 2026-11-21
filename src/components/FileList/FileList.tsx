@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
+import { readDroppedPaths } from "../../api/fileDrop";
 import { emitFileTrashed, onFileChanged } from "../../api/fileEvents";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
@@ -7,7 +8,7 @@ import { useTrashConfirm } from "../../hooks/useTrashConfirm";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
-import { encodeDragPaths } from "../../utils/fileDrag";
+import { dragSource, encodeDragPaths } from "../../utils/fileDrag";
 import {
   SORT_KEY_LABELS,
   type SortDirection,
@@ -24,6 +25,8 @@ type FileListProps = {
   onFolderSelect: (path: string) => void;
   searchResults: DirectoryEntry[] | null;
   reloadTrigger?: number;
+  /** Finder などから一覧へ落とされたファイルを、表示中のフォルダへ移す */
+  onFileDrop?: (srcPaths: string[], destDir: string) => void;
 };
 
 export function FileList({
@@ -32,6 +35,7 @@ export function FileList({
   onFolderSelect,
   searchResults,
   reloadTrigger,
+  onFileDrop,
 }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,6 +48,7 @@ export function FileList({
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const listRef = useRef<HTMLDivElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
   const requestIdRef = useRef(0);
@@ -299,8 +304,34 @@ export function FileList({
     );
   }
 
+  // 表示中のフォルダへの移動先として、アプリ外（Finder など）からのドラッグだけを受ける。
+  // アプリ内のドラッグは一覧の項目そのものなので、同じフォルダへの移動にしかならない。
+  const dropTarget = folderPath;
+  const dropProps =
+    dropTarget && onFileDrop
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            if (dragSource(e.dataTransfer.types) !== "external") return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            setIsDragOver(true);
+          },
+          onDragLeave: (e: React.DragEvent) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragOver(false);
+          },
+          onDrop: async (e: React.DragEvent) => {
+            if (dragSource(e.dataTransfer.types) !== "external") return;
+            e.preventDefault();
+            setIsDragOver(false);
+            const srcPaths = await readDroppedPaths(e.dataTransfer);
+            if (srcPaths.length > 0) onFileDrop(srcPaths, dropTarget);
+          },
+        }
+      : undefined;
+  const listClassName = `file-list${isDragOver ? " file-list--drop-target" : ""}`;
+
   const renderMessage = (text: string, modifier: "empty" | "loading" | "error") => (
-    <div className="file-list">
+    <div className={listClassName} {...dropProps}>
       {renderHeader("ファイル", null)}
       <div className={`file-list__message file-list__message--${modifier}`}>
         <p>{text}</p>
@@ -321,10 +352,11 @@ export function FileList({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcuts for the list container
     <div
-      className="file-list"
+      className={listClassName}
       ref={listRef}
       tabIndex={-1}
       onKeyDown={(e) => handleListKeyDown(e, order)}
+      {...dropProps}
     >
       {renderHeader("ファイル", files.length)}
       <div className="file-list__items" role="listbox" aria-multiselectable="true">

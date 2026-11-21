@@ -47,3 +47,12 @@ pub fn move_file(src: String, dest_dir: String) -> Result<String, String> {
 pub fn search_directory(path: String, query: String) -> Result<Vec<DirectoryEntry>, String> {
     filesystem::search_directory(Path::new(&path), &query)
 }
+
+/// Finder などアプリ外からドロップ中のファイルのパス。UTF-8 にできないパスは除く。
+#[tauri::command]
+pub fn read_dragged_paths() -> Vec<String> {
+    crate::drag_pasteboard::dragged_file_paths()
+        .into_iter()
+        .filter_map(|p| p.to_str().map(str::to_string))
+        .collect()
+}

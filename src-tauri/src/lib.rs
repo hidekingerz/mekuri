@@ -1,5 +1,6 @@
 mod archive;
 mod commands;
+mod drag_pasteboard;
 mod filesystem;
 pub mod launch;
 pub mod window_label;
@@ -21,6 +22,7 @@ pub fn run() {
             commands::fs::count_files,
             commands::fs::move_file,
             commands::fs::search_directory,
+            commands::fs::read_dragged_paths,
             commands::archive::list_archive_images,
             commands::archive::get_archive_image,
             commands::archive::analyze_archive_contents,

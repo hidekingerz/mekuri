@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { readDroppedPaths } from "../../api/fileDrop";
 import type { TreeNodeData } from "../../types";
-import { FILE_DRAG_MIME } from "../../utils/constants";
-import { decodeDragPaths } from "../../utils/fileDrag";
+import { dragSource } from "../../utils/fileDrag";
 import { ChevronDown, ChevronRight, FolderIcon, FolderOpenIcon } from "../Icons/Icons";
 
 type TreeNodeProps = {
@@ -42,7 +42,7 @@ export function TreeNode({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes(FILE_DRAG_MIME)) {
+    if (dragSource(e.dataTransfer.types)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       setIsDragOver(true);
@@ -53,10 +53,10 @@ export function TreeNode({
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    const srcPaths = decodeDragPaths(e.dataTransfer.getData(FILE_DRAG_MIME));
+    const srcPaths = await readDroppedPaths(e.dataTransfer);
     if (srcPaths.length > 0) {
       onFileDrop(srcPaths, entry.path);
     }

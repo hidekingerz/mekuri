@@ -583,6 +583,11 @@ body {
   outline-offset: -2px;
 }
 
+.file-list--drop-target {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
 .toolbar__banner {
   display: flex;
   align-items: center;

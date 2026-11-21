@@ -263,6 +263,7 @@ function App() {
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
             reloadTrigger={reloadTrigger}
+            onFileDrop={handleFileDrop}
           />
         </div>
       </div>

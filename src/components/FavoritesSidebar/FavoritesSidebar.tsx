@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { getFavorites, removeFavorite } from "../../api/favorites";
+import { readDroppedPaths } from "../../api/fileDrop";
 import { useContextMenu } from "../../hooks/useContextMenu";
-import { FILE_DRAG_MIME } from "../../utils/constants";
-import { decodeDragPaths } from "../../utils/fileDrag";
+import { dragSource } from "../../utils/fileDrag";
 import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
 
@@ -69,17 +69,17 @@ export function FavoritesSidebar({
               onClick={() => onSelect(path)}
               onContextMenu={(e) => openContextMenu(e, path)}
               onDragOver={(e) => {
-                if (onFileDrop && e.dataTransfer.types.includes(FILE_DRAG_MIME)) {
+                if (onFileDrop && dragSource(e.dataTransfer.types)) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setDragOverPath(path);
                 }
               }}
               onDragLeave={() => setDragOverPath(null)}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 e.preventDefault();
                 setDragOverPath(null);
-                const srcPaths = decodeDragPaths(e.dataTransfer.getData(FILE_DRAG_MIME));
+                const srcPaths = await readDroppedPaths(e.dataTransfer);
                 if (srcPaths.length > 0 && onFileDrop) {
                   onFileDrop(srcPaths, path);
                 }

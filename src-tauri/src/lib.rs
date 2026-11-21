@@ -22,6 +22,7 @@ pub fn run() {
             commands::fs::count_files,
             commands::fs::move_file,
             commands::fs::search_directory,
+            commands::fs::existing_dirs,
             commands::fs::read_dragged_paths,
             commands::archive::list_archive_images,
             commands::archive::get_archive_image,

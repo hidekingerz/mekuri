@@ -44,6 +44,15 @@ pub fn move_file(src: String, dest_dir: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn existing_dirs(paths: Vec<String>) -> Vec<String> {
+    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    filesystem::existing_dirs(&paths)
+        .into_iter()
+        .filter_map(|p| p.to_str().map(str::to_string))
+        .collect()
+}
+
+#[tauri::command]
 pub fn search_directory(path: String, query: String) -> Result<Vec<DirectoryEntry>, String> {
     filesystem::search_directory(Path::new(&path), &query)
 }

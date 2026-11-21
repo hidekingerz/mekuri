@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
 import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
 import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
+import { recordRecentFolder } from "./api/recentFolders";
 import { saveViewerSettings } from "./api/settings";
 import { showViewerContextMenu } from "./api/viewerContextMenu";
 import { SpreadViewer, type SpreadViewerHandle } from "./components/SpreadViewer/SpreadViewer";
@@ -38,6 +39,14 @@ function Viewer() {
       setArchivePath(path);
     }
   }, []);
+
+  // 開いたファイルのフォルダを「最近開いたフォルダ」に残す（前後の巻へ移ったときも更新）
+  useEffect(() => {
+    if (!archivePath) return;
+    recordRecentFolder(archivePath).catch((err) => {
+      console.error("Failed to record recent folder:", err);
+    });
+  }, [archivePath]);
 
   const fileType = archivePath ? detectFileType(archivePath) : "unknown";
   const isPdf = fileType === "pdf";

@@ -16,8 +16,10 @@ import {
   sortEntries,
 } from "../../utils/fileSort";
 import { isListKeySource, moveListIndex } from "../../utils/listKeyboard";
+import type { ResolvedRecentFolder } from "../../utils/recentFolders";
 import { isTrashShortcut } from "../../utils/trashShortcut";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
+import { RecentFolderList } from "../RecentFolders/RecentFolderList";
 
 type FileListProps = {
   folderPath: string | null;
@@ -27,6 +29,9 @@ type FileListProps = {
   reloadTrigger?: number;
   /** Finder などから一覧へ落とされたファイルを、表示中のフォルダへ移す */
   onFileDrop?: (srcPaths: string[], destDir: string) => void;
+  /** 最近開いたフォルダ（表示中のフォルダは除いたもの） */
+  recentFolders?: ResolvedRecentFolder[];
+  onRecentSelect?: (entry: ResolvedRecentFolder) => void;
 };
 
 export function FileList({
@@ -36,6 +41,8 @@ export function FileList({
   searchResults,
   reloadTrigger,
   onFileDrop,
+  recentFolders = [],
+  onRecentSelect,
 }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +56,22 @@ export function FileList({
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const listRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const recentButtonRef = useRef<HTMLButtonElement>(null);
+  const recentPopoverRef = useRef<HTMLDivElement>(null);
+
+  // ポップオーバーの外を押したら閉じる
+  useEffect(() => {
+    if (!recentOpen) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (recentPopoverRef.current?.contains(target)) return;
+      if (recentButtonRef.current?.contains(target)) return;
+      setRecentOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [recentOpen]);
 
   // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
   const requestIdRef = useRef(0);
@@ -217,39 +240,85 @@ export function FileList({
       </div>
     );
 
+  const selectRecent = (entry: ResolvedRecentFolder) => {
+    setRecentOpen(false);
+    onRecentSelect?.(entry);
+  };
+
+  const showRecentButton = folderPath !== null && recentFolders.length > 0 && !!onRecentSelect;
+
+  const renderRecentPopover = () =>
+    recentOpen &&
+    showRecentButton && (
+      <div
+        className="recent-popover"
+        ref={recentPopoverRef}
+        role="dialog"
+        aria-label="最近開いたフォルダ"
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.preventDefault();
+          e.stopPropagation();
+          setRecentOpen(false);
+          recentButtonRef.current?.focus();
+        }}
+      >
+        <RecentFolderList entries={recentFolders} onSelect={selectRecent} autoFocus />
+      </div>
+    );
+
   const renderHeader = (label: string, count: number | null) => (
     <div className="file-list__header">
       <span className="file-list__header-title">
         {label}
         {count !== null && <span className="file-list__count">{count} 件</span>}
       </span>
-      {count !== null && count > 1 && (
-        <span className="file-list__sort">
-          <select
-            className="file-list__sort-select"
-            aria-label="並び順"
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-          >
-            {(Object.keys(SORT_KEY_LABELS) as SortKey[]).map((key) => (
-              <option key={key} value={key}>
-                {SORT_KEY_LABELS[key]}
-              </option>
-            ))}
-          </select>
+      <span className="file-list__header-actions">
+        {showRecentButton && (
           <button
             type="button"
-            className="file-list__sort-dir"
-            aria-label={sortDirection === "asc" ? "昇順。クリックで降順" : "降順。クリックで昇順"}
-            title={sortDirection === "asc" ? "昇順" : "降順"}
-            onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+            ref={recentButtonRef}
+            className={`file-list__recent-btn${recentOpen ? " file-list__recent-btn--open" : ""}`}
+            aria-haspopup="dialog"
+            aria-expanded={recentOpen}
+            title="最近開いたフォルダ"
+            onClick={() => setRecentOpen((v) => !v)}
           >
-            {sortDirection === "asc" ? "↑" : "↓"}
+            最近
           </button>
-        </span>
-      )}
+        )}
+        {renderSort(count)}
+      </span>
     </div>
   );
+
+  const renderSort = (count: number | null) =>
+    count !== null &&
+    count > 1 && (
+      <span className="file-list__sort">
+        <select
+          className="file-list__sort-select"
+          aria-label="並び順"
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as SortKey)}
+        >
+          {(Object.keys(SORT_KEY_LABELS) as SortKey[]).map((key) => (
+            <option key={key} value={key}>
+              {SORT_KEY_LABELS[key]}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="file-list__sort-dir"
+          aria-label={sortDirection === "asc" ? "昇順。クリックで降順" : "降順。クリックで昇順"}
+          title={sortDirection === "asc" ? "昇順" : "降順"}
+          onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+        >
+          {sortDirection === "asc" ? "↑" : "↓"}
+        </button>
+      </span>
+    );
 
   // 検索結果表示モード
   if (searchResults !== null) {
@@ -257,6 +326,7 @@ export function FileList({
       return (
         <div className="file-list">
           {renderHeader("検索結果", 0)}
+          {renderRecentPopover()}
           <div className="file-list__message file-list__message--empty">
             <p>一致するものがありません</p>
           </div>
@@ -281,6 +351,7 @@ export function FileList({
         onKeyDown={(e) => handleListKeyDown(e, order)}
       >
         {renderHeader("検索結果", searchResults.length)}
+        {renderRecentPopover()}
         <div className="file-list__items" role="listbox" aria-multiselectable="true">
           {resultFolders.map((folder) => (
             <button
@@ -333,13 +404,31 @@ export function FileList({
   const renderMessage = (text: string, modifier: "empty" | "loading" | "error") => (
     <div className={listClassName} {...dropProps}>
       {renderHeader("ファイル", null)}
+      {renderRecentPopover()}
       <div className={`file-list__message file-list__message--${modifier}`}>
         <p>{text}</p>
       </div>
     </div>
   );
 
-  if (!folderPath) return renderMessage("フォルダを選んでください", "empty");
+  if (!folderPath) {
+    if (recentFolders.length > 0 && onRecentSelect) {
+      return (
+        <div className="file-list">
+          <div className="file-list__header">
+            <span className="file-list__header-title">最近開いたフォルダ</span>
+          </div>
+          <div className="file-list__recent">
+            <RecentFolderList entries={recentFolders} onSelect={onRecentSelect} />
+            <p className="file-list__recent-hint">
+              お気に入りやフォルダを選ぶと、ここにファイルの一覧が出ます
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return renderMessage("フォルダを選んでください", "empty");
+  }
   if (loading) return renderMessage("読み込み中...", "loading");
   if (error) return renderMessage(`読み込めませんでした: ${error}`, "error");
   if (files.length === 0) {
@@ -359,6 +448,7 @@ export function FileList({
       {...dropProps}
     >
       {renderHeader("ファイル", files.length)}
+      {renderRecentPopover()}
       <div className="file-list__items" role="listbox" aria-multiselectable="true">
         {sortedFiles.map((file) => renderFileItem(file, order))}
       </div>

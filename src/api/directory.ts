@@ -78,3 +78,9 @@ export async function trashFolder(path: string): Promise<void> {
 export async function countFiles(path: string): Promise<number> {
   return invoke<number>("count_files", { path });
 }
+
+/** 渡したパスのうち、いまフォルダとして存在するものだけを返す。 */
+export async function existingDirs(paths: string[]): Promise<string[]> {
+  if (paths.length === 0) return [];
+  return invoke<string[]>("existing_dirs", { paths });
+}

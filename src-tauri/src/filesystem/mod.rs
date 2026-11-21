@@ -310,10 +310,31 @@ fn has_subdirectories(path: &Path) -> bool {
     })
 }
 
+/// 渡したパスのうち、いまフォルダとして存在するものだけを順序を保って返す。
+pub fn existing_dirs(paths: &[PathBuf]) -> Vec<PathBuf> {
+    paths.iter().filter(|p| p.is_dir()).cloned().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn existing_dirs_keeps_only_present_folders_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a");
+        let b = dir.path().join("b");
+        let file = dir.path().join("f.zip");
+        fs::create_dir(&a).unwrap();
+        fs::create_dir(&b).unwrap();
+        fs::write(&file, b"x").unwrap();
+        let missing = dir.path().join("gone");
+        assert_eq!(
+            existing_dirs(&[b.clone(), missing, file, a.clone()]),
+            vec![b, a]
+        );
+    }
 
     #[test]
     fn trash_file_nonexistent_path() {

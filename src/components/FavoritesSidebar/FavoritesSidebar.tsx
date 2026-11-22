@@ -13,6 +13,8 @@ type FavoritesSidebarProps = {
   onFileDrop?: (srcPaths: string[], destDir: string) => void;
   /** 空状態の「フォルダを追加」ボタンから呼ぶ */
   onAddFolder?: () => void;
+  /** お気に入りを外したときに呼ぶ */
+  onFavoriteRemoved?: () => void;
 };
 
 export function FavoritesSidebar({
@@ -21,6 +23,7 @@ export function FavoritesSidebar({
   refreshTrigger,
   onFileDrop,
   onAddFolder,
+  onFavoriteRemoved,
 }: FavoritesSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
@@ -41,8 +44,9 @@ export function FavoritesSidebar({
       await removeFavorite(contextMenu.path);
       closeContextMenu();
       loadFavorites();
+      onFavoriteRemoved?.();
     }
-  }, [contextMenu, closeContextMenu, loadFavorites]);
+  }, [contextMenu, closeContextMenu, loadFavorites, onFavoriteRemoved]);
 
   return (
     <div className="favorites-sidebar">

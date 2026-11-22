@@ -100,6 +100,22 @@ mod macos {
 
         #[test]
         fn skips_items_without_file_url() {
+            let pasteboard = pasteboard_with(&[NSString::from_str("file:///tmp/a.zip")]);
+            let text_only = NSPasteboardItem::new();
+            text_only.setString_forType(&NSString::from_str("not a file"), unsafe {
+                objc2_app_kit::NSPasteboardTypeString
+            });
+            let items: Vec<Retained<ProtocolObject<dyn NSPasteboardWriting>>> =
+                vec![ProtocolObject::from_retained(text_only)];
+            assert!(pasteboard.writeObjects(&NSArray::from_retained_slice(&items)));
+            assert_eq!(
+                file_paths_on(&pasteboard),
+                vec![PathBuf::from("/tmp/a.zip")]
+            );
+        }
+
+        #[test]
+        fn returns_nothing_for_an_empty_pasteboard() {
             let pasteboard = NSPasteboard::pasteboardWithUniqueName();
             pasteboard.clearContents();
             assert!(file_paths_on(&pasteboard).is_empty());

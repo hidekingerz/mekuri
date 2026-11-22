@@ -250,6 +250,7 @@ function App() {
           refreshTrigger={favoritesRefresh}
           onFileDrop={handleFileDrop}
           onAddFolder={handleAddFolder}
+          onFavoriteRemoved={handleFavoriteAdded}
         />
         <div className="app__tree-column" style={{ width: treeColumnWidth, flexShrink: 0 }}>
           {selectedFavorite ? (

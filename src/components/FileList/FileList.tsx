@@ -60,7 +60,7 @@ export function FileList({
   const recentButtonRef = useRef<HTMLButtonElement>(null);
   const recentPopoverRef = useRef<HTMLDivElement>(null);
 
-  // ポップオーバーの外を押したら閉じる
+  // ポップオーバーの外を押したら閉じる。Esc はフォーカスがどこにあっても閉じて、ボタンへ戻す
   useEffect(() => {
     if (!recentOpen) return;
     const handlePointerDown = (e: PointerEvent) => {
@@ -69,8 +69,19 @@ export function FileList({
       if (recentButtonRef.current?.contains(target)) return;
       setRecentOpen(false);
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setRecentOpen(false);
+      recentButtonRef.current?.focus();
+    };
     window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, [recentOpen]);
 
   // 古い応答を捨てるためのリクエスト連番。フォルダ切替や再読込のたびに進める。
@@ -255,13 +266,6 @@ export function FileList({
         ref={recentPopoverRef}
         role="dialog"
         aria-label="最近開いたフォルダ"
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") return;
-          e.preventDefault();
-          e.stopPropagation();
-          setRecentOpen(false);
-          recentButtonRef.current?.focus();
-        }}
       >
         <RecentFolderList entries={recentFolders} onSelect={selectRecent} autoFocus />
       </div>

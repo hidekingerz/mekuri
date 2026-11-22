@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   formatOpenedAt,
   parseRecentFolders,
-  RECENT_FOLDERS_LIMIT,
   type RecentFolder,
   recordOpen,
   resolveRecentFolders,
@@ -29,9 +28,9 @@ describe("recordOpen", () => {
 
   it("keeps only the newest entries up to the limit", () => {
     let list: RecentFolder[] = [];
-    for (let i = 0; i <= RECENT_FOLDERS_LIMIT; i++) list = recordOpen(list, `/m/${i}/a.zip`, i);
-    expect(list).toHaveLength(RECENT_FOLDERS_LIMIT);
-    expect(list[0].folder).toBe(`/m/${RECENT_FOLDERS_LIMIT}`);
+    for (let i = 0; i <= 10; i++) list = recordOpen(list, `/m/${i}/a.zip`, i);
+    expect(list).toHaveLength(10);
+    expect(list[0].folder).toBe("/m/10");
     expect(list[list.length - 1].folder).toBe("/m/1");
   });
 
@@ -44,6 +43,15 @@ describe("parseRecentFolders", () => {
   it("keeps well-formed entries and drops the rest", () => {
     const good = { folder: "/m/A", file: "/m/A/a.zip", openedAt: 1 };
     expect(parseRecentFolders([good, { folder: 1 }, null, "x"])).toEqual([good]);
+  });
+
+  it("drops an entry when any one field has the wrong type", () => {
+    const entries = [
+      { folder: 1, file: "/m/A/a.zip", openedAt: 1 },
+      { folder: "/m/A", file: 1, openedAt: 1 },
+      { folder: "/m/A", file: "/m/A/a.zip", openedAt: "1" },
+    ];
+    expect(parseRecentFolders(entries)).toEqual([]);
   });
 
   it("returns an empty list for anything that is not an array", () => {
@@ -92,6 +100,8 @@ describe("resolveRecentFolders", () => {
   it("uses the deepest favorite when favorites are nested", () => {
     const [entry] = resolveRecentFolders(list, ["/m", "/m/manga"], null, allExist);
     expect(entry.favorite).toBe("/m/manga");
+    const [reversed] = resolveRecentFolders(list, ["/m/manga", "/m"], null, allExist);
+    expect(reversed.favorite).toBe("/m/manga");
   });
 
   it("leaves out the folder being shown and folders that no longer exist", () => {
@@ -123,6 +133,15 @@ describe("formatOpenedAt", () => {
 
   it("shows the date from a week ago on", () => {
     expect(formatOpenedAt(at("2026-11-14T09:00:00"), now)).toBe("11月14日");
+  });
+
+  it("counts calendar days across a month boundary", () => {
+    expect(formatOpenedAt(at("2026-11-30T22:00:00"), at("2026-12-01T08:00:00"))).toBe("昨日");
+    expect(formatOpenedAt(at("2026-10-29T12:00:00"), at("2026-11-02T12:00:00"))).toBe("4 日前");
+  });
+
+  it("counts calendar days across a year boundary without adding the year", () => {
+    expect(formatOpenedAt(at("2026-12-31T23:00:00"), at("2027-01-01T01:00:00"))).toBe("昨日");
   });
 
   it("adds the year for an earlier year", () => {

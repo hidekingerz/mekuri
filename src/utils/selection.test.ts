@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rangeBetween, toggleInSet } from "./selection";
+import { rangeBetween, retainInSet, toggleInSet } from "./selection";
 
 describe("toggleInSet", () => {
   it("adds an item that is not selected", () => {
@@ -38,5 +38,20 @@ describe("rangeBetween", () => {
 
   it("returns only the target when anchor is null", () => {
     expect(rangeBetween(order, null, "c")).toEqual(["c"]);
+  });
+});
+
+describe("retainInSet", () => {
+  it("drops items that are not in the list to keep", () => {
+    expect(retainInSet(new Set(["a", "b", "c"]), ["c", "a", "x"])).toEqual(new Set(["a", "c"]));
+  });
+
+  it("returns the same set when nothing is dropped", () => {
+    const set = new Set(["a", "b"]);
+    expect(retainInSet(set, ["b", "a", "c"])).toBe(set);
+  });
+
+  it("empties the set when nothing is kept", () => {
+    expect(retainInSet(new Set(["a"]), [])).toEqual(new Set());
   });
 });

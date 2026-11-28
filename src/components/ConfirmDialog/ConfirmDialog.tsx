@@ -27,11 +27,22 @@ export function ConfirmDialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
+  const openerRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog || dialog.open) return;
-    dialog.showModal();
+    if (!dialog) return;
+    if (!dialog.open) {
+      openerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dialog.showModal();
+    }
     cancelRef.current?.focus();
+    // 閉じたあとは、開く前にフォーカスのあった場所へ戻す（キー操作を続けられるように）
+    return () => {
+      const opener = openerRef.current;
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
 
   return (

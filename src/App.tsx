@@ -2,9 +2,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { countFiles, moveFiles, trashFolder } from "./api/directory";
-import { addFavorite } from "./api/favorites";
-import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
-import { openViewerWindow } from "./api/viewerWindow";
+import { addFavorite, getFavorites, removeFavorites } from "./api/favorites";
+import { emitFileMoved, emitFileTrashed, onFileChanged } from "./api/fileEvents";
+import { openViewerWindow, openViewerWindows } from "./api/viewerWindow";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
@@ -17,6 +17,7 @@ import { useRecentFolders } from "./hooks/useRecentFolders";
 import { useUpdater } from "./hooks/useUpdater";
 import { DEFAULT_TREE_COLUMN_WIDTH } from "./utils/constants";
 import { errorToString } from "./utils/errorToString";
+import { favoritesInside } from "./utils/favorites";
 import { selectionAfterRemoval } from "./utils/folderTree";
 import type { ResolvedRecentFolder } from "./utils/recentFolders";
 import { folderTrashConfirmLines, folderTrashConfirmTitle } from "./utils/trashConfirm";
@@ -75,6 +76,16 @@ function App() {
     setReloadTrigger((n) => n + 1);
   }, [searchActive, rerunSearch]);
 
+  // ファイルが消えた・動いたら、表示中の検索結果も取り直す（消えた項目を残さない）
+  useEffect(() => {
+    const unlisten = onFileChanged(() => {
+      void rerunSearch();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [rerunSearch]);
+
   const handleFavoriteSelect = useCallback((path: string) => {
     setSelectedFavorite(path);
     setSelectedFolder(null);
@@ -114,30 +125,29 @@ function App() {
     setFavoritesRefresh((n) => n + 1);
   }, []);
 
-  const handleFileDrop = useCallback(
-    async (srcPaths: string[], destDir: string) => {
-      setMoveError(null);
-      const { moved, errors } = await moveFiles(srcPaths, destDir);
-      if (errors.length > 0) {
-        setMoveError(errors.join(" / "));
-      }
-      if (moved.length === 0) return;
-      await emitFileMoved();
-      // Refresh the active search so a moved-out entry doesn't linger stale.
-      await rerunSearch();
-    },
-    [rerunSearch],
-  );
+  const handleFileDrop = useCallback(async (srcPaths: string[], destDir: string) => {
+    setMoveError(null);
+    const { moved, errors } = await moveFiles(srcPaths, destDir);
+    if (errors.length > 0) {
+      setMoveError(errors.join(" / "));
+    }
+    if (moved.length === 0) return;
+    // 表示中の検索結果は、この通知を受けた上の購読が取り直す（そのときの検索語で）
+    await emitFileMoved();
+  }, []);
 
   const handleTrashFolder = useCallback(
     async (path: string) => {
       if (!selectedFavorite) return false;
       setTrashError(null);
+      // このフォルダ自身か中にあるお気に入りは行き先を失うので、登録も一緒に外す
+      let lostFavorites: string[] = [];
       try {
-        const fileCount = await countFiles(path);
+        const [fileCount, favorites] = await Promise.all([countFiles(path), getFavorites()]);
+        lostFavorites = favoritesInside(favorites, path);
         const ok = await confirm({
           title: folderTrashConfirmTitle(path),
-          lines: folderTrashConfirmLines(fileCount),
+          lines: folderTrashConfirmLines(fileCount, lostFavorites.length),
           confirmLabel: "ゴミ箱に移動",
           danger: true,
         });
@@ -146,6 +156,14 @@ function App() {
       } catch (err) {
         setTrashError(errorToString(err));
         return false;
+      }
+      if (lostFavorites.length > 0) {
+        try {
+          await removeFavorites(lostFavorites);
+          setFavoritesRefresh((n) => n + 1);
+        } catch (err) {
+          console.error("Failed to remove favorites of a trashed folder:", err);
+        }
       }
       setSelectedFolder((current) => selectionAfterRemoval(current, path, selectedFavorite));
       await emitFileTrashed();
@@ -278,12 +296,14 @@ function App() {
           <FileList
             folderPath={selectedFolder || selectedFavorite}
             onArchiveSelect={openViewerWindow}
+            onOpenFiles={openViewerWindows}
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
             reloadTrigger={reloadTrigger}
             onFileDrop={handleFileDrop}
             recentFolders={recentFolders}
             onRecentSelect={handleRecentSelect}
+            onTrashError={setTrashError}
           />
         </div>
       </div>

@@ -142,7 +142,7 @@ Output:  void
 ```
 Command: count_files
 Input:   { path: string }
-Output:  number   // サブフォルダを含むファイル数（フォルダとシンボリックリンク先は数えない）
+Output:  number   // ファイルリストに出るファイル（アーカイブと PDF）の数。サブフォルダを含み、隠しファイル・隠しフォルダの中・フォルダ自体・シンボリックリンク先は数えない
 
 Command: trash_folder
 Input:   { path: string }

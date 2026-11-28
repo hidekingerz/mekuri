@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { searchDirectory } from "../api/directory";
 import type { DirectoryEntry } from "../types";
 
@@ -23,17 +23,24 @@ export function useFolderSearch(rootPath: string | null): FolderSearch {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryEntry[] | null>(null);
 
+  // 古い応答を捨てるための連番。検索語・ルートが変わるか検索を抜けるたびに進める
+  const requestIdRef = useRef(0);
+
   const runSearch = useCallback(async (root: string, q: string) => {
+    const requestId = ++requestIdRef.current;
     try {
-      setResults(await searchDirectory(root, q));
+      const found = await searchDirectory(root, q);
+      if (requestId === requestIdRef.current) setResults(found);
     } catch (err) {
       console.error("Search failed:", err);
-      setResults([]);
+      if (requestId === requestIdRef.current) setResults([]);
     }
   }, []);
 
   // Debounced search
   useEffect(() => {
+    // 検索語やルートが変わったら、取りに行っている途中の応答は使わない
+    requestIdRef.current++;
     if (!query || !rootPath) {
       setResults(null);
       return;
@@ -63,6 +70,7 @@ export function useFolderSearch(rootPath: string | null): FolderSearch {
   }, [isActive, rootPath, query, runSearch]);
 
   const clear = useCallback(() => {
+    requestIdRef.current++;
     setQuery("");
     setResults(null);
   }, []);

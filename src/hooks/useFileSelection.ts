@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { rangeBetween, toggleInSet } from "../utils/selection";
+import { rangeBetween, retainInSet, toggleInSet } from "../utils/selection";
 
 export function useFileSelection() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -12,11 +12,8 @@ export function useFileSelection() {
 
   const selectRange = useCallback(
     (order: string[], target: string) => {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        for (const p of rangeBetween(order, anchor, target)) next.add(p);
-        return next;
-      });
+      // Finder と同じく、起点から target までの範囲で選択を置き換える（縮めることもできる）
+      setSelected(new Set(rangeBetween(order, anchor, target)));
       setAnchor((prev) => prev ?? target);
     },
     [anchor],
@@ -32,5 +29,11 @@ export function useFileSelection() {
     setAnchor(null);
   }, []);
 
-  return { selected, toggle, selectRange, selectOnly, clear };
+  /** paths に無いものを選択から外す（一覧から消えたファイルを残さない）。起点が消えたら起点も忘れる。 */
+  const retain = useCallback((paths: string[]) => {
+    setSelected((prev) => retainInSet(prev, paths));
+    setAnchor((prev) => (prev !== null && !paths.includes(prev) ? null : prev));
+  }, []);
+
+  return { selected, toggle, selectRange, selectOnly, clear, retain };
 }

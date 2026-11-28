@@ -23,6 +23,11 @@ describe("encodeDragPaths / decodeDragPaths", () => {
   it("drops non-string entries from malformed JSON arrays", () => {
     expect(decodeDragPaths('["/a/b.zip", 1, null]')).toEqual(["/a/b.zip"]);
   });
+
+  it("returns nothing for a broken or non-array payload", () => {
+    expect(decodeDragPaths('["/a/b.zip"')).toEqual([]);
+    expect(decodeDragPaths("[1")).toEqual([]);
+  });
 });
 
 describe("dragSource", () => {

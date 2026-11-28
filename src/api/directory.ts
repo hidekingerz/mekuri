@@ -74,7 +74,7 @@ export async function trashFolder(path: string): Promise<void> {
   return invoke<void>("trash_folder", { path });
 }
 
-/** フォルダ内のファイル数をサブフォルダまで数える。 */
+/** フォルダ内の、ファイルリストに出るファイル（アーカイブと PDF）をサブフォルダまで数える。 */
 export async function countFiles(path: string): Promise<number> {
   return invoke<number>("count_files", { path });
 }

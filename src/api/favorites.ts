@@ -26,3 +26,15 @@ export async function removeFavorite(path: string): Promise<void> {
     await store.set(FAVORITES_KEY, favorites);
   }
 }
+
+/** 渡したお気に入りをまとめて外す。 */
+export async function removeFavorites(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const store = await getStore({ [FAVORITES_KEY]: [] });
+  const favorites = (await store.get<string[]>(FAVORITES_KEY)) ?? [];
+  const removing = new Set(paths);
+  await store.set(
+    FAVORITES_KEY,
+    favorites.filter((fav) => !removing.has(fav)),
+  );
+}

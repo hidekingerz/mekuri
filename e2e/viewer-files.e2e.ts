@@ -607,16 +607,20 @@ test.describe("メインウィンドウの一覧の並び順に合わせた移�
 
     test("ゴミ箱へ移したあとは、一覧での次のファイル（無ければ前）を開く", async ({ viewer }) => {
       await viewer.page.keyboard.press("Alt+ArrowUp");
-      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
-      // v3.zip の次は v2.zip（名前の順なら、次は無く、前の v2.zip）
-      await viewer.page.keyboard.press("Delete");
-      await viewer.confirmTrash();
-      await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
-
-      // v2.zip は末尾なので、前の v1.zip へ
-      await viewer.page.keyboard.press("Delete");
-      await viewer.confirmTrash();
+      await viewer.page.keyboard.press("Alt+ArrowUp");
       await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+      // 一覧は v1, v3, v2 の順。v1.zip の次は v3.zip（名前の順なら v2.zip）
+      await viewer.page.keyboard.press("Delete");
+      await viewer.confirmTrash();
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      expect(await viewer.calls("trash_file")).toEqual([{ path: "/lib/v1.zip" }]);
+
+      // 残りは v3, v2。末尾の v2.zip を消すと、次が無いので前の v3.zip へ
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
+      await viewer.page.keyboard.press("Delete");
+      await viewer.confirmTrash();
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
     });
 
     test("別のウィンドウで消されたファイルからは、消える前の位置の前後へ移れる", async ({
@@ -680,6 +684,34 @@ test.describe("メインウィンドウの一覧の並び順に合わせた移�
       await expect(viewer.button("前のファイル")).toBeEnabled();
       await viewer.page.keyboard.press("Alt+ArrowUp");
       await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+    });
+  });
+
+  test.describe("一覧の取得が遅く、あとから始めた取得のほうが先に返る", () => {
+    test.use({
+      mockOptions: {
+        ...base,
+        viewerFile: "/lib/v1.zip",
+        fileMeta: {
+          "/lib/v1.zip": { size: 30 },
+          "/lib/v2.zip": { size: 10 },
+          "/lib/v3.zip": { size: 20 },
+        },
+        delay: { read_directory: 800 },
+      },
+    });
+
+    test("遅れて返った古い結果で、前後のボタンが前の並び順に戻らない", async ({ viewer }) => {
+      // 開いたときの取得（名前の順）は 800ms かかる。次の取得からはすぐ返す
+      await viewer.setDelay("read_directory", 0);
+      await viewer.sortChangedElsewhere({ key: "size", direction: "asc" });
+      // サイズの昇順では v1.zip は末尾（名前の順では先頭）
+      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+      // 開いたときの取得が返るのを待つ
+      await viewer.page.waitForTimeout(1000);
+      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await expect(viewer.button("次のファイル")).toBeDisabled();
     });
   });
 

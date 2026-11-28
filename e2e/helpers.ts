@@ -327,6 +327,18 @@ export class ViewerWindow {
     }, cmd);
   }
 
+  /** モックの応答の遅れを、途中で変える。 */
+  async setDelay(cmd: string, ms: number) {
+    await this.page.evaluate(
+      ([c, m]) => {
+        const opts = (window as unknown as { __MOCK_OPTS__: { delay?: Record<string, number> } })
+          .__MOCK_OPTS__;
+        opts.delay = { ...opts.delay, [c]: m };
+      },
+      [cmd, ms] as const,
+    );
+  }
+
   /** 右クリックのあと、コンテキストメニューが出たかどうか。 */
   async menuShown(): Promise<boolean> {
     return this.page.evaluate(

@@ -45,10 +45,14 @@ export function useSiblingNavigation(
     }
 
     let cancelled = false;
+    // 取得の通し番号。あとから始めた取得が先に返ることがあるので、遅れて返った古い結果は使わない
+    let latest = 0;
     const refresh = async () => {
+      latest += 1;
+      const id = latest;
       try {
         const { entries, sort } = await getSiblingFiles(archivePath);
-        if (cancelled) return;
+        if (cancelled || id !== latest) return;
         setSiblings((prev) => ({
           entries,
           sort,

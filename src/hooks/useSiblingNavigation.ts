@@ -18,6 +18,9 @@ const NO_SIBLINGS: Siblings = { archives: [], currentIndex: -1 };
  * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↓/↑ のキー操作と
  * マウスの戻る/進むボタンを登録し、ボタンやメニューから呼ぶための移動関数と端判定を返す。
  */
+/** 確認ダイアログが開いているあいだは、裏でファイルを切り替えない。 */
+const dialogOpen = () => document.querySelector("dialog[open]") !== null;
+
 export function useSiblingNavigation(
   archivePath: string | null,
   onNavigate: (newPath: string) => void,
@@ -57,7 +60,8 @@ export function useSiblingNavigation(
         // 移動時は最新の一覧で判定する (保持中の一覧が古い可能性があるため)
         const { archives } = await getSiblingArchives(archivePath);
         const newPath = siblingByPath(archives, archivePath, direction);
-        if (!newPath) return;
+        // 一覧を待つあいだに確認ダイアログが開いていたら、その裏では切り替えない
+        if (!newPath || dialogOpen()) return;
 
         onNavigate(newPath);
         await getCurrentWindow().setTitle(appTitle(fileNameFromPath(newPath)));
@@ -73,9 +77,6 @@ export function useSiblingNavigation(
 
   useEffect(() => {
     if (!archivePath) return;
-
-    // 確認ダイアログが開いているあいだは、裏でファイルを切り替えない
-    const dialogOpen = () => document.querySelector("dialog[open]") !== null;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const direction = siblingDirectionForKey(e);

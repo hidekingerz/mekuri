@@ -95,5 +95,8 @@ describe("compareNatural", () => {
   it("treats characters outside the basic plane as one character", () => {
     expect(compareNatural("😀1", "😀2")).toBe(-1);
     expect(compareNatural("a😀", "a😁")).toBe(-1);
+    // 文字コード順（Rust の char の順）。UTF-16 の順では絵文字が半角カナより前になってしまう
+    expect(compareNatural("ｱ", "😀")).toBe(-1);
+    expect(compareNatural("😀", "ｱ")).toBe(1);
   });
 });

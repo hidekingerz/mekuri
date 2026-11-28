@@ -29,16 +29,19 @@ export function useArchiveLoader(archivePath: string | null) {
   // 下の状態がどのファイルのものか。ファイルが変わった直後の描画では、まだ前のファイルの
   // 状態が残っているので、そのあいだは読み込み中として扱う
   const [analyzedPath, setAnalyzedPath] = useState<string | null>(null);
-  const currentPathRef = useRef(archivePath);
-  currentPathRef.current = archivePath;
+  // 読み込みの通し番号。ファイルを開き直すたびに進める。展開を始めたあとで番号が進んでいたら、
+  // その展開の結果は使わない（別のファイルへ移って戻った場合も、前の展開は古い）
+  const loadIdRef = useRef(0);
 
   // Analyze archive contents when archive path changes
   useEffect(() => {
+    loadIdRef.current += 1;
+    // PDF を開いているあいだは path が無い。戻ってきたときに前の状態を使わないよう、印を消す
+    setAnalyzedPath(archivePath);
     if (!archivePath) return;
     const path = archivePath;
 
     let cancelled = false;
-    setAnalyzedPath(path);
     setLoading(true);
     setNestedArchives(null);
     // 前のファイルのネストの一覧を持ち越さない（開けなかったファイルで「一覧に戻る」が出てしまう）
@@ -84,7 +87,8 @@ export function useArchiveLoader(archivePath: string | null) {
     async (nestedName: string) => {
       if (!archivePath) return;
       // 展開のあいだに別のファイルへ移っていたら、結果は使わない（移動先の表示を上書きしない）
-      const stillCurrent = () => currentPathRef.current === archivePath;
+      const loadId = loadIdRef.current;
+      const stillCurrent = () => loadIdRef.current === loadId;
       setLoading(true);
       setError(null);
 

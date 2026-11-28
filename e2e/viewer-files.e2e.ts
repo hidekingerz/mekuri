@@ -416,3 +416,160 @@ test.describe("開けないファイルへ移ってきたとき", () => {
     expect(menu.find((item) => item.text === "ウィンドウを閉じる")?.enabled).toBe(true);
   });
 });
+
+test.describe("画像が無いアーカイブ（ゴミ箱）", () => {
+  test.use({
+    mockOptions: { tree: TREE, viewerFile: "/lib/v1.zip", archives: { "/lib/v1.zip": [] } },
+  });
+
+  test("その画面からゴミ箱へ移せる", async ({ viewer }) => {
+    await viewer.page.keyboard.press("Delete");
+    await expect(viewer.dialog()).toContainText("v1.zip");
+    await viewer.confirmTrash();
+    await expect.poll(() => viewer.calls("trash_file")).toEqual([{ path: "/lib/v1.zip" }]);
+    await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
+  });
+});
+
+test.describe("ネストしたアーカイブ（選択の画面と、展開した中身）", () => {
+  test.use({
+    mockOptions: {
+      tree: { "/lib": ["v1.zip", "v2.zip", "v3.zip", "v4.pdf"] },
+      viewerFile: "/lib/v2.zip",
+      nested: { "/lib/v2.zip": ["inner/第1話.zip", "inner/第2話.zip"] },
+      archives: {
+        "/lib/v2.zip!/inner/第1話.zip": [],
+        "/lib/v3.zip": [],
+      },
+      broken: { "/lib/v1.zip": "Failed to read ZIP archive: invalid Zip archive" },
+    },
+  });
+
+  test("選択の画面からゴミ箱へ移せる", async ({ viewer }) => {
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    await viewer.page.keyboard.press("Delete");
+    await expect(viewer.dialog()).toContainText("v2.zip");
+    await viewer.confirmTrash();
+    await expect.poll(() => viewer.calls("trash_file")).toEqual([{ path: "/lib/v2.zip" }]);
+  });
+
+  test("一覧へ戻ると、タイトルからページ数が消える", async ({ viewer }) => {
+    await viewer.nestedItems().nth(1).click();
+    await viewer.page.keyboard.press("Space");
+    await expect.poll(() => viewer.title()).toBe("v2.zip [2/6] - mekuri");
+    await viewer.button("アーカイブ一覧に戻る").click();
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    await expect.poll(() => viewer.title()).toBe("v2.zip - mekuri");
+  });
+
+  test("展開した中身に画像が無いときも、一覧へ戻れる", async ({ viewer }) => {
+    await viewer.nestedItems().first().click();
+    await expect(viewer.notice()).toContainText("このアーカイブには画像がありません");
+    await viewer.button("アーカイブ一覧に戻る").click();
+    await expect(viewer.nestedItems()).toHaveCount(2);
+  });
+
+  test("開けないファイルや空のファイルへ移ったあとは、「一覧に戻る」を出さない", async ({
+    viewer,
+  }) => {
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    await viewer.page.keyboard.press("Alt+ArrowUp");
+    await expect(viewer.notice()).toContainText("壊れている");
+    await expect(viewer.button("アーカイブ一覧に戻る")).toHaveCount(0);
+    await viewer.page.keyboard.press("Alt+ArrowDown");
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    await viewer.page.keyboard.press("Alt+ArrowDown");
+    await expect(viewer.notice()).toContainText("このアーカイブには画像がありません");
+    await expect(viewer.button("アーカイブ一覧に戻る")).toHaveCount(0);
+  });
+});
+
+test.describe("ネストを読んでいる途中で PDF へ移って戻るとき", () => {
+  test.use({
+    mockOptions: {
+      tree: { "/lib": ["v2.zip", "v4.pdf"] },
+      viewerFile: "/lib/v2.zip",
+      nested: { "/lib/v2.zip": ["inner/第1話.zip", "inner/第2話.zip"] },
+    },
+  });
+
+  test("選択の画面のタイトルに、前に読んでいたページ数を付けない", async ({ viewer }) => {
+    await viewer.nestedItems().nth(1).click();
+    await viewer.page.keyboard.press("Space");
+    await expect.poll(() => viewer.title()).toBe("v2.zip [2/6] - mekuri");
+    // モックでは PDF は開けないファイルとして表示される
+    await viewer.page.keyboard.press("Alt+ArrowDown");
+    await expect(viewer.notice()).toBeVisible();
+    await expect.poll(() => viewer.title()).toBe("v4.pdf - mekuri");
+    const imagesBefore = (await viewer.calls("get_archive_image")).length;
+    await viewer.page.keyboard.press("Alt+ArrowUp");
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    await viewer.page.waitForTimeout(300);
+    expect(await viewer.title()).toBe("v2.zip - mekuri");
+    // 前に読んでいたページを、一瞬でも描き直そうとしない
+    expect((await viewer.calls("get_archive_image")).length).toBe(imagesBefore);
+  });
+});
+
+test.describe("ネストの展開中に別のファイルへ移って、すぐ戻るとき", () => {
+  test.use({
+    mockOptions: {
+      ...base,
+      nested: { "/lib/v2.zip": ["inner/第1話.zip", "inner/第2話.zip"] },
+      delay: { extract_nested_archive: 1000 },
+    },
+  });
+
+  test("選んでいないのに、前の展開の中身が開くことはない", async ({ viewer }) => {
+    await viewer.nestedItems().nth(1).click();
+    await viewer.page.keyboard.press("Alt+ArrowDown");
+    await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+    await viewer.page.keyboard.press("Alt+ArrowUp");
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    // 前の展開が終わるのを待っても、選択の画面のまま
+    await viewer.page.waitForTimeout(1300);
+    await expect(viewer.nestedItems()).toHaveCount(2);
+    expect(await viewer.title()).toBe("v2.zip - mekuri");
+  });
+});
+
+test.describe("一覧の取得に時間がかかるとき", () => {
+  test.use({ mockOptions: { ...base, delay: { read_directory: 400 } } });
+
+  test("Alt+↓ の直後に確認を出したら、確認の裏でファイルを切り替えない", async ({ viewer }) => {
+    await viewer.page.keyboard.press("Alt+ArrowDown");
+    await viewer.page.keyboard.press("Delete");
+    await expect(viewer.dialog()).toContainText("v2.zip");
+    await viewer.page.waitForTimeout(900);
+    await expect(viewer.dialog()).toContainText("v2.zip");
+    expect(await viewer.currentFile()).toBe("v2.zip");
+  });
+});
+
+test.describe("ゴミ箱への移動の途中で、別のファイルへ移ったとき", () => {
+  test.use({ mockOptions: { ...base, delay: { trash_file: 700 } } });
+
+  test("移動が終わっても、移った先のファイルを開いたままにする", async ({ viewer }) => {
+    await viewer.page.keyboard.press("Delete");
+    await viewer.confirmTrash();
+    await viewer.page.keyboard.press("Alt+ArrowUp");
+    await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+    await expect.poll(() => viewer.folderContents("/lib")).not.toContain("v2.zip");
+    await viewer.page.waitForTimeout(300);
+    expect(await viewer.currentFile()).toBe("v1.zip");
+    expect(await viewer.title()).toBe("v1.zip [1/6] - mekuri");
+  });
+});
+
+test.describe("モックの失敗の設定", () => {
+  test("あとから足した失敗も効く", async ({ viewer }) => {
+    await viewer.page.evaluate(() => {
+      (
+        window as unknown as { __MOCK_OPTS__: { fail?: Record<string, string> } }
+      ).__MOCK_OPTS__.fail = { trash_file: "Operation not permitted" };
+    });
+    await viewer.page.keyboard.press("Delete");
+    await viewer.confirmTrash();
+    await expect(viewer.alerts()).toHaveCount(1);
+  });
+});

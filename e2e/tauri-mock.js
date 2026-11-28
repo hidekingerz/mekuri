@@ -46,7 +46,6 @@
     recentFolders: opts.recentFolders || [],
     ...(opts.viewerSettings ? { viewerSettings: opts.viewerSettings } : {}),
   };
-  const fail = opts.fail || {};
   const isDir = (p) => p in tree;
   const parent = (p) => p.slice(0, p.lastIndexOf("/"));
   const base = (p) => p.slice(p.lastIndexOf("/") + 1);
@@ -126,7 +125,7 @@
     async invoke(cmd, args = {}) {
       calls.push({ cmd, args: JSON.parse(JSON.stringify(args ?? {})) });
       if (opts.delay?.[cmd]) await new Promise((resolve) => setTimeout(resolve, opts.delay[cmd]));
-      if (cmd in fail) throw fail[cmd];
+      if (opts.fail && cmd in opts.fail) throw opts.fail[cmd];
       switch (cmd) {
         case "plugin:store|load":
           return 1;

@@ -92,6 +92,9 @@ function Viewer() {
       await trashFile(currentPath);
       await emitFileTrashed();
 
+      // 移しているあいだに利用者が別のファイルへ移っていたら、そのファイルを開いたままにする
+      if (archivePathRef.current !== currentPath) return;
+
       if (nextPath) {
         navigateToArchive(nextPath);
         await getCurrentWindow().setTitle(appTitle(fileNameFromPath(nextPath)));
@@ -192,6 +195,17 @@ function Viewer() {
 
   const closeWindow = () => void getCurrentWindow().close();
 
+  const showsNestedList =
+    !isPdf && archive.nestedArchives !== null && archive.nestedArchives.length > 0;
+  const showsPages =
+    archivePath !== null && !error && !loading && !showsNestedList && pageCount > 0;
+
+  // ページを表示していない画面（開けない・読み込み中・ネストの選択・空）では、タイトルにページ数を付けない
+  useEffect(() => {
+    if (!archivePath || showsPages) return;
+    void getCurrentWindow().setTitle(appTitle(fileNameFromPath(archivePath)));
+  }, [archivePath, showsPages]);
+
   // ゴミ箱の確認と、移動・ゴミ箱の失敗の表示。開けないファイルや空のファイルの画面でも
   // ゴミ箱へ移せるよう、どの画面にも置く
   const overlays = (
@@ -243,7 +257,7 @@ function Viewer() {
   }
 
   // Show nested archive selection (archive mode only)
-  if (!isPdf && archive.nestedArchives && archive.nestedArchives.length > 0) {
+  if (showsNestedList && archive.nestedArchives) {
     return (
       <div className="viewer viewer--nested">
         {overlays}
@@ -288,6 +302,7 @@ function Viewer() {
           title={isPdf ? "この PDF にはページがありません" : "このアーカイブには画像がありません"}
           siblingNav={siblingNav}
           onClose={closeWindow}
+          onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         />
       </div>
     );

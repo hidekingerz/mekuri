@@ -54,6 +54,10 @@ export function buildPageGroups(
     case "fit":
       groupSize = Number.isFinite(fitPageCount) ? Math.max(1, Math.floor(fitPageCount)) : 1;
       break;
+    default:
+      // 保存された設定が知らない値でも止まらないよう、見開きとして扱う
+      groupSize = 2;
+      coverAlone = true;
   }
 
   const groups: PageGroup[] = [];

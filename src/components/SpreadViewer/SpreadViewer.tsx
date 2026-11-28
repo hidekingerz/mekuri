@@ -92,7 +92,12 @@ export function SpreadViewer({
   ref,
 }: SpreadViewerProps) {
   const [currentPage, setCurrentPage] = useState(initialPage ?? 0);
-  const [srcs, setSrcs] = useState<(string | null)[]>([]);
+  // 読み込んだ画像と、それがどの組のものか。組が変わった直後に前の組の画像を
+  // 別のページへ当ててしまうと、その画像の大きさで横長と取り違える
+  const [loaded, setLoaded] = useState<{ groupKey: string; srcs: string[] }>({
+    groupKey: "",
+    srcs: [],
+  });
   const [loadError, setLoadError] = useState<string | null>(null);
   const { viewMode, readingDirection, setViewMode, toggleReadingDirection } =
     useViewerSettings(defaultReadingDirection);
@@ -145,13 +150,12 @@ export function SpreadViewer({
     let cancelled = false;
     const pages = groupKey === "" ? [] : groupKey.split(",").map(Number);
 
-    setSrcs(pages.map(() => null));
     setLoadError(null);
     if (pages.length === 0) return;
 
     Promise.all(pages.map((p) => getPageDataUrl(p)))
-      .then((loaded) => {
-        if (!cancelled) setSrcs(loaded);
+      .then((srcs) => {
+        if (!cancelled) setLoaded({ groupKey, srcs });
       })
       .catch((err) => {
         if (!cancelled) setLoadError(errorToString(err));
@@ -161,6 +165,9 @@ export function SpreadViewer({
       cancelled = true;
     };
   }, [getPageDataUrl, groupKey]);
+
+  // 「前へ」「最後へ」で着いた組の最後のページ（それ以外の移動では null）
+  const backAnchorRef = useRef<number | null>(null);
 
   const navigate = useCallback(
     (action: NavigationAction) => {
@@ -172,7 +179,12 @@ export function SpreadViewer({
             : action === "first"
               ? groups[0]
               : groups[groups.length - 1];
-      if (target) setCurrentPage(target[0]);
+      if (!target) return;
+      setCurrentPage(target[0]);
+      // 後ろから来たときは、移動先の組の最後のページを覚えておく。読み込んでから横長と分かって
+      // 組み直しても、そのページを含む組を出せば、手前のページへ飛ばない
+      backAnchorRef.current =
+        action === "prev" || action === "last" ? target[target.length - 1] : null;
     },
     [groups, groupIndex],
   );
@@ -183,7 +195,9 @@ export function SpreadViewer({
   // Keyboard navigation (direction-aware)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const action = navigationForKey(e.key, isRtl);
+      // 確認ダイアログが開いているあいだは、その中のキー操作に任せる
+      if (document.querySelector("dialog[open]")) return;
+      const action = navigationForKey(e, isRtl);
       if (!action) return;
       e.preventDefault();
       navigate(action);
@@ -194,18 +208,20 @@ export function SpreadViewer({
   }, [navigate, isRtl]);
 
   // Mouse wheel navigation
+  // 最後にホイールでページを送った時刻。ページを送るたびに effect が作り直されるので ref に持つ
+  const lastWheelTimeRef = useRef(0);
   useEffect(() => {
-    let lastWheelTime = 0;
     const wheelThrottleMs = 200;
 
     function handleWheel(e: WheelEvent) {
       e.preventDefault();
+      if (document.querySelector("dialog[open]")) return;
+      const action = navigationForWheel(e);
+      if (!action) return;
       const now = Date.now();
-      if (now - lastWheelTime < wheelThrottleMs) return;
-      lastWheelTime = now;
-
-      const action = navigationForWheel(e.deltaY);
-      if (action) navigate(action);
+      if (now - lastWheelTimeRef.current < wheelThrottleMs) return;
+      lastWheelTimeRef.current = now;
+      navigate(action);
     }
 
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -219,8 +235,12 @@ export function SpreadViewer({
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const ratio = progressRatio(e.clientX, e.currentTarget.getBoundingClientRect(), isRtl);
-      const group = groups[groupIndexFromRatio(ratio, groups.length)];
-      if (group) setCurrentPage(group[0]);
+      const index = groupIndexFromRatio(ratio, groups.length);
+      const group = groups[index];
+      if (!group) return;
+      setCurrentPage(group[0]);
+      // 端をクリックして最後の組へ飛んだときは、End と同じく最後のページを覚える
+      backAnchorRef.current = index === groups.length - 1 ? group[group.length - 1] : null;
     },
     [groups, isRtl],
   );
@@ -242,6 +262,8 @@ export function SpreadViewer({
       const aspect = img.naturalWidth / img.naturalHeight;
       if (isWidePage(aspect)) {
         setWidePages((prev) => (prev.has(pageIndex) ? prev : new Set(prev).add(pageIndex)));
+        // 後ろから来て組み直しになるときは、覚えておいたページを含む組へ寄せる
+        if (backAnchorRef.current !== null) setCurrentPage(backAnchorRef.current);
         return;
       }
       // Latch the first measured portrait page aspect (spec: measure the first displayed page).
@@ -251,6 +273,9 @@ export function SpreadViewer({
     [],
   );
 
+  // いまの組のために読み込んだ画像だけを出す（読み込み中は空のまま）
+  const srcs: (string | null)[] =
+    loaded.groupKey === groupKey ? loaded.srcs : currentGroup.map(() => null);
   const displayPages = isRtl ? [...currentGroup].reverse() : currentGroup;
   const displaySrcs = isRtl ? [...srcs].reverse() : srcs;
   const isPair = displayPages.length === 2;

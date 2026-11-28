@@ -8,7 +8,8 @@
 //   window.__MOCK_STORE__    settings.json の中身（favorites, recentFolders）
 //   window.__MOCK_DRAGGED__  read_dragged_paths が返すパス（Finder からのドロップの再現用）
 //   window.__MOCK_EMIT__     アプリ内イベントを届ける（別ウィンドウからの通知の再現用）
-// 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, dragged, fail: { cmd: "message" }, monitor: null }
+// 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, viewerSettings, archives, dragged,
+//   fail: { cmd: "message" }, monitor: null }
 // を置くと初期値を変えられる。
 (() => {
   const opts = window.__MOCK_OPTS__ || {};
@@ -38,6 +39,7 @@
   const store = {
     favorites: opts.favorites || ["/m/manga", "/m/mag"],
     recentFolders: opts.recentFolders || [],
+    ...(opts.viewerSettings ? { viewerSettings: opts.viewerSettings } : {}),
   };
   const fail = opts.fail || {};
   const isDir = (p) => p in tree;
@@ -76,6 +78,16 @@
   const removeDir = (dir) => {
     for (const c of tree[dir] || []) if (c.endsWith("/")) removeDir(`${dir}/${c.slice(0, -1)}`);
     delete tree[dir];
+  };
+  // opts.archives = { "<アーカイブのパス>": [[名前, 幅, 高さ], ...] }。無いパスは縦長 10 ページ
+  const archivePages = (path) => {
+    const custom = opts.archives?.[path];
+    if (custom) return custom;
+    return Array.from({ length: 10 }, (_, i) => [
+      `${String(i + 1).padStart(3, "0")}.jpg`,
+      700,
+      1000,
+    ]);
   };
   const callbacks = new Map();
   const listeners = new Map(); // event -> [handler の id]
@@ -180,6 +192,24 @@
           );
           removeDir(args.path);
           return null;
+        }
+        // ---- ビューワー: アーカイブの中身 ----
+        // 画像は、ページ番号を描いた SVG（naturalWidth / naturalHeight が指定どおりになる）
+        case "analyze_archive_contents": {
+          const pages = archivePages(args.archivePath);
+          return pages.length === 0
+            ? { type: "Empty" }
+            : { type: "Images", names: pages.map((p) => p[0]) };
+        }
+        case "list_archive_images":
+          return archivePages(args.archivePath).map((p) => p[0]);
+        case "get_archive_image": {
+          const pages = archivePages(args.archivePath);
+          const index = pages.findIndex((p) => p[0] === args.entryName);
+          if (index < 0) throw `Entry not found: ${args.entryName}`;
+          const [, w, h] = pages[index];
+          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="${w > h ? "#fde68a" : "#e0f2fe"}" stroke="#111" stroke-width="8"/><text x="50%" y="50%" font-size="${Math.min(w, h) / 3}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">${index + 1}</text></svg>`;
+          return `data:image/svg+xml;base64,${btoa(svg)}`;
         }
         case "search_directory": {
           // 名前に query を含むものを再帰で集める（filesystem/mod.rs:218-）

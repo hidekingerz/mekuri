@@ -10,6 +10,10 @@ export type MockOptions = {
   recentFolders?: { folder: string; file: string; openedAt: number }[];
   fail?: Record<string, string>;
   monitor?: null;
+  /** 保存済みのビューワーの設定（無ければ既定で開く） */
+  viewerSettings?: { width: number; height: number; viewMode?: string; readingDirection?: string };
+  /** アーカイブのパス → ページ（名前、画像の幅、高さ）。無いパスは縦長 10 ページ */
+  archives?: Record<string, [string, number, number][]>;
 };
 
 type Call = { cmd: string; args: Record<string, unknown> };
@@ -153,11 +157,114 @@ export class MainWindow {
   cancelTrash = () => this.dialog().getByRole("button", { name: "キャンセル" }).click();
 }
 
+/** 縦長と横長のページの大きさ（幅、高さ）。 */
+export const PORTRAIT: [number, number] = [700, 1000];
+export const LANDSCAPE: [number, number] = [1400, 1000];
+
+/** ページの大きさの並びから、モックに渡すアーカイブの中身を作る。 */
+export function pagesOf(sizes: [number, number][]): [string, number, number][] {
+  return sizes.map(([w, h], i) => [`${String(i + 1).padStart(3, "0")}.jpg`, w, h]);
+}
+
+/** ビューワーウィンドウの操作と読み取り。 */
+export class ViewerWindow {
+  constructor(readonly page: Page) {}
+
+  /** 「2 / 6」のような位置の表示 */
+  position = () => this.page.locator(".spread-viewer__info");
+  progress = () => this.page.getByRole("progressbar");
+  directionButton = () => this.page.locator('button[aria-label^="読み方向"]');
+  dialog = () => this.page.locator("dialog.confirm-dialog");
+  button = (name: string) => this.page.getByRole("button", { name, exact: true });
+
+  /** 画面に出ているページ番号を、左から右の順で返す。 */
+  async shownPages(): Promise<number[]> {
+    const cells = await this.page.locator(".spread-viewer__cell").evaluateAll((els) =>
+      els.map((el) => {
+        const img = el.querySelector("img");
+        return {
+          x: el.getBoundingClientRect().x,
+          n: img ? Number.parseInt(img.alt, 10) : Number.NaN,
+        };
+      }),
+    );
+    return cells.sort((a, b) => a.x - b.x).map((c) => c.n);
+  }
+
+  /** 画像の読み込みと組み直しが落ち着いたあとの、画面のページ番号。 */
+  async settledPages(): Promise<number[]> {
+    let last = "";
+    await expect
+      .poll(
+        async () => {
+          const now = JSON.stringify(await this.shownPages());
+          const stable = now === last && !now.includes("null");
+          last = now;
+          return stable;
+        },
+        { intervals: [150] },
+      )
+      .toBe(true);
+    return this.shownPages();
+  }
+
+  async title(): Promise<string | undefined> {
+    return this.page.evaluate(() => {
+      const calls = (window as unknown as { __MOCK_CALLS__: Call[] }).__MOCK_CALLS__;
+      const last = calls.filter((c) => c.cmd === "plugin:window|set_title").pop();
+      return last?.args.value as string | undefined;
+    });
+  }
+
+  async savedSettings(): Promise<Record<string, unknown> | undefined> {
+    return this.page.evaluate(
+      () =>
+        (window as unknown as { __MOCK_STORE__: { viewerSettings?: Record<string, unknown> } })
+          .__MOCK_STORE__.viewerSettings,
+    );
+  }
+
+  /** ページ領域の左半分か右半分をクリックする。 */
+  async clickHalf(side: "left" | "right") {
+    const box = await this.page.locator(".spread-viewer__pages").boundingBox();
+    if (!box) throw new Error("pages area is not visible");
+    const x = box.x + box.width * (side === "left" ? 0.25 : 0.75);
+    await this.page.mouse.click(x, box.y + box.height / 2);
+  }
+
+  /** プログレスバーの、左端からの割合の位置をクリックする。 */
+  async clickProgress(fromLeft: number) {
+    const box = await this.progress().boundingBox();
+    if (!box) throw new Error("progress bar is not visible");
+    await this.page.mouse.click(box.x + box.width * fromLeft, box.y + box.height / 2);
+  }
+
+  /** 短い間隔で wheel を続けて届ける（トラックパッドの慣性を模す）。 */
+  async wheelBurst(count: number, intervalMs: number, deltaY = 120) {
+    await this.page.evaluate(
+      async ([n, interval, dy]) => {
+        for (let i = 0; i < n; i++) {
+          window.dispatchEvent(
+            new WheelEvent("wheel", { deltaY: dy, bubbles: true, cancelable: true }),
+          );
+          await new Promise((resolve) => setTimeout(resolve, interval));
+        }
+      },
+      [count, intervalMs, deltaY] as const,
+    );
+  }
+}
+
+/** ビューワーで開くファイルの既定（モックの作者A の 1 冊目）。 */
+export const VIEWER_FILE = "/m/manga/作者A/a1.zip";
+
 type Fixtures = {
   /** モックの初期値。test.use({ mockOptions: {...} }) で変える */
   mockOptions: MockOptions;
   /** モックを入れて開いたメインウィンドウ */
   main: MainWindow;
+  /** モックを入れて VIEWER_FILE を開いたビューワーウィンドウ */
+  viewer: ViewerWindow;
   /** コンソールのエラーを集め、テストの終わりに 1 件でもあれば失敗させる */
   consoleErrors: string[];
 };
@@ -181,6 +288,12 @@ export const test = base.extend<Fixtures>({
     await openWithMock(page, "/index.html", mockOptions);
     await expect(page.locator(".favorites-sidebar__item").first()).toBeVisible();
     await use(new MainWindow(page));
+  },
+  viewer: async ({ page, mockOptions }, use) => {
+    const url = `/viewer.html?archive=${encodeURIComponent(VIEWER_FILE)}`;
+    await openWithMock(page, url, mockOptions, "viewer-1");
+    await expect(page.locator(".spread-viewer__info")).toBeVisible();
+    await use(new ViewerWindow(page));
   },
 });
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { countFiles, moveFiles, trashFolder } from "./api/directory";
 import { addFavorite, getFavorites, removeFavorites } from "./api/favorites";
 import { emitFileMoved, emitFileTrashed, onFileChanged } from "./api/fileEvents";
-import { openViewerWindow } from "./api/viewerWindow";
+import { openViewerWindow, openViewerWindows } from "./api/viewerWindow";
 import { FavoritesSidebar } from "./components/FavoritesSidebar/FavoritesSidebar";
 import { FileList } from "./components/FileList/FileList";
 import { FolderTree } from "./components/FolderTree/FolderTree";
@@ -296,6 +296,7 @@ function App() {
           <FileList
             folderPath={selectedFolder || selectedFavorite}
             onArchiveSelect={openViewerWindow}
+            onOpenFiles={openViewerWindows}
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
             reloadTrigger={reloadTrigger}

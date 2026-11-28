@@ -25,6 +25,8 @@ import { RecentFolderList } from "../RecentFolders/RecentFolderList";
 type FileListProps = {
   folderPath: string | null;
   onArchiveSelect: (path: string) => void;
+  /** Enter で選択中のファイルをまとめて開く（表示順） */
+  onOpenFiles: (paths: string[]) => void;
   onFolderSelect: (path: string) => void;
   searchResults: DirectoryEntry[] | null;
   reloadTrigger?: number;
@@ -40,6 +42,7 @@ type FileListProps = {
 export function FileList({
   folderPath,
   onArchiveSelect,
+  onOpenFiles,
   onFolderSelect,
   searchResults,
   reloadTrigger,
@@ -204,9 +207,7 @@ export function FileList({
     if (e.key === "Enter") {
       if (selected.size === 0) return;
       e.preventDefault();
-      for (const path of order) {
-        if (selected.has(path)) onArchiveSelect(path);
-      }
+      onOpenFiles(order.filter((path) => selected.has(path)));
       return;
     }
     const nextIndex = moveListIndex(order.length, order.indexOf(cursorPath ?? ""), e.key);

@@ -150,6 +150,12 @@ describe("findNode", () => {
     expect(findNode([a, node("/root/b")], "/root/a/x")).toBe(x);
   });
 
+  it("keeps looking in later branches when an earlier one has children but no match", () => {
+    const y = node("/root/b/y");
+    const b = node("/root/b", { children: [y] });
+    expect(findNode([a, b], "/root/b/y")).toBe(y);
+  });
+
   it("returns null for a path that is not loaded", () => {
     expect(findNode([a], "/root/a/x/deep")).toBeNull();
     expect(findNode([], "/root/a")).toBeNull();
@@ -262,6 +268,10 @@ describe("selectionAfterRemoval with other path shapes", () => {
       selectionAfterRemoval("C:\\manga\\作者A\\完結\\X", "C:\\manga\\作者A\\完結", "C:\\manga"),
     ).toBe("C:\\manga\\作者A");
     expect(selectionAfterRemoval("C:\\manga\\作者A", "C:\\manga\\作者A", "C:\\manga")).toBeNull();
+  });
+
+  it("clears the selection when the removed folder has no parent", () => {
+    expect(selectionAfterRemoval("/a/x", "/a", "/root")).toBeNull();
   });
 
   it("keeps a selection that only shares the start of the removed folder's name", () => {

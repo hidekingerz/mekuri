@@ -53,6 +53,12 @@ describe("segmentsBelow", () => {
     expect(segmentsBelow("/m/manga", "/m/manga")).toEqual([]);
   });
 
+  it("accepts a folder written with a trailing separator", () => {
+    expect(segmentsBelow("/m/manga/", "/m/manga/作者A")).toEqual(["作者A"]);
+    expect(segmentsBelow("C:\\", "C:\\manga\\作者A")).toEqual(["manga", "作者A"]);
+    expect(segmentsBelow("/m/manga//", "/m/manga")).toEqual([]);
+  });
+
   it("returns null for a path outside the folder", () => {
     expect(segmentsBelow("/m/manga", "/m/manga2/x")).toBeNull();
     expect(segmentsBelow("/m/manga", "/m")).toBeNull();
@@ -63,5 +69,15 @@ describe("joinPath", () => {
   it("joins with the separator the folder already uses", () => {
     expect(joinPath("/m/manga", "作者A")).toBe("/m/manga/作者A");
     expect(joinPath("C:\\manga", "作者A")).toBe("C:\\manga\\作者A");
+  });
+
+  it("does not double a trailing separator", () => {
+    expect(joinPath("/m/manga/", "作者A")).toBe("/m/manga/作者A");
+    expect(joinPath("C:\\", "manga")).toBe("C:\\manga");
+  });
+
+  it("uses a slash when the folder mixes both separators or has none", () => {
+    expect(joinPath("C:\\manga/作者A", "完結")).toBe("C:\\manga/作者A/完結");
+    expect(joinPath("manga", "作者A")).toBe("manga/作者A");
   });
 });

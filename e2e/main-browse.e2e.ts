@@ -216,6 +216,19 @@ test.describe("フォルダツリー", () => {
       expect(await main.treeNames()).toEqual(["S1"]);
     });
 
+    test("お気に入りを切り替えたら、読み込みが終わるまで前のお気に入りのツリーを出さない", async ({
+      main,
+    }) => {
+      await main.favorite("r").click();
+      await main.chevron("X").click();
+      await expect(main.treeNode("x1")).toBeVisible();
+      await main.setMock("delay", "read_directory", 400);
+      await main.favorite("s").click();
+      await expect(main.page.locator(".folder-tree-loading")).toHaveText("読み込み中...");
+      expect(await main.treeNames()).toEqual([]);
+      await expect(main.treeNode("S1")).toBeVisible();
+    });
+
     test("遅い展開の途中で別のフォルダを展開しても、両方が開く", async ({ main }) => {
       await main.favorite("r").click();
       await expect(main.treeNode("X")).toBeVisible();

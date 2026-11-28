@@ -22,6 +22,8 @@ export type MockOptions = {
   broken?: Record<string, string>;
   /** ビューワーで開くファイル（既定は VIEWER_FILE） */
   viewerFile?: string;
+  /** フォルダ選択ダイアログが返すパス（無ければ、キャンセルしたことになる） */
+  dialog?: string;
   /** 保存済みのファイル一覧の並び順（無ければ名前の昇順） */
   fileSort?: FileSort;
   /** ファイルのパス → 更新日時とサイズ（無いファイルは、どれも同じ値） */
@@ -83,6 +85,29 @@ export class MainWindow {
           .filter((x) => x.cmd === c)
           .map((x) => x.args),
       cmd,
+    );
+  }
+
+  /** フォルダツリーに出ているフォルダの名前（上から順）。 */
+  treeNames = () =>
+    this.page.locator('[aria-label="フォルダツリー"] .tree-node__name').allTextContents();
+  /** フォルダの展開・折りたたみのボタン（サブフォルダの無いフォルダには無い）。 */
+  chevron = (name: string) => this.treeNode(name).locator(".tree-node__chevron");
+  toolbarButton = (name: string) => this.page.locator(".toolbar").getByRole("button", { name });
+
+  /** モックの失敗（fail）や応答の遅れ（delay）を、途中で変える。value が null なら外す。 */
+  async setMock(kind: "fail" | "delay", cmd: string, value: string | number | null) {
+    await this.page.evaluate(
+      ([k, c, v]) => {
+        const opts = (
+          window as unknown as { __MOCK_OPTS__: Record<string, Record<string, unknown>> }
+        ).__MOCK_OPTS__;
+        const next = { ...opts[k] };
+        if (v === null) delete next[c];
+        else next[c] = v;
+        opts[k] = next;
+      },
+      [kind, cmd, value] as const,
     );
   }
 

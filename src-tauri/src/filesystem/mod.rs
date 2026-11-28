@@ -6,6 +6,7 @@ use crate::natural_order;
 use base64::Engine;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Debug, Serialize)]
 pub struct DirectoryEntry {
@@ -219,10 +220,17 @@ pub fn move_file(src_path: &Path, dest_dir_path: &Path) -> Result<PathBuf, Strin
     Ok(dest_path)
 }
 
-/// ディレクトリ以下を再帰的に検索し、名前に query (大文字小文字無視) を含む
-/// フォルダ・アーカイブ・PDF を返す。
+/// 検索で名前を比べるときの形。大文字と小文字、合成の違い（NFC と NFD）を区別しない。
+/// macOS では、濁点・半濁点のある名前が分解された形（NFD）で保存されていることがあり、
+/// IME が出す検索語（NFC）とそのまま比べると一致しない。
+fn search_key(text: &str) -> String {
+    text.nfc().collect::<String>().to_lowercase()
+}
+
+/// ディレクトリ以下を再帰的に検索し、名前に query を含むフォルダ・アーカイブ・PDF を返す。
+/// 大文字と小文字、合成の違い（NFC と NFD）は区別しない。
 pub fn search_directory(dir_path: &Path, query: &str) -> Result<Vec<DirectoryEntry>, String> {
-    let query_lower = query.to_lowercase();
+    let query_lower = search_key(query);
     let mut result: Vec<DirectoryEntry> = Vec::new();
 
     search_recursive(dir_path, &query_lower, &mut result)
@@ -254,7 +262,7 @@ fn search_recursive(
         let is_dir = metadata.is_dir();
 
         if is_dir {
-            if name.to_lowercase().contains(query) {
+            if search_key(&name).contains(query) {
                 let has_subfolders = has_subdirectories(&entry_path);
                 let (modified_ms, size) = entry_stats(&metadata);
                 result.push(DirectoryEntry {
@@ -274,7 +282,7 @@ fn search_recursive(
             let is_archive = archive::is_archive_file(&name);
             let is_pdf = !is_archive && archive::is_pdf_file(&name);
 
-            if (is_archive || is_pdf) && name.to_lowercase().contains(query) {
+            if (is_archive || is_pdf) && search_key(&name).contains(query) {
                 let (modified_ms, size) = entry_stats(&metadata);
                 result.push(DirectoryEntry {
                     name,
@@ -653,5 +661,34 @@ mod tests {
         let result = trash_folder(&folder);
         assert!(result.is_ok(), "trash_folder failed: {:?}", result);
         assert!(!folder.exists());
+    }
+
+    #[test]
+    fn search_directory_finds_names_stored_in_decomposed_form() {
+        let dir = tempfile::tempdir().unwrap();
+        // 「が」「ば」を NFD（清音 + 結合濁点）で持つ名前。macOS で作られたファイルはこの形になることがある
+        let decomposed = "\u{304B}\u{3099}\u{3093}\u{306F}\u{3099}\u{308B}";
+        std::fs::write(dir.path().join(format!("{decomposed}.zip")), b"x").unwrap();
+        std::fs::create_dir(dir.path().join(format!("{decomposed}フォルダ"))).unwrap();
+        std::fs::write(dir.path().join("がんばる2.zip"), b"x").unwrap();
+
+        // 検索語は IME が出す NFC
+        let found = search_directory(dir.path(), "がんば").unwrap();
+        assert_eq!(found.len(), 3);
+        assert!(found[0].is_dir);
+
+        // 検索語が NFD でも、NFC の名前が見つかる
+        let found = search_directory(dir.path(), decomposed).unwrap();
+        assert_eq!(found.len(), 3);
+    }
+
+    #[test]
+    fn search_directory_ignores_case_after_normalizing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Café-É.zip"), b"x").unwrap();
+
+        // 「é」を e + 結合アクセントで書いた検索語
+        let found = search_directory(dir.path(), "cafe\u{0301}-e\u{0301}").unwrap();
+        assert_eq!(found.len(), 1);
     }
 }

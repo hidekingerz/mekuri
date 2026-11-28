@@ -27,6 +27,23 @@ test.describe("アクセシビリティ（axe）", () => {
     expect(await seriousViolations(main.page)).toEqual([]);
   });
 
+  test("フォルダツリー（展開中）とそのメニュー、お気に入りのメニューに重大な違反が無い", async ({
+    main,
+  }) => {
+    await main.favorite("manga").click();
+    await main.chevron("作者A").click();
+    await expect(main.treeNode("完結")).toBeVisible();
+    expect(await seriousViolations(main.page)).toEqual([]);
+
+    await main.treeNode("完結").click({ button: "right" });
+    await expect(main.menuItem("お気に入りに追加")).toBeVisible();
+    expect(await seriousViolations(main.page)).toEqual([]);
+
+    await main.favorite("mag").click({ button: "right" });
+    await expect(main.menuItem("お気に入りから削除")).toBeVisible();
+    expect(await seriousViolations(main.page)).toEqual([]);
+  });
+
   test("検索結果の表示に重大な違反が無い", async ({ main }) => {
     await main.favorite("manga").click();
     await main.searchBox().fill("作者");

@@ -18,7 +18,8 @@ export function useContextMenu() {
     setContextMenu(null);
   }, []);
 
-  // 外側のクリック、Esc、ウィンドウのフォーカス喪失で閉じる
+  // 外側のクリック、別の場所の右クリック、Esc、ウィンドウのフォーカス喪失で閉じる。
+  // 右クリックは capture で先に受けるので、同じ一覧の別の項目なら、閉じたあとにその項目のメニューが開く
   useEffect(() => {
     if (!contextMenu) return;
     const handleClick = () => closeContextMenu();
@@ -26,10 +27,12 @@ export function useContextMenu() {
       if (e.key === "Escape") closeContextMenu();
     };
     window.addEventListener("click", handleClick);
+    window.addEventListener("contextmenu", closeContextMenu, true);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("blur", closeContextMenu);
     return () => {
       window.removeEventListener("click", handleClick);
+      window.removeEventListener("contextmenu", closeContextMenu, true);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", closeContextMenu);
     };

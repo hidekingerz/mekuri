@@ -21,10 +21,18 @@ mekuri/
 │   │   ├── FolderTree/            #     フォルダツリー
 │   │   │   ├── FolderTree.tsx     #       ツリー本体
 │   │   │   └── TreeNode.tsx       #       ツリーノード
-│   │   ├── FileList/              #     ファイルリスト（アーカイブ一覧）
-│   │   │   └── FileList.tsx
+│   │   ├── FileList/              #     ファイルリスト（アーカイブと PDF の一覧、検索結果）
+│   │   │   ├── FileList.tsx
+│   │   │   └── FileList.test.tsx  #       選択・キー操作・ゴミ箱・並び順のコンポーネントテスト
+│   │   ├── RecentFolders/         #     最近開いたフォルダの一覧
+│   │   │   └── RecentFolderList.tsx
+│   │   ├── ConfirmDialog/         #     確認ダイアログ
+│   │   │   └── ConfirmDialog.tsx
+│   │   ├── SubfolderPanel/        #     ビューワーの移動先フォルダのパネル
+│   │   │   └── SubfolderPanel.tsx
 │   │   ├── SpreadViewer/          #     見開きビューワー
 │   │   │   ├── SpreadViewer.tsx   #       ビューワー本体
+│   │   │   ├── ViewerNotice.tsx   #       開けない・空のときの画面
 │   │   │   └── PageImage.tsx      #       画像表示コンポーネント
 │   │   ├── UpdateBanner/          #     アップデート状態バナー
 │   │   │   └── UpdateBanner.tsx
@@ -35,6 +43,11 @@ mekuri/
 │   │   ├── usePdfLoader.ts        #     PDF 読み込み・ページレンダリング
 │   │   ├── useSiblingNavigation.ts #    兄弟ファイル間ナビゲーション
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
+│   │   ├── useConfirmDialog.ts    #     確認ダイアログの表示と結果の受け取り
+│   │   ├── useTrashConfirm.ts     #     ゴミ箱へ移す前の確認
+│   │   ├── useColumnResize.ts     #     ツリー列の幅のドラッグ変更と保存
+│   │   ├── useFolderDropTarget.ts #     フォルダの行をファイルの落とし先にする
+│   │   ├── useRecentFolders.ts    #     最近開いたフォルダの読み込みと絞り込み
 │   │   ├── useElementSize.ts      #     要素サイズの追跡 (ResizeObserver)
 │   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
 │   │   ├── useFileSort.ts         #     ファイル一覧の並び順の復元と保存
@@ -59,8 +72,17 @@ mekuri/
 │   │   ├── updateState.test.ts    #     updateState テスト
 │   │   ├── updateProgress.ts      #     ダウンロード進捗の集計
 │   │   ├── updateProgress.test.ts #     updateProgress テスト
-│   │   ├── folderTree.ts          #     フォルダツリーの純粋操作 (展開・トグル・再読込マージ)
+│   │   ├── folderTree.ts          #     フォルダツリーの純粋操作 (子のマージ・開閉・削除・階層の計算)
 │   │   ├── folderTree.test.ts     #     folderTree テスト
+│   │   ├── paths.ts               #     パスの文字列の扱い（/ と \ の両方に対応）
+│   │   ├── paths.test.ts          #     paths テスト
+│   │   ├── fileSort.ts            #     ファイル一覧の並べ替え
+│   │   ├── naturalOrder.ts        #     自然順の比較（Rust と同じ結果）
+│   │   ├── recentFolders.ts       #     最近開いたフォルダの記録と解決
+│   │   ├── favorites.ts           #     フォルダの中にあるお気に入りの抽出
+│   │   ├── columnLayout.ts        #     ツリー列の幅の制限
+│   │   ├── listKeyboard.ts        #     一覧・ツリーのキー操作での移動先
+│   │   ├── （上の各ファイルに、同名の *.test.ts がある）
 │   │   ├── selection.ts           #     選択トグル・範囲選択の純粋ロジック
 │   │   └── selection.test.ts      #     selection テスト
 │   ├── types/                     #   型定義
@@ -72,7 +94,7 @@ mekuri/
 ├── e2e/                           # 画面の確認 (Playwright)
 │   ├── tauri-mock.js              #   Tauri の IPC を差し替えるモック（仮のファイルツリーと store）
 │   ├── helpers.ts                 #   メインウィンドウの操作とモックの読み取り
-│   └── *.e2e.ts                   #   テスト（選択・ゴミ箱・移動・最近開いたフォルダ・アクセシビリティ）
+│   └── *.e2e.ts                   #   テスト（お気に入り・ツリー・一覧・検索・選択・ゴミ箱・移動・最近開いたフォルダ・ビューワー・アクセシビリティ）
 │
 ├── src-tauri/                     # バックエンド (Rust/Tauri)
 │   ├── Cargo.toml                 #   Rust 依存定義

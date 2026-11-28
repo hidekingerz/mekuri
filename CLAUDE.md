@@ -56,12 +56,13 @@ src/                    # フロントエンド (React/TypeScript)
     FavoritesSidebar/   #   お気に入りサイドバー
     FolderTree/         #   フォルダツリーUI
     FileList/           #   アーカイブファイル一覧
+    RecentFolders/      #   最近開いたフォルダの一覧
     SpreadViewer/       #   見開きビューワーUI
     UpdateBanner/       #   アップデート状態バナー
     Icons/              #   カスタム SVG アイコン
-  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, fileEvents, launch, settings, store, updater, viewerContextMenu, viewerWindow)
+  api/                  #   Tauri IPC ラッパー (archive, directory, favorites, fileDrop, fileEvents, launch, recentFolders, settings, store, updater, viewerContextMenu, viewerWindow)
   hooks/                #   React カスタムフック (useFolderSearch, useMainWindowSetup, useViewerSettings, useUpdater など)
-  utils/                #   ユーティリティ (spreadLayout, spreadNavigation, folderTree, windowLabel など)
+  utils/                #   ユーティリティ (spreadLayout, spreadNavigation, folderTree, paths, windowLabel など)
   types/                #   型定義
 
 src-tauri/              # バックエンド (Rust)

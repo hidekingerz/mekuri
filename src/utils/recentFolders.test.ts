@@ -148,3 +148,33 @@ describe("formatOpenedAt", () => {
     expect(formatOpenedAt(at("2025-12-30T09:00:00"), now)).toBe("2025年12月30日");
   });
 });
+
+describe("Windows paths", () => {
+  it("records the folder of a file whose path uses backslashes", () => {
+    expect(recordOpen([], "C:\\manga\\作者A\\a1.zip", 1)).toEqual([
+      { folder: "C:\\manga\\作者A", file: "C:\\manga\\作者A\\a1.zip", openedAt: 1 },
+    ]);
+  });
+
+  it("resolves the favorite, the names and the location", () => {
+    const list = [
+      { folder: "C:\\manga\\作者A\\完結", file: "C:\\manga\\作者A\\完結\\k1.zip", openedAt: 1 },
+    ];
+    expect(resolveRecentFolders(list, ["C:\\manga", "D:\\other"], null, () => true)).toEqual([
+      {
+        ...list[0],
+        favorite: "C:\\manga",
+        name: "完結",
+        fileName: "k1.zip",
+        location: ["manga", "作者A", "完結"],
+      },
+    ]);
+  });
+});
+
+describe("favorites that only share the start of a name", () => {
+  it("does not put a folder under a favorite whose name is a prefix of its own", () => {
+    const list = [{ folder: "/m/manga2/x", file: "/m/manga2/x/a.zip", openedAt: 1 }];
+    expect(resolveRecentFolders(list, ["/m/manga"], null, () => true)).toEqual([]);
+  });
+});

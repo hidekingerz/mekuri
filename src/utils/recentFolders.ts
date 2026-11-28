@@ -1,3 +1,5 @@
+import { baseName, isSameOrInside, parentPath, segmentsBelow } from "./paths";
+
 /** ビューワでファイルを開いたフォルダの履歴。新しい順に並べ、1 フォルダ 1 件にまとめる。 */
 export type RecentFolder = {
   folder: string;
@@ -20,18 +22,9 @@ export const RECENT_FOLDERS_LIMIT = 10;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function parentOf(path: string): string | null {
-  const slash = path.lastIndexOf("/");
-  return slash > 0 ? path.slice(0, slash) : null;
-}
-
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
-
 /** filePath を開いた記録を足した新しい履歴を返す。 */
 export function recordOpen(list: RecentFolder[], filePath: string, now: number): RecentFolder[] {
-  const folder = parentOf(filePath);
+  const folder = parentPath(filePath);
   if (!folder) return list;
   const rest = list.filter((entry) => entry.folder !== folder);
   return [{ folder, file: filePath, openedAt: now }, ...rest].slice(0, RECENT_FOLDERS_LIMIT);
@@ -53,8 +46,7 @@ export function parseRecentFolders(value: unknown): RecentFolder[] {
 function favoriteFor(folder: string, favorites: string[]): string | null {
   let best: string | null = null;
   for (const fav of favorites) {
-    const inside = folder === fav || folder.startsWith(`${fav}/`);
-    if (inside && (best === null || fav.length > best.length)) best = fav;
+    if (isSameOrInside(fav, folder) && (best === null || fav.length > best.length)) best = fav;
   }
   return best;
 }
@@ -74,7 +66,7 @@ export function resolveRecentFolders(
     if (entry.folder === currentFolder || !exists(entry.folder)) continue;
     const favorite = favoriteFor(entry.folder, favorites);
     if (!favorite) continue;
-    const below = entry.folder.slice(favorite.length).split("/").filter(Boolean);
+    const below = segmentsBelow(favorite, entry.folder) ?? [];
     resolved.push({
       ...entry,
       favorite,

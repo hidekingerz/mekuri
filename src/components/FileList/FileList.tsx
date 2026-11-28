@@ -12,6 +12,7 @@ import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { dragSource, encodeDragPaths } from "../../utils/fileDrag";
 import { SORT_KEY_LABELS, type SortKey, sortEntries } from "../../utils/fileSort";
+import { relativeParent } from "../../utils/folderTree";
 import { isListKeySource, moveListIndex } from "../../utils/listKeyboard";
 import type { ResolvedRecentFolder } from "../../utils/recentFolders";
 import { isMacUserAgent, isTrashShortcut } from "../../utils/trashShortcut";
@@ -25,6 +26,10 @@ type FileListProps = {
   onOpenFiles: (paths: string[]) => void;
   onFolderSelect: (path: string) => void;
   searchResults: DirectoryEntry[] | null;
+  /** 検索の失敗。検索していないか、成功していれば null */
+  searchError?: string | null;
+  /** 検索の対象のお気に入り。検索結果のファイルに、そこからの場所を添えるのに使う */
+  searchRoot?: string | null;
   reloadTrigger?: number;
   /** Finder などから一覧へ落とされたファイルを、表示中のフォルダへ移す */
   onFileDrop?: (srcPaths: string[], destDir: string) => void;
@@ -41,6 +46,8 @@ export function FileList({
   onOpenFiles,
   onFolderSelect,
   searchResults,
+  searchError = null,
+  searchRoot = null,
   reloadTrigger,
   onFileDrop,
   recentFolders = [],
@@ -48,6 +55,9 @@ export function FileList({
   onTrashError,
 }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
+  // files がどのフォルダの中身か。同じフォルダを読み直すあいだは、一覧を出したままにする
+  // （「読み込み中」に差し替えると、スクロールの位置とフォーカスを失う）
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
@@ -97,7 +107,10 @@ export function FileList({
     setError(null);
     try {
       const entries = await readDirectoryFiles(path);
-      if (isCurrent()) setFiles(entries);
+      if (isCurrent()) {
+        setFiles(entries);
+        setLoadedPath(path);
+      }
     } catch (err) {
       if (isCurrent()) setError(errorToString(err));
     } finally {
@@ -110,6 +123,7 @@ export function FileList({
     if (!folderPath) {
       requestIdRef.current++;
       setFiles([]);
+      setLoadedPath(null);
       setLoading(false);
       return;
     }
@@ -153,6 +167,10 @@ export function FileList({
       if (!confirmed) return;
 
       onTrashError?.(null);
+      // 消した項目にあったフォーカスは行き場を失うので、一覧を読み直したあと、同じ位置の項目へ移す
+      const items = Array.from(listRef.current?.querySelectorAll("[data-path]") ?? []);
+      const index = items.findIndex((el) => paths.includes((el as HTMLElement).dataset.path ?? ""));
+      focusAfterReloadRef.current = index === -1 ? null : index;
       try {
         await trashFiles(paths);
       } catch (err) {
@@ -165,6 +183,24 @@ export function FileList({
     },
     [folderPath, loadFiles, clear, confirmTrash, onTrashError],
   );
+
+  // ゴミ箱へ移したあとにフォーカスを置く、一覧の中の位置（置き終えたら null）
+  const focusAfterReloadRef = useRef<number | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 一覧（files / searchResults）が描き直されてから項目を探す
+  useEffect(() => {
+    const index = focusAfterReloadRef.current;
+    if (index === null || loading) return;
+    const items = listRef.current?.querySelectorAll<HTMLElement>("[data-path]");
+    if (!items) return;
+    // 消す前の項目がまだ残っているあいだは待つ
+    if (document.activeElement !== document.body && document.activeElement !== listRef.current)
+      return;
+    focusAfterReloadRef.current = null;
+    const next = items[Math.min(index, items.length - 1)];
+    if (!next) return;
+    setCursorPath(next.dataset.path ?? null);
+    next.focus();
+  }, [files, searchResults, loading]);
 
   // Right-click on a selected item targets the whole selection; otherwise only that item
   const contextTargets =
@@ -230,7 +266,8 @@ export function FileList({
     }
   };
 
-  const renderFileItem = (file: DirectoryEntry, order: string[]) => (
+  // location は、検索結果で同じ名前のファイルを見分けるための、お気に入りからの場所
+  const renderFileItem = (file: DirectoryEntry, order: string[], location = "") => (
     <button
       key={file.path}
       type="button"
@@ -256,6 +293,7 @@ export function FileList({
     >
       {file.is_pdf ? <PdfIcon size={14} /> : <ArchiveIcon size={14} />}
       <span className="file-list__name">{file.name}</span>
+      {location && <span className="file-list__location">{location}</span>}
     </button>
   );
 
@@ -357,9 +395,15 @@ export function FileList({
         <div className="file-list">
           {renderHeader("検索結果", 0)}
           {renderRecentPopover()}
-          <div className="file-list__message file-list__message--empty">
-            <p>一致するものがありません</p>
-          </div>
+          {searchError ? (
+            <div className="file-list__message file-list__message--error">
+              <p>検索できませんでした: {searchError}</p>
+            </div>
+          ) : (
+            <div className="file-list__message file-list__message--empty">
+              <p>一致するものがありません</p>
+            </div>
+          )}
         </div>
       );
     }
@@ -403,7 +447,9 @@ export function FileList({
               <span className="file-list__name">{folder.name}</span>
             </button>
           ))}
-          {resultFiles.map((file) => renderFileItem(file, order))}
+          {resultFiles.map((file) =>
+            renderFileItem(file, order, searchRoot ? relativeParent(searchRoot, file.path) : ""),
+          )}
         </div>
         {renderContextMenu()}
         {trashDialog}
@@ -465,7 +511,7 @@ export function FileList({
     }
     return renderMessage("フォルダを選んでください", "empty");
   }
-  if (loading) return renderMessage("読み込み中...", "loading");
+  if (loading && loadedPath !== folderPath) return renderMessage("読み込み中...", "loading");
   if (error) return renderMessage(`読み込めませんでした: ${error}`, "error");
   if (files.length === 0) {
     return renderMessage("このフォルダにアーカイブや PDF はありません", "empty");

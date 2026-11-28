@@ -1,4 +1,5 @@
 use super::{is_archive_file, is_image_file, mime_type_from_name, store_temp_dir, ArchiveContents};
+use crate::natural_order;
 use base64::Engine;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -23,7 +24,7 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
         })
         .collect();
 
-    names.sort_by(|a, b| natord::compare(a, b));
+    names.sort_by(|a, b| natural_order::compare(a, b));
     Ok(names)
 }
 
@@ -59,13 +60,13 @@ pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
 
     // If we have images, return them
     if !images.is_empty() {
-        images.sort_by(|a, b| natord::compare(a, b));
+        images.sort_by(|a, b| natural_order::compare(a, b));
         return Ok(ArchiveContents::Images { names: images });
     }
 
     // If we have nested archives, return them
     if !nested_archives.is_empty() {
-        nested_archives.sort_by(|a, b| natord::compare(a, b));
+        nested_archives.sort_by(|a, b| natural_order::compare(a, b));
         return Ok(ArchiveContents::NestedArchives {
             names: nested_archives,
         });
@@ -236,5 +237,24 @@ mod tests {
         let result = get_image_base64(zip_file.path().to_str().unwrap(), "nonexistent.png");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Entry not found"));
+    }
+
+    #[test]
+    fn test_pages_with_mixed_padding_and_case_are_in_reading_order() {
+        let zip_file = create_test_zip(&[
+            ("p010.jpg", b"x"),
+            ("P9.jpg", b"x"),
+            ("p8.jpg", b"x"),
+            ("p02.jpg", b"x"),
+            ("p1.jpg", b"x"),
+        ]);
+        let expected = ["p1.jpg", "p02.jpg", "p8.jpg", "P9.jpg", "p010.jpg"];
+        let path = zip_file.path().to_str().unwrap();
+
+        assert_eq!(list_images(path).unwrap(), expected);
+        match analyze_contents(path).unwrap() {
+            ArchiveContents::Images { names } => assert_eq!(names, expected),
+            other => panic!("expected images, got {other:?}"),
+        }
     }
 }

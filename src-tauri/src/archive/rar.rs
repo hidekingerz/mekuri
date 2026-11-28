@@ -1,4 +1,5 @@
 use super::{is_archive_file, is_image_file, mime_type_from_name, store_temp_dir, ArchiveContents};
+use crate::natural_order;
 use base64::Engine;
 use std::io::Write;
 use std::path::Path;
@@ -22,7 +23,7 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
         })
         .collect();
 
-    names.sort_by(|a, b| natord::compare(a, b));
+    names.sort_by(|a, b| natural_order::compare(a, b));
     Ok(names)
 }
 
@@ -57,13 +58,13 @@ pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
 
     // If we have images, return them
     if !images.is_empty() {
-        images.sort_by(|a, b| natord::compare(a, b));
+        images.sort_by(|a, b| natural_order::compare(a, b));
         return Ok(ArchiveContents::Images { names: images });
     }
 
     // If we have nested archives, return them
     if !nested_archives.is_empty() {
-        nested_archives.sort_by(|a, b| natord::compare(a, b));
+        nested_archives.sort_by(|a, b| natural_order::compare(a, b));
         return Ok(ArchiveContents::NestedArchives {
             names: nested_archives,
         });

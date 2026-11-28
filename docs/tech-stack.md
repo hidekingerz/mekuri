@@ -54,6 +54,9 @@ pdfjs-dist が必要とする CMap ファイルと標準フォントファイル
 | `pnpm` | パッケージマネージャ |
 | `biome` | フロントエンドリンタ + フォーマッタ |
 | `vitest` | フロントエンドテストフレームワーク |
+| `happy-dom` + Testing Library | コンポーネントのテスト環境（Tauri の IPC を差し替えて、画面の配線を確かめる） |
+| `@playwright/test` + `@axe-core/playwright` | 画面の確認（e2e）とアクセシビリティの検査。ビルド済みの画面を、IPC のモック（`e2e/tauri-mock.js`）の上で操作する |
+| `@mizchi/mutator` | ミューテーションテスト（`src/utils` が対象） |
 | `clippy` | Rust リンタ |
 | `rustfmt` | Rust フォーマッタ |
 

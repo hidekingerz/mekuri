@@ -76,7 +76,8 @@ export default defineConfig({
         }
       : undefined,
     watch: {
-      ignored: ["**/src-tauri/**"],
+      // 検証やテストの作業ファイルの書き込みで、開発中のページを読み直さない
+      ignored: ["**/src-tauri/**", "**/.dokumi/**", "**/e2e/.output/**"],
     },
   },
 });

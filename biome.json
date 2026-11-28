@@ -26,6 +26,6 @@
     }
   },
   "files": {
-    "includes": ["src/**"]
+    "includes": ["src/**", "e2e/**", "!e2e/.output", "playwright.config.ts"]
   }
 }

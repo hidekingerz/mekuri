@@ -34,6 +34,8 @@ pnpm dev              # 開発サーバー起動（Tauri 経由）
 pnpm build            # プロダクションビルド
 pnpm lint             # Biome リント実行
 pnpm format           # Biome フォーマット実行
+pnpm test             # 単体テストとコンポーネントのテスト（Vitest）
+pnpm test:e2e         # 画面の確認（Playwright。ビルドしてから、IPC のモックの上でメインウィンドウを操作する）
 pnpm test:mutation    # ミューテーションテスト（mutator、対象は src/utils。`--since main` を付けると差分だけ）
 
 # Rust (src-tauri/ 配下で実行)
@@ -112,6 +114,8 @@ src-tauri/              # バックエンド (Rust)
 
 - Rust: `archive/` 配下のロジックには `#[cfg(test)]` モジュールで単体テストを書く
 - TypeScript: `utils/` 等のロジックには Vitest でテストを書く（`*.test.ts`）
+- コンポーネントの配線（選択、キー操作、確認してから実行する流れ）は、`*.test.tsx` に書く。先頭に `// @vitest-environment happy-dom` を置き、`api/` のモジュールだけを `vi.mock` で差し替える
+- 複数のコンポーネントやウィンドウにまたがる操作（ドラッグ、検索、フォーカス、アクセシビリティ）は `e2e/*.e2e.ts` に書く。Rust 側の振る舞いを変えたら `e2e/tauri-mock.js` も合わせる
 
 ### 2. フォーマッタ実行
 
@@ -132,6 +136,7 @@ pnpm lint                     # TypeScript (Biome)
 ```bash
 cd src-tauri && cargo test    # Rust テスト
 pnpm test                     # TypeScript テスト (Vitest)
+pnpm test:e2e                 # 画面の確認 (Playwright。UI を変えたとき。CI では実行しない)
 ```
 
 ### 5. 型チェック

@@ -257,4 +257,82 @@ mod tests {
             other => panic!("expected images, got {other:?}"),
         }
     }
+    /// 中に入れるアーカイブ（1 巻は 2 ページ、2 巻は 1 ページ）を持つ ZIP を作る。
+    fn create_zip_with_nested_volumes() -> tempfile::NamedTempFile {
+        let vol1 = create_test_zip(&[("2.jpg", b"v1-p2"), ("1.jpg", b"v1-p1")]);
+        let vol2 = create_test_zip(&[("1.jpg", b"v2-p1")]);
+        let vol1_bytes = std::fs::read(vol1.path()).unwrap();
+        let vol2_bytes = std::fs::read(vol2.path()).unwrap();
+        create_test_zip(&[
+            ("books/vol10.zip", &vol2_bytes),
+            ("books/vol2.zip", &vol1_bytes),
+            ("__MACOSX/._vol2.zip", b"macos metadata"),
+            ("readme.txt", b"not an archive"),
+        ])
+    }
+
+    #[test]
+    fn test_analyze_contents_lists_nested_archives_in_natural_order() {
+        let outer = create_zip_with_nested_volumes();
+
+        match analyze_contents(outer.path().to_str().unwrap()).unwrap() {
+            ArchiveContents::NestedArchives { names } => {
+                assert_eq!(names, ["books/vol2.zip", "books/vol10.zip"]);
+            }
+            other => panic!("expected nested archives, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_analyze_contents_prefers_images_over_nested_archives() {
+        let inner = create_test_zip(&[("1.jpg", b"x")]);
+        let inner_bytes = std::fs::read(inner.path()).unwrap();
+        let mixed = create_test_zip(&[("extra.zip", &inner_bytes), ("cover.jpg", b"x")]);
+
+        match analyze_contents(mixed.path().to_str().unwrap()).unwrap() {
+            ArchiveContents::Images { names } => assert_eq!(names, ["cover.jpg"]),
+            other => panic!("expected images, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_analyze_contents_reports_an_archive_without_images_or_archives_as_empty() {
+        let zip_file = create_test_zip(&[("readme.txt", b"nothing to show")]);
+
+        let result = analyze_contents(zip_file.path().to_str().unwrap()).unwrap();
+        assert!(matches!(result, ArchiveContents::Empty), "{result:?}");
+    }
+
+    #[test]
+    fn test_extract_nested_archive_writes_the_chosen_archive() {
+        let outer = create_zip_with_nested_volumes();
+        let outer_path = outer.path().to_str().unwrap();
+
+        let extracted = extract_nested_archive(outer_path, "books/vol2.zip").unwrap();
+        assert!(extracted.ends_with("vol2.zip"), "{extracted}");
+        assert_eq!(list_images(&extracted).unwrap(), ["1.jpg", "2.jpg"]);
+        let page = get_image_base64(&extracted, "2.jpg").unwrap();
+        let encoded = page.split(',').nth(1).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        assert_eq!(decoded, b"v1-p2");
+
+        // もう一方を選べば、そちらの中身になる
+        let other = extract_nested_archive(outer_path, "books/vol10.zip").unwrap();
+        assert_eq!(list_images(&other).unwrap(), ["1.jpg"]);
+        // 先に展開したものは、あとの展開で消えない
+        assert_eq!(list_images(&extracted).unwrap(), ["1.jpg", "2.jpg"]);
+    }
+
+    #[test]
+    fn test_extract_nested_archive_rejects_a_name_that_is_not_in_the_archive() {
+        let outer = create_zip_with_nested_volumes();
+        let outer_path = outer.path().to_str().unwrap();
+
+        let error = extract_nested_archive(outer_path, "books/vol3.zip").unwrap_err();
+        assert!(error.contains("Entry not found"), "{error}");
+        // フォルダを省いた名前では見つからない
+        assert!(extract_nested_archive(outer_path, "vol2.zip").is_err());
+    }
 }

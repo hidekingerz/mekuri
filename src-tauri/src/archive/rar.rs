@@ -5,8 +5,17 @@ use std::io::Write;
 use std::path::Path;
 use unrar::Archive;
 
+/// unrar は、ファイルが無い・読めない場合も「Could not open archive」としか返さない。
+/// 先に自分で開いて、OS のエラー（見つからない、権限が無い）をそのまま伝える。
+fn ensure_readable(archive_path: &str) -> Result<(), String> {
+    std::fs::File::open(archive_path)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to open archive: {e}"))
+}
+
 /// List image file names inside a RAR archive, sorted by natural order.
 pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
+    ensure_readable(archive_path)?;
     let archive = Archive::new(archive_path)
         .open_for_listing()
         .map_err(|e| format!("Failed to open RAR archive: {e}"))?;
@@ -29,6 +38,7 @@ pub fn list_images(archive_path: &str) -> Result<Vec<String>, String> {
 
 /// Analyze RAR archive contents to determine if it contains images or nested archives.
 pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
+    ensure_readable(archive_path)?;
     let archive = Archive::new(archive_path)
         .open_for_listing()
         .map_err(|e| format!("Failed to open RAR archive: {e}"))?;
@@ -75,6 +85,7 @@ pub fn analyze_contents(archive_path: &str) -> Result<ArchiveContents, String> {
 
 /// Extract a nested archive from a RAR file and return the path to the extracted file.
 pub fn extract_nested_archive(parent_path: &str, nested_name: &str) -> Result<String, String> {
+    ensure_readable(parent_path)?;
     let archive = Archive::new(parent_path)
         .open_for_processing()
         .map_err(|e| format!("Failed to open RAR archive: {e}"))?;
@@ -131,6 +142,7 @@ pub fn extract_nested_archive(parent_path: &str, nested_name: &str) -> Result<St
 
 /// Extract a single image from a RAR archive and return it as a Base64 data URL.
 pub fn get_image_base64(archive_path: &str, entry_name: &str) -> Result<String, String> {
+    ensure_readable(archive_path)?;
     let archive = Archive::new(archive_path)
         .open_for_processing()
         .map_err(|e| format!("Failed to open RAR archive: {e}"))?;
@@ -164,4 +176,36 @@ pub fn get_image_base64(archive_path: &str, entry_name: &str) -> Result<String, 
     }
 
     Err(format!("Entry not found: {entry_name}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_file_is_reported_as_not_found_rather_than_broken() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone.rar");
+        let path = missing.to_str().unwrap();
+
+        for error in [
+            list_images(path).unwrap_err(),
+            analyze_contents(path).unwrap_err(),
+            get_image_base64(path, "1.jpg").unwrap_err(),
+            extract_nested_archive(path, "inner.zip").unwrap_err(),
+        ] {
+            assert!(error.contains("os error 2"), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_file_that_is_not_a_rar_is_reported_as_a_rar_problem() {
+        let dir = tempfile::tempdir().unwrap();
+        let fake = dir.path().join("fake.rar");
+        std::fs::write(&fake, b"this is not a rar archive").unwrap();
+
+        let error = list_images(fake.to_str().unwrap()).unwrap_err();
+        println!("actual error for a non-RAR file: {error}");
+        assert!(error.contains("RAR archive"), "{error}");
+    }
 }

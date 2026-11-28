@@ -6,7 +6,7 @@ import {
   navigationForKey,
   navigationForWheel,
   progressRatio,
-  siblingAfterRemoval,
+  siblingByPath,
   siblingDirectionForKey,
   siblingDirectionForMouseButton,
 } from "./spreadNavigation";
@@ -116,28 +116,6 @@ describe("groupIndexFromRatio", () => {
   });
 });
 
-describe("siblingAfterRemoval", () => {
-  const list = ["a", "b", "c"];
-
-  it("prefers the following sibling", () => {
-    expect(siblingAfterRemoval(list, 1)).toBe("c");
-  });
-
-  it("falls back to the preceding sibling at the end of the list", () => {
-    expect(siblingAfterRemoval(list, 2)).toBe("b");
-  });
-
-  it("moves to the second item when the first one is removed", () => {
-    expect(siblingAfterRemoval(list, 0)).toBe("b");
-  });
-
-  it("returns null when the item is alone or not in the list", () => {
-    expect(siblingAfterRemoval(["only"], 0)).toBeNull();
-    expect(siblingAfterRemoval(list, -1)).toBeNull();
-    expect(siblingAfterRemoval(list, list.length)).toBeNull();
-  });
-});
-
 describe("adjacentSibling", () => {
   const list = ["a", "b", "c"];
 
@@ -187,5 +165,34 @@ describe("siblingDirectionForKey", () => {
   it("ignores arrows without Alt and other keys", () => {
     expect(siblingDirectionForKey({ key: "ArrowDown", altKey: false })).toBeNull();
     expect(siblingDirectionForKey({ key: "ArrowLeft", altKey: true })).toBeNull();
+  });
+});
+
+describe("siblingByPath", () => {
+  const files = ["/lib/v1.zip", "/lib/v2.zip", "/lib/v10.zip"];
+
+  it("returns the neighbors of a file that is in the list", () => {
+    expect(siblingByPath(files, "/lib/v2.zip", "next")).toBe("/lib/v10.zip");
+    expect(siblingByPath(files, "/lib/v2.zip", "prev")).toBe("/lib/v1.zip");
+    expect(siblingByPath(files, "/lib/v1.zip", "prev")).toBeNull();
+    expect(siblingByPath(files, "/lib/v10.zip", "next")).toBeNull();
+  });
+
+  it("uses the place the name would take when the file is no longer in the list", () => {
+    // v3.zip は消されたが、並び順では v2 と v10 のあいだ
+    expect(siblingByPath(files, "/lib/v3.zip", "next")).toBe("/lib/v10.zip");
+    expect(siblingByPath(files, "/lib/v3.zip", "prev")).toBe("/lib/v2.zip");
+  });
+
+  it("handles a missing file that would come first or last", () => {
+    expect(siblingByPath(files, "/lib/a.zip", "prev")).toBeNull();
+    expect(siblingByPath(files, "/lib/a.zip", "next")).toBe("/lib/v1.zip");
+    expect(siblingByPath(files, "/lib/w.zip", "next")).toBeNull();
+    expect(siblingByPath(files, "/lib/w.zip", "prev")).toBe("/lib/v10.zip");
+  });
+
+  it("returns nothing when there are no other files", () => {
+    expect(siblingByPath([], "/lib/v1.zip", "next")).toBeNull();
+    expect(siblingByPath(["/lib/v1.zip"], "/lib/v1.zip", "prev")).toBeNull();
   });
 });

@@ -8,8 +8,13 @@
 //   window.__MOCK_STORE__    settings.json の中身（favorites, recentFolders）
 //   window.__MOCK_DRAGGED__  read_dragged_paths が返すパス（Finder からのドロップの再現用）
 //   window.__MOCK_EMIT__     アプリ内イベントを届ける（別ウィンドウからの通知の再現用）
+//   window.__MOCK_MENU__     最後に出たネイティブのコンテキストメニューの項目（text, enabled, checked, separator）
+//   window.__MOCK_MENU_CLICK__("文言")  その項目を選んだことにする
+//   window.__MOCK_CLOSED__   ウィンドウを閉じる呼び出しがあったか
 // 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, viewerSettings, archives, dragged,
-//   fail: { cmd: "message" }, monitor: null }
+//   nested: { "<パス>": ["内側1.zip", …] }, broken: { "<パス>": "エラーの文" },
+//   fail: { cmd: "message" }, delay: { cmd: ミリ秒 }, monitor: null }
+// fail と delay は、あとから window.__MOCK_OPTS__ を書き換えても効く
 // を置くと初期値を変えられる。
 (() => {
   const opts = window.__MOCK_OPTS__ || {};
@@ -89,6 +94,7 @@
       1000,
     ]);
   };
+  const menuItems = new Map();
   const callbacks = new Map();
   const listeners = new Map(); // event -> [handler の id]
   const listenerIds = new Map(); // listen が返した id -> handler の id
@@ -119,6 +125,7 @@
     convertFileSrc: (p) => p,
     async invoke(cmd, args = {}) {
       calls.push({ cmd, args: JSON.parse(JSON.stringify(args ?? {})) });
+      if (opts.delay?.[cmd]) await new Promise((resolve) => setTimeout(resolve, opts.delay[cmd]));
       if (cmd in fail) throw fail[cmd];
       switch (cmd) {
         case "plugin:store|load":
@@ -196,10 +203,19 @@
         // ---- ビューワー: アーカイブの中身 ----
         // 画像は、ページ番号を描いた SVG（naturalWidth / naturalHeight が指定どおりになる）
         case "analyze_archive_contents": {
+          if (opts.broken?.[args.archivePath]) throw opts.broken[args.archivePath];
+          const nested = opts.nested?.[args.archivePath];
+          if (nested) return { type: "NestedArchives", names: nested };
           const pages = archivePages(args.archivePath);
           return pages.length === 0
             ? { type: "Empty" }
             : { type: "Images", names: pages.map((p) => p[0]) };
+        }
+        // ネストしたアーカイブは、親のパス + "!/" + 名前 を展開先のパスとして返す
+        case "extract_nested_archive": {
+          const extracted = `${args.parentPath}!/${args.nestedName}`;
+          if (opts.broken?.[extracted]) throw opts.broken[extracted];
+          return extracted;
         }
         case "list_archive_images":
           return archivePages(args.archivePath).map((p) => p[0]);
@@ -225,6 +241,47 @@
           walk(args.path);
           return out;
         }
+        // ---- ネイティブのコンテキストメニュー ----
+        // 作られた項目を覚え、popup されたメニューの中身を window.__MOCK_MENU__ に置く。
+        // window.__MOCK_MENU_CLICK__("項目の文言") で、その項目を選んだことにできる
+        case "plugin:menu|new": {
+          const rid = nextId++;
+          const o = args.options || {};
+          const id = o.id || `menu-item-${rid}`;
+          menuItems.set(rid, {
+            rid,
+            id,
+            kind: args.kind,
+            text: o.text ?? null,
+            enabled: o.enabled !== false,
+            checked: o.checked ?? null,
+            separator: o.item === "Separator",
+            channel: args.handler?.id ?? null,
+            children: (o.items || []).map((i) => (Array.isArray(i) ? i[0] : null)),
+          });
+          return [rid, id];
+        }
+        case "plugin:menu|popup": {
+          const menu = menuItems.get(args.rid);
+          const children = (menu?.children || []).map((rid) => menuItems.get(rid));
+          window.__MOCK_MENU__ = children.map(({ text, enabled, checked, separator }) => ({
+            text,
+            enabled,
+            checked,
+            separator,
+          }));
+          window.__MOCK_MENU_CLICK__ = (text) => {
+            const item = children.find((i) => i.text === text);
+            if (!item) throw new Error(`no menu item: ${text}`);
+            if (!item.enabled) return false;
+            callbacks.get(item.channel)?.({ message: item.id, index: 0 });
+            return true;
+          };
+          return null;
+        }
+        case "plugin:window|close":
+          window.__MOCK_CLOSED__ = true;
+          return null;
         case "plugin:window|get_all_windows":
           return ["main"];
         // 2 倍の画面（論理 1600x1000、メニューバー 25px を除いた作業領域）

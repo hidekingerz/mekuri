@@ -1,3 +1,5 @@
+import { compareNatural } from "./naturalOrder";
+
 /** ビューワーのページ移動操作。入力 (キー・クリック・ホイール) を移動に変換する純粋関数。 */
 
 export type NavigationAction = "next" | "prev" | "first" | "last";
@@ -73,12 +75,6 @@ export function groupIndexFromRatio(ratio: number, groupCount: number): number {
   return Math.max(0, Math.min(index, groupCount - 1));
 }
 
-/** index の要素を取り除いたあとに表示すべき隣接要素。後ろを優先し、無ければ前。単独や範囲外なら null。 */
-export function siblingAfterRemoval<T>(items: T[], index: number): T | null {
-  if (index < 0 || index >= items.length) return null;
-  return items[index + 1] ?? items[index - 1] ?? null;
-}
-
 /** index の隣の要素 (next は後ろ、prev は前)。端や範囲外なら null。 */
 export function adjacentSibling<T>(
   items: T[],
@@ -87,6 +83,24 @@ export function adjacentSibling<T>(
 ): T | null {
   if (index < 0 || index >= items.length) return null;
   return items[direction === "next" ? index + 1 : index - 1] ?? null;
+}
+
+/**
+ * currentPath の隣のファイル (next は後ろ、prev は前)。端なら null。
+ * currentPath が一覧に無いとき（別のウィンドウで消された・動かされた、開く前から無かった）は、
+ * 名前の並び順で入るはずの位置の前後を返す。そうしないと、開けないファイルから動けなくなる。
+ */
+export function siblingByPath(
+  items: string[],
+  currentPath: string,
+  direction: "next" | "prev",
+): string | null {
+  const index = items.indexOf(currentPath);
+  if (index !== -1) return adjacentSibling(items, index, direction);
+
+  // 同じフォルダのファイルどうしなので、パスのまま比べても名前の順と同じになる
+  const insertAt = items.filter((item) => compareNatural(item, currentPath) < 0).length;
+  return (direction === "next" ? items[insertAt] : items[insertAt - 1]) ?? null;
 }
 
 /** マウスの戻る (button 3) / 進む (button 4) ボタンを兄弟ファイルの移動方向に対応づける。他のボタンは null。 */

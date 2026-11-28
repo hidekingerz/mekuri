@@ -4,7 +4,7 @@ import { getSiblingArchives } from "../api/directory";
 import { onFileChanged } from "../api/fileEvents";
 import type { SiblingNavigation } from "../types";
 import {
-  adjacentSibling,
+  siblingByPath,
   siblingDirectionForKey,
   siblingDirectionForMouseButton,
 } from "../utils/spreadNavigation";
@@ -55,8 +55,8 @@ export function useSiblingNavigation(
       if (!archivePath) return;
       try {
         // 移動時は最新の一覧で判定する (保持中の一覧が古い可能性があるため)
-        const { archives, currentIndex } = await getSiblingArchives(archivePath);
-        const newPath = adjacentSibling(archives, currentIndex, direction);
+        const { archives } = await getSiblingArchives(archivePath);
+        const newPath = siblingByPath(archives, archivePath, direction);
         if (!newPath) return;
 
         onNavigate(newPath);
@@ -74,9 +74,12 @@ export function useSiblingNavigation(
   useEffect(() => {
     if (!archivePath) return;
 
+    // 確認ダイアログが開いているあいだは、裏でファイルを切り替えない
+    const dialogOpen = () => document.querySelector("dialog[open]") !== null;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const direction = siblingDirectionForKey(e);
-      if (!direction) return;
+      if (!direction || dialogOpen()) return;
       e.preventDefault();
       if (direction === "next") goNext();
       else goPrev();
@@ -84,7 +87,7 @@ export function useSiblingNavigation(
 
     const handleMouseUp = (e: MouseEvent) => {
       const direction = siblingDirectionForMouseButton(e.button);
-      if (!direction) return;
+      if (!direction || dialogOpen()) return;
       e.preventDefault();
       if (direction === "next") goNext();
       else goPrev();
@@ -107,11 +110,13 @@ export function useSiblingNavigation(
 
   return useMemo(
     () => ({
-      hasNext: adjacentSibling(siblings.archives, siblings.currentIndex, "next") !== null,
-      hasPrev: adjacentSibling(siblings.archives, siblings.currentIndex, "prev") !== null,
+      hasNext:
+        archivePath !== null && siblingByPath(siblings.archives, archivePath, "next") !== null,
+      hasPrev:
+        archivePath !== null && siblingByPath(siblings.archives, archivePath, "prev") !== null,
       goNext,
       goPrev,
     }),
-    [siblings, goNext, goPrev],
+    [siblings, archivePath, goNext, goPrev],
   );
 }

@@ -9,11 +9,27 @@ export type MockOptions = {
   favorites?: string[];
   recentFolders?: { folder: string; file: string; openedAt: number }[];
   fail?: Record<string, string>;
+  /** コマンド名 → 応答を遅らせるミリ秒 */
+  delay?: Record<string, number>;
   monitor?: null;
   /** 保存済みのビューワーの設定（無ければ既定で開く） */
   viewerSettings?: { width: number; height: number; viewMode?: string; readingDirection?: string };
   /** アーカイブのパス → ページ（名前、画像の幅、高さ）。無いパスは縦長 10 ページ */
   archives?: Record<string, [string, number, number][]>;
+  /** アーカイブのパス → 中にあるアーカイブの名前。展開先のパスは `<親>!/<名前>` */
+  nested?: Record<string, string[]>;
+  /** パス → 開こうとしたときのエラーの文（展開先のパスなら、展開の失敗） */
+  broken?: Record<string, string>;
+  /** ビューワーで開くファイル（既定は VIEWER_FILE） */
+  viewerFile?: string;
+};
+
+/** ネイティブのコンテキストメニューの 1 項目。 */
+export type MenuEntry = {
+  text: string | null;
+  enabled: boolean;
+  checked: boolean | null;
+  separator: boolean;
 };
 
 type Call = { cmd: string; args: Record<string, unknown> };
@@ -239,6 +255,121 @@ export class ViewerWindow {
     await this.page.mouse.click(box.x + box.width * fromLeft, box.y + box.height / 2);
   }
 
+  notice = () => this.page.locator(".viewer-notice");
+  alerts = () => this.page.getByRole("alert");
+  nestedItems = () => this.page.locator(".nested-selector__item");
+  confirmTrash = () => this.dialog().getByRole("button", { name: "ゴミ箱に移動" }).click();
+
+  /** いま開いているファイルの名前（最後に中身を調べに行ったパスから）。 */
+  async currentFile(): Promise<string | undefined> {
+    return this.page.evaluate(() => {
+      const calls = (window as unknown as { __MOCK_CALLS__: Call[] }).__MOCK_CALLS__;
+      const last = calls.filter((c) => c.cmd === "analyze_archive_contents").pop();
+      return (last?.args.archivePath as string | undefined)?.split("/").pop();
+    });
+  }
+
+  async calls(cmd: string): Promise<Record<string, unknown>[]> {
+    return this.page.evaluate(
+      (c) =>
+        (window as unknown as { __MOCK_CALLS__: Call[] }).__MOCK_CALLS__
+          .filter((x) => x.cmd === c)
+          .map((x) => x.args),
+      cmd,
+    );
+  }
+
+  async folderContents(dir: string): Promise<string[] | undefined> {
+    return this.page.evaluate(
+      (d) => (window as unknown as { __MOCK_FS__: Record<string, string[]> }).__MOCK_FS__[d],
+      dir,
+    );
+  }
+
+  /** 最後に画像を取りに行ったアーカイブのパス（いま表示している中身の出どころ）。 */
+  async imageSource(): Promise<string | undefined> {
+    return this.page.evaluate(() => {
+      const calls = (window as unknown as { __MOCK_CALLS__: Call[] }).__MOCK_CALLS__;
+      return calls.filter((c) => c.cmd === "get_archive_image").pop()?.args.archivePath as
+        | string
+        | undefined;
+    });
+  }
+
+  /** モックの失敗の設定を、途中で外す。 */
+  async stopFailing(cmd: string) {
+    await this.page.evaluate((c) => {
+      delete (window as unknown as { __MOCK_OPTS__: { fail?: Record<string, string> } })
+        .__MOCK_OPTS__.fail?.[c];
+    }, cmd);
+  }
+
+  /** 右クリックのあと、コンテキストメニューが出たかどうか。 */
+  async menuShown(): Promise<boolean> {
+    return this.page.evaluate(
+      () => (window as unknown as { __MOCK_MENU__: unknown }).__MOCK_MENU__ != null,
+    );
+  }
+
+  async closed(): Promise<boolean> {
+    return this.page.evaluate(
+      () => (window as unknown as { __MOCK_CLOSED__?: boolean }).__MOCK_CLOSED__ === true,
+    );
+  }
+
+  /** 右クリックして、出たコンテキストメニューの項目を返す。 */
+  async openMenu(): Promise<MenuEntry[]> {
+    await this.page.evaluate(() => {
+      (window as unknown as { __MOCK_MENU__: unknown }).__MOCK_MENU__ = null;
+      window.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    });
+    await expect
+      .poll(() =>
+        this.page.evaluate(
+          () => (window as unknown as { __MOCK_MENU__: unknown }).__MOCK_MENU__ !== null,
+        ),
+      )
+      .toBe(true);
+    return this.page.evaluate(
+      () => (window as unknown as { __MOCK_MENU__: MenuEntry[] }).__MOCK_MENU__,
+    );
+  }
+
+  /** 出ているコンテキストメニューの項目を選ぶ。無効な項目なら false。 */
+  async chooseMenu(text: string): Promise<boolean> {
+    return this.page.evaluate(
+      (t) =>
+        (
+          window as unknown as { __MOCK_MENU_CLICK__: (text: string) => boolean }
+        ).__MOCK_MENU_CLICK__(t),
+      text,
+    );
+  }
+
+  /** マウスの戻る（3）・進む（4）ボタンを押す。 */
+  async mouseButton(button: 3 | 4) {
+    await this.page.evaluate((b) => {
+      for (const type of ["mousedown", "mouseup"]) {
+        window.dispatchEvent(new MouseEvent(type, { button: b, bubbles: true, cancelable: true }));
+      }
+    }, button);
+  }
+
+  /** 別のウィンドウでファイルが消えたことを再現する。 */
+  async trashedElsewhere(dir: string, name: string) {
+    await this.page.evaluate(
+      ([d, n]) => {
+        const w = window as unknown as {
+          __MOCK_FS__: Record<string, string[]>;
+          __MOCK_EMIT__: (event: string) => void;
+        };
+        w.__MOCK_FS__[d] = w.__MOCK_FS__[d].filter((c) => c !== n);
+        w.__MOCK_EMIT__("file-trashed");
+      },
+      [dir, name] as const,
+    );
+  }
+
   /** 短い間隔で wheel を続けて届ける（トラックパッドの慣性を模す）。 */
   async wheelBurst(count: number, intervalMs: number, deltaY = 120) {
     await this.page.evaluate(
@@ -267,17 +398,22 @@ type Fixtures = {
   viewer: ViewerWindow;
   /** コンソールのエラーを集め、テストの終わりに 1 件でもあれば失敗させる */
   consoleErrors: string[];
+  /** わざと失敗させるテストで、出てよいコンソールのエラー（test.use で指定する） */
+  expectedConsoleError: RegExp | null;
 };
 
 export const test = base.extend<Fixtures>({
   mockOptions: [{}, { option: true }],
+  expectedConsoleError: [null, { option: true }],
   consoleErrors: [
-    async ({ page }, use) => {
+    async ({ page, expectedConsoleError }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (err) => errors.push(String(err)));
       page.on("console", (msg) => {
         // favicon はブラウザが勝手に取りに行くもので、アプリには無い
-        if (msg.type() === "error" && !/favicon|404/.test(msg.text())) errors.push(msg.text());
+        if (msg.type() !== "error" || /favicon|404/.test(msg.text())) return;
+        if (expectedConsoleError?.test(msg.text())) return;
+        errors.push(msg.text());
       });
       await use(errors);
       expect(errors, "コンソールにエラーが出ていないこと").toEqual([]);
@@ -290,9 +426,17 @@ export const test = base.extend<Fixtures>({
     await use(new MainWindow(page));
   },
   viewer: async ({ page, mockOptions }, use) => {
-    const url = `/viewer.html?archive=${encodeURIComponent(VIEWER_FILE)}`;
-    await openWithMock(page, url, mockOptions, "viewer-1");
-    await expect(page.locator(".spread-viewer__info")).toBeVisible();
+    const file = mockOptions.viewerFile ?? VIEWER_FILE;
+    await openWithMock(
+      page,
+      `/viewer.html?archive=${encodeURIComponent(file)}`,
+      mockOptions,
+      "viewer-1",
+    );
+    // ページの表示、エラーや空の画面、ネストの選択のどれかが出るまで待つ
+    await expect(
+      page.locator(".spread-viewer__info, .viewer-notice, .nested-selector").first(),
+    ).toBeVisible();
     await use(new ViewerWindow(page));
   },
 });

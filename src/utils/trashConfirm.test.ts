@@ -49,7 +49,18 @@ describe("folderTrashConfirmLines", () => {
     ]);
   });
 
-  it("says when the folder has no files", () => {
-    expect(folderTrashConfirmLines(0)).toEqual(["フォルダの中にファイルはありません"]);
+  it("says when the folder has no archives or PDFs", () => {
+    expect(folderTrashConfirmLines(0)).toEqual(["フォルダの中にアーカイブや PDF はありません"]);
+  });
+
+  it("adds a line when favorites inside the folder lose their registration", () => {
+    expect(folderTrashConfirmLines(3, 2)).toEqual([
+      "中のファイル 3 件（サブフォルダを含む）も一緒に移動します",
+      "お気に入り 2 件の登録も外します",
+    ]);
+    expect(folderTrashConfirmLines(0, 1)).toEqual([
+      "フォルダの中にアーカイブや PDF はありません",
+      "お気に入り 1 件の登録も外します",
+    ]);
   });
 });

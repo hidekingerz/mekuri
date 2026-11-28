@@ -131,7 +131,8 @@ fn validate_folder(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// フォルダ内のファイル数をサブフォルダまで数える。フォルダ自体とシンボリックリンク先は数えない。
+/// フォルダ内の、ファイルリストに出るファイル（アーカイブと PDF）をサブフォルダまで数える。
+/// 隠しファイル・隠しフォルダの中・フォルダ自体・シンボリックリンク先は数えない。
 pub fn count_files(dir_path: &Path) -> Result<u64, String> {
     validate_folder(dir_path)?;
     let mut count = 0;
@@ -142,9 +143,13 @@ pub fn count_files(dir_path: &Path) -> Result<u64, String> {
             let Ok(file_type) = entry.file_type() else {
                 continue;
             };
+            let name = entry.file_name().to_string_lossy().to_string();
+            if is_hidden(&name) {
+                continue;
+            }
             if file_type.is_dir() {
                 stack.push(entry.path());
-            } else {
+            } else if archive::is_archive_file(&name) || archive::is_pdf_file(&name) {
                 count += 1;
             }
         }
@@ -562,20 +567,32 @@ mod tests {
         let src = dir.path().join("a.zip");
         fs::write(&src, b"data").unwrap();
         let result = move_file(&src, dir.path());
-        assert!(result.unwrap_err().contains("same"));
+        assert!(result.unwrap_err().contains("same folder"));
         assert!(src.exists());
     }
 
     #[test]
-    fn count_files_counts_nested_files_but_not_folders() {
+    fn count_files_counts_nested_archives_and_pdfs_but_not_folders() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("a.zip"), "").unwrap();
         fs::create_dir(dir.path().join("sub")).unwrap();
         fs::write(dir.path().join("sub").join("b.pdf"), "").unwrap();
-        fs::write(dir.path().join("sub").join("notes.txt"), "").unwrap();
         fs::create_dir(dir.path().join("empty")).unwrap();
 
-        assert_eq!(count_files(dir.path()).unwrap(), 3);
+        assert_eq!(count_files(dir.path()).unwrap(), 2);
+    }
+
+    #[test]
+    fn count_files_skips_what_the_file_list_does_not_show() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("a.zip"), "").unwrap();
+        fs::write(dir.path().join("notes.txt"), "").unwrap();
+        fs::write(dir.path().join(".DS_Store"), "").unwrap();
+        fs::write(dir.path().join(".hidden.zip"), "").unwrap();
+        fs::create_dir(dir.path().join(".cache")).unwrap();
+        fs::write(dir.path().join(".cache").join("c.zip"), "").unwrap();
+
+        assert_eq!(count_files(dir.path()).unwrap(), 1);
     }
 
     #[test]
@@ -604,7 +621,9 @@ mod tests {
 
     #[test]
     fn trash_folder_rejects_filesystem_root() {
-        assert!(trash_folder(Path::new("/")).is_err());
+        assert!(trash_folder(Path::new("/"))
+            .unwrap_err()
+            .contains("Refusing to trash a root folder"));
     }
 
     #[test]

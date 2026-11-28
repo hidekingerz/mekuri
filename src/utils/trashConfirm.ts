@@ -20,9 +20,16 @@ export function folderTrashConfirmTitle(path: string): string {
   return `フォルダ「${name}」をゴミ箱に移動しますか?`;
 }
 
-/** フォルダの確認の本文。中身ごと移ることを件数で伝える。 */
-export function folderTrashConfirmLines(fileCount: number): string[] {
-  return fileCount === 0
-    ? ["フォルダの中にファイルはありません"]
-    : [`中のファイル ${fileCount} 件（サブフォルダを含む）も一緒に移動します`];
+/**
+ * フォルダの確認の本文。中身ごと移ることを、一覧に出るファイル（アーカイブと PDF）の件数で伝える。
+ * 中にお気に入りがあれば、その登録も外すことを添える。
+ */
+export function folderTrashConfirmLines(fileCount: number, favoriteCount = 0): string[] {
+  const lines = [
+    fileCount === 0
+      ? "フォルダの中にアーカイブや PDF はありません"
+      : `中のファイル ${fileCount} 件（サブフォルダを含む）も一緒に移動します`,
+  ];
+  if (favoriteCount > 0) lines.push(`お気に入り ${favoriteCount} 件の登録も外します`);
+  return lines;
 }

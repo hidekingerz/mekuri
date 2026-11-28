@@ -88,6 +88,7 @@ export function TreeNode({
           }
         }}
         role="treeitem"
+        data-path={entry.path}
         aria-selected={isSelected}
         aria-expanded={hasChildren ? node.isOpen : undefined}
         aria-level={depth + 1}

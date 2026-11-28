@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
 import { readDroppedPaths } from "../../api/fileDrop";
 import { emitFileTrashed, onFileChanged } from "../../api/fileEvents";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
+import { useFolderDropTarget } from "../../hooks/useFolderDropTarget";
 import { useTrashConfirm } from "../../hooks/useTrashConfirm";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
@@ -32,6 +33,8 @@ type FileListProps = {
   /** 最近開いたフォルダ（表示中のフォルダは除いたもの） */
   recentFolders?: ResolvedRecentFolder[];
   onRecentSelect?: (entry: ResolvedRecentFolder) => void;
+  /** ゴミ箱への移動に失敗したときのメッセージ（始めるときは null で消す） */
+  onTrashError?: (message: string | null) => void;
 };
 
 export function FileList({
@@ -43,12 +46,13 @@ export function FileList({
   onFileDrop,
   recentFolders = [],
   onRecentSelect,
+  onTrashError,
 }: FileListProps) {
   const [files, setFiles] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
-  const { selected, toggle, selectRange, selectOnly, clear } = useFileSelection();
+  const { selected, toggle, selectRange, selectOnly, clear, retain } = useFileSelection();
   const { confirm: confirmTrash, dialog: trashDialog } = useTrashConfirm();
   // キーボード操作の現在位置（最後にクリックまたは矢印で選んだ項目）
   const [cursorPath, setCursorPath] = useState<string | null>(null);
@@ -113,12 +117,23 @@ export function FileList({
     void loadFiles(folderPath);
   }, [folderPath, reloadTrigger, loadFiles]);
 
-  // Clear selection whenever the displayed list changes
-  const [prevList, setPrevList] = useState({ folderPath, searchResults });
-  if (prevList.folderPath !== folderPath || prevList.searchResults !== searchResults) {
-    setPrevList({ folderPath, searchResults });
+  // フォルダを切り替えたとき・検索に入るか抜けるときは選択を解除する。
+  // 同じ一覧の中身が変わっただけのときは、消えたファイルだけを下の retain で外す。
+  const searching = searchResults !== null;
+  const [prevList, setPrevList] = useState({ folderPath, searching });
+  if (prevList.folderPath !== folderPath || prevList.searching !== searching) {
+    setPrevList({ folderPath, searching });
     clear();
   }
+
+  // 一覧から消えたファイル（別ウィンドウで消した・動かしたもの）を選択から外す
+  const listedPaths = useMemo(
+    () => (searchResults ?? files).filter((e) => !e.is_dir).map((e) => e.path),
+    [searchResults, files],
+  );
+  useEffect(() => {
+    retain(listedPaths);
+  }, [listedPaths, retain]);
 
   // Reload file list when a file is trashed or moved from another surface
   useEffect(() => {
@@ -138,17 +153,18 @@ export function FileList({
       const confirmed = await confirmTrash(paths);
       if (!confirmed) return;
 
+      onTrashError?.(null);
       try {
         await trashFiles(paths);
       } catch (err) {
-        setError(errorToString(err));
+        onTrashError?.(errorToString(err));
       } finally {
         clear();
         if (folderPath) await loadFiles(folderPath);
         await emitFileTrashed();
       }
     },
-    [folderPath, loadFiles, clear, confirmTrash],
+    [folderPath, loadFiles, clear, confirmTrash, onTrashError],
   );
 
   // Right-click on a selected item targets the whole selection; otherwise only that item
@@ -159,16 +175,18 @@ export function FileList({
         ? [contextMenu.path]
         : [];
 
-  const handleTrashFromMenu = useCallback(() => {
-    closeContextMenu();
-    trashPaths(contextTargets);
-  }, [closeContextMenu, trashPaths, contextTargets]);
-
   const focusItem = useCallback((path: string) => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
     el?.focus();
     el?.scrollIntoView({ block: "nearest" });
   }, []);
+
+  const handleTrashFromMenu = useCallback(() => {
+    // メニューは消えるので、確認を閉じたあとキー操作が続けられるよう項目へフォーカスを戻しておく
+    if (contextMenu) focusItem(contextMenu.path);
+    closeContextMenu();
+    trashPaths(contextTargets);
+  }, [contextMenu, focusItem, closeContextMenu, trashPaths, contextTargets]);
 
   const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, order: string[]) => {
     if (!(e.target instanceof Element) || !isListKeySource(e.target, e.currentTarget)) return;
@@ -181,9 +199,14 @@ export function FileList({
       trashPaths([...selected]);
       return;
     }
-    if (e.key === "Enter" && cursorPath && order.includes(cursorPath)) {
+    // Enter は選択中のファイルを一覧の並び順ですべて開く（選択から外した項目は開かない）。
+    // 何も選んでいないときは既定の動作に任せ、フォーカスのある項目が選ばれる
+    if (e.key === "Enter") {
+      if (selected.size === 0) return;
       e.preventDefault();
-      onArchiveSelect(cursorPath);
+      for (const path of order) {
+        if (selected.has(path)) onArchiveSelect(path);
+      }
       return;
     }
     const nextIndex = moveListIndex(order.length, order.indexOf(cursorPath ?? ""), e.key);
@@ -222,6 +245,7 @@ export function FileList({
       onDoubleClick={() => onArchiveSelect(file.path)}
       onContextMenu={(e) => {
         if (!selected.has(file.path)) selectOnly(file.path);
+        setCursorPath(file.path);
         openContextMenu(e, file.path);
       }}
       title={file.path}
@@ -324,6 +348,9 @@ export function FileList({
       </span>
     );
 
+  // 検索結果のフォルダの行は、ファイルの落とし先にする（アプリ内のドラッグと Finder から）
+  const { dragOverPath, dropProps: folderDropProps } = useFolderDropTarget(onFileDrop);
+
   // 検索結果表示モード
   if (searchResults !== null) {
     if (searchResults.length === 0) {
@@ -356,15 +383,21 @@ export function FileList({
       >
         {renderHeader("検索結果", searchResults.length)}
         {renderRecentPopover()}
-        <div className="file-list__items" role="listbox" aria-multiselectable="true">
+        <div
+          className="file-list__items"
+          role="listbox"
+          aria-label="検索結果"
+          aria-multiselectable="true"
+        >
           {resultFolders.map((folder) => (
             <button
               key={folder.path}
               type="button"
-              className="file-list__item"
+              className={`file-list__item${dragOverPath === folder.path ? " file-list__item--drop-target" : ""}`}
               role="option"
               aria-selected={false}
               onClick={() => onFolderSelect(folder.path)}
+              {...folderDropProps(folder.path)}
               title={folder.path}
             >
               <FolderIcon size={14} />
@@ -453,7 +486,12 @@ export function FileList({
     >
       {renderHeader("ファイル", files.length)}
       {renderRecentPopover()}
-      <div className="file-list__items" role="listbox" aria-multiselectable="true">
+      <div
+        className="file-list__items"
+        role="listbox"
+        aria-label="ファイル"
+        aria-multiselectable="true"
+      >
         {sortedFiles.map((file) => renderFileItem(file, order))}
       </div>
       {renderContextMenu()}

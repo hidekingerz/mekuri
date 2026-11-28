@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { readDirectoryFolders } from "../../api/directory";
 import { addFavorite } from "../../api/favorites";
 import { useContextMenu } from "../../hooks/useContextMenu";
+import { useFolderDropTarget } from "../../hooks/useFolderDropTarget";
 import type { DirectoryEntry, TreeNodeData } from "../../types";
 import { errorToString } from "../../utils/errorToString";
 import {
@@ -127,22 +128,37 @@ export function FolderTree({
     });
   }, []);
 
+  const treeRef = useRef<HTMLDivElement>(null);
+
+  // メニューは消えるので、閉じる前に項目へフォーカスを戻しておく（そのままキー操作を続けられるように）
+  const focusTreeItem = useCallback((path: string) => {
+    treeRef.current
+      ?.querySelector<HTMLElement>(`[role="treeitem"][data-path="${CSS.escape(path)}"]`)
+      ?.focus();
+  }, []);
+
   const handleAddFavorite = useCallback(async () => {
     if (contextMenu) {
       await addFavorite(contextMenu.path);
+      focusTreeItem(contextMenu.path);
       closeContextMenu();
       onFavoriteAdded?.();
     }
-  }, [contextMenu, closeContextMenu, onFavoriteAdded]);
+  }, [contextMenu, focusTreeItem, closeContextMenu, onFavoriteAdded]);
 
   const handleTrashFolder = useCallback(async () => {
     if (!contextMenu) return;
     const path = contextMenu.path;
+    // 確認をキャンセルしたときに、この項目からキー操作を続けられるようにする
+    focusTreeItem(path);
     closeContextMenu();
     if (await onTrashFolder(path)) {
       setNodes((prev) => removeNode(prev, path));
     }
-  }, [contextMenu, closeContextMenu, onTrashFolder]);
+  }, [contextMenu, focusTreeItem, closeContextMenu, onTrashFolder]);
+
+  // 検索に一致したフォルダの行も、ファイルの落とし先にする
+  const { dragOverPath, dropProps } = useFolderDropTarget(onFileDrop);
 
   // ↑↓ / Home / End で表示中の項目間を移動する（開閉と選択は各項目が処理する）
   const handleTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -183,9 +199,10 @@ export function FolderTree({
         {searchFolders.map((folder) => (
           <div
             key={folder.path}
-            className={`tree-node tree-node--folder ${folder.path === selectedPath ? "tree-node--selected" : ""}`}
+            className={`tree-node tree-node--folder ${folder.path === selectedPath ? "tree-node--selected" : ""}${dragOverPath === folder.path ? " tree-node--drop-target" : ""}`}
             style={{ paddingLeft: "8px" }}
             onClick={() => onFolderSelect(folder.path)}
+            {...dropProps(folder.path)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -229,6 +246,7 @@ export function FolderTree({
       className="folder-tree"
       role="tree"
       aria-label="フォルダツリー"
+      ref={treeRef}
       onKeyDown={handleTreeKeyDown}
     >
       {nodes.map((node) => (

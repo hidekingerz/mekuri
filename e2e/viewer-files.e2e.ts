@@ -1,4 +1,4 @@
-import { expect, test } from "./helpers";
+import { expect, test, WINDOWS_USER_AGENT } from "./helpers";
 
 // v1.zip〜v3.zip が並ぶフォルダ。v2.zip（途中のファイル）を開く
 const TREE = { "/lib": ["v1.zip", "v2.zip", "v3.zip", "sub/"], "/lib/sub": ["s1.zip"] };
@@ -571,5 +571,220 @@ test.describe("モックの失敗の設定", () => {
     await viewer.page.keyboard.press("Delete");
     await viewer.confirmTrash();
     await expect(viewer.alerts()).toHaveCount(1);
+  });
+});
+
+test.describe("メインウィンドウの一覧の並び順に合わせた移動", () => {
+  // 名前の順は v1, v2, v3。更新日時の新しい順は v1, v3, v2
+  const fileMeta = {
+    "/lib/v1.zip": { modified_ms: 300 },
+    "/lib/v2.zip": { modified_ms: 100 },
+    "/lib/v3.zip": { modified_ms: 200 },
+  };
+  const newestFirst = { key: "modified", direction: "desc" } as const;
+
+  test.describe("更新日時の新しい順にしてある", () => {
+    test.use({ mockOptions: { ...base, fileMeta, fileSort: newestFirst } });
+
+    test("一覧で下にあるファイルが次、上にあるファイルが前になる", async ({ viewer }) => {
+      // v2.zip は一番古いので、一覧の末尾
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      expect(await viewer.currentFile()).toBe("v2.zip");
+
+      await viewer.page.keyboard.press("Alt+ArrowUp");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await viewer.button("前のファイル").click();
+      await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+      await expect(viewer.button("前のファイル")).toBeDisabled();
+      const menu = await viewer.openMenu();
+      expect(menu.find((item) => item.text === "前のファイル")?.enabled).toBe(false);
+      expect(menu.find((item) => item.text === "次のファイル")?.enabled).toBe(true);
+
+      await viewer.mouseButton(4);
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+    });
+
+    test("ゴミ箱へ移したあとは、一覧での次のファイル（無ければ前）を開く", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Alt+ArrowUp");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      // v3.zip の次は v2.zip（名前の順なら、次は無く、前の v2.zip）
+      await viewer.page.keyboard.press("Delete");
+      await viewer.confirmTrash();
+      await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
+
+      // v2.zip は末尾なので、前の v1.zip へ
+      await viewer.page.keyboard.press("Delete");
+      await viewer.confirmTrash();
+      await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+    });
+
+    test("別のウィンドウで消されたファイルからは、消える前の位置の前後へ移れる", async ({
+      viewer,
+    }) => {
+      await viewer.page.keyboard.press("Alt+ArrowUp");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await viewer.trashedElsewhere("/lib", "v3.zip");
+      // v3.zip は v1.zip と v2.zip のあいだにあった
+      await expect(viewer.button("次のファイル")).toBeEnabled();
+      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
+    });
+  });
+
+  test.describe("サイズの大きい順にしてある", () => {
+    test.use({
+      mockOptions: {
+        ...base,
+        fileMeta: {
+          "/lib/v1.zip": { size: 10 },
+          "/lib/v2.zip": { size: 30 },
+          "/lib/v3.zip": { size: 20 },
+        },
+        fileSort: { key: "size", direction: "desc" },
+      },
+    });
+
+    test("大きいファイルから小さいファイルへ進む", async ({ viewer }) => {
+      await expect(viewer.button("前のファイル")).toBeDisabled();
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+    });
+  });
+
+  test.describe("名前の降順にしてある", () => {
+    test.use({ mockOptions: { ...base, fileSort: { key: "name", direction: "desc" } } });
+
+    test("名前の大きいほうから小さいほうへ進む", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v1.zip");
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+    });
+  });
+
+  test.describe("開いているあいだに並び順が変わる", () => {
+    test.use({ mockOptions: { ...base, fileMeta } });
+
+    test("前後のボタンの有効・無効と、移動の順が、新しい並び順に変わる", async ({ viewer }) => {
+      // 名前の順では、v2.zip は真ん中
+      await expect(viewer.button("次のファイル")).toBeEnabled();
+      await viewer.sortChangedElsewhere(newestFirst);
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await viewer.page.keyboard.press("Alt+ArrowUp");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+    });
+  });
+
+  test.describe("保存されている並び順が、いまの版の知らない値", () => {
+    test.use({
+      mockOptions: {
+        ...base,
+        fileMeta,
+        fileSort: { key: "created", direction: "asc" } as never,
+      },
+    });
+
+    test("名前の順で移動する", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+    });
+  });
+});
+
+test.describe("中のアーカイブが 1 つだけのアーカイブ", () => {
+  test.describe("開ける", () => {
+    test.use({ mockOptions: { ...base, nested: { "/lib/v2.zip": ["inner/第1話.zip"] } } });
+
+    test("選択の画面を出さずに、中のアーカイブをそのまま開く", async ({ viewer }) => {
+      await expect(viewer.position()).toHaveText("1 / 6");
+      await expect(viewer.nestedItems()).toHaveCount(0);
+      expect(await viewer.calls("extract_nested_archive")).toEqual([
+        { parentPath: "/lib/v2.zip", nestedName: "inner/第1話.zip" },
+      ]);
+      expect(await viewer.imageSource()).toBe("/lib/v2.zip!/inner/第1話.zip");
+      // 戻る先の一覧が無いので、戻るボタンも出さない
+      await expect(viewer.button("アーカイブ一覧に戻る")).toHaveCount(0);
+      await expect.poll(() => viewer.title()).toBe("v2.zip [1/6] - mekuri");
+    });
+
+    test("前後のファイルへ移れて、戻ってきてもそのまま開く", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await viewer.page.keyboard.press("Alt+ArrowUp");
+      await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
+      await expect(viewer.position()).toHaveText("1 / 6");
+      await expect(viewer.nestedItems()).toHaveCount(0);
+    });
+
+    test("ゴミ箱へ移すのは、外側のファイル", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Delete");
+      await expect(viewer.dialog()).toContainText("v2.zip");
+      await viewer.confirmTrash();
+      await expect.poll(() => viewer.calls("trash_file")).toEqual([{ path: "/lib/v2.zip" }]);
+    });
+  });
+
+  test.describe("展開に失敗する", () => {
+    test.use({
+      expectedConsoleError: null,
+      mockOptions: {
+        ...base,
+        nested: { "/lib/v2.zip": ["inner/第1話.zip"] },
+        broken: {
+          "/lib/v2.zip!/inner/第1話.zip": "Failed to read ZIP archive: invalid Zip archive",
+        },
+      },
+    });
+
+    test("エラーの画面が出て、戻るボタンは出ず、前後のファイルへは移れる", async ({ viewer }) => {
+      await expect(viewer.notice()).toContainText(
+        "この ZIP ファイルは壊れているか、ZIP 形式ではありません",
+      );
+      await expect(viewer.button("アーカイブ一覧に戻る")).toHaveCount(0);
+      await viewer.page.keyboard.press("Alt+ArrowDown");
+      await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await expect(viewer.position()).toHaveText("1 / 6");
+    });
+  });
+
+  test.describe("中のアーカイブに画像が無い", () => {
+    test.use({
+      mockOptions: {
+        ...base,
+        nested: { "/lib/v2.zip": ["inner/第1話.zip"] },
+        archives: { "/lib/v2.zip!/inner/第1話.zip": [] },
+      },
+    });
+
+    test("画像が無いことを知らせ、戻るボタンは出さない", async ({ viewer }) => {
+      await expect(viewer.notice()).toContainText("このアーカイブには画像がありません");
+      await expect(viewer.button("アーカイブ一覧に戻る")).toHaveCount(0);
+    });
+  });
+});
+
+test.describe("ゴミ箱のショートカットは OS に合わせる", () => {
+  test("macOS では Ctrl+Backspace を受け付けない", async ({ viewer }) => {
+    await viewer.page.keyboard.press("Control+Backspace");
+    await expect(viewer.dialog()).toHaveCount(0);
+    await viewer.page.keyboard.press("Meta+Backspace");
+    await expect(viewer.dialog()).toBeVisible();
+  });
+
+  test.describe("Windows", () => {
+    test.use({ userAgent: WINDOWS_USER_AGENT });
+
+    test("Delete だけを受け付け、Backspace は修飾キーつきでも受け付けない", async ({ viewer }) => {
+      await viewer.page.keyboard.press("Control+Backspace");
+      await viewer.page.keyboard.press("Meta+Backspace");
+      await expect(viewer.dialog()).toHaveCount(0);
+      await viewer.page.keyboard.press("Delete");
+      await expect(viewer.dialog()).toBeVisible();
+    });
   });
 });

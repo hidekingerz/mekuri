@@ -1,4 +1,6 @@
-import { compareNatural } from "./naturalOrder";
+import type { DirectoryEntry } from "../types";
+import { compareEntries, type FileSort } from "./fileSort";
+import { fileNameFromPath } from "./windowLabel";
 
 /** ビューワーのページ移動操作。入力 (キー・クリック・ホイール) を移動に変換する純粋関数。 */
 
@@ -85,22 +87,40 @@ export function adjacentSibling<T>(
   return items[direction === "next" ? index + 1 : index - 1] ?? null;
 }
 
+/** 前後のファイルを決めるのに使う、ファイルの情報。 */
+type SiblingEntry = Pick<DirectoryEntry, "path" | "name" | "modified_ms" | "size">;
+
 /**
- * currentPath の隣のファイル (next は後ろ、prev は前)。端なら null。
- * currentPath が一覧に無いとき（別のウィンドウで消された・動かされた、開く前から無かった）は、
- * 名前の並び順で入るはずの位置の前後を返す。そうしないと、開けないファイルから動けなくなる。
+ * 開いているファイルの情報。一覧にあればそれを、無ければ最後に一覧で見えたときのもの（lastSeen）を使う。
+ * 一度も見えていないファイルは、更新日時もサイズも分からないものとして扱う。
  */
-export function siblingByPath(
-  items: string[],
-  currentPath: string,
+export function currentEntry<T extends SiblingEntry>(
+  entries: T[],
+  path: string,
+  lastSeen: SiblingEntry | null,
+): SiblingEntry {
+  const listed = entries.find((entry) => entry.path === path);
+  if (listed) return listed;
+  if (lastSeen?.path === path) return lastSeen;
+  return { path, name: fileNameFromPath(path), modified_ms: null, size: null };
+}
+
+/**
+ * current の隣のファイルのパス (next は後ろ、prev は前)。端なら null。entries は sort の順に並べたもの。
+ * current が一覧に無いとき（別のウィンドウで消された・動かされた、開く前から無かった）は、
+ * その並び順で入るはずの位置の前後を返す。そうしないと、開けないファイルから動けなくなる。
+ */
+export function siblingPath(
+  entries: SiblingEntry[],
+  sort: FileSort,
+  current: SiblingEntry,
   direction: "next" | "prev",
 ): string | null {
-  const index = items.indexOf(currentPath);
-  if (index !== -1) return adjacentSibling(items, index, direction);
+  const index = entries.findIndex((entry) => entry.path === current.path);
+  if (index !== -1) return adjacentSibling(entries, index, direction)?.path ?? null;
 
-  // 同じフォルダのファイルどうしなので、パスのまま比べても名前の順と同じになる
-  const insertAt = items.filter((item) => compareNatural(item, currentPath) < 0).length;
-  return (direction === "next" ? items[insertAt] : items[insertAt - 1]) ?? null;
+  const insertAt = entries.filter((entry) => compareEntries(entry, current, sort) < 0).length;
+  return (direction === "next" ? entries[insertAt] : entries[insertAt - 1])?.path ?? null;
 }
 
 /** マウスの戻る (button 3) / 進む (button 4) ボタンを兄弟ファイルの移動方向に対応づける。他のボタンは null。 */

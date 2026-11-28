@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
+import type { FileSort } from "./fileSort";
 import {
   adjacentSibling,
+  currentEntry,
   groupIndexFromRatio,
   navigationForClick,
   navigationForKey,
   navigationForWheel,
   progressRatio,
-  siblingByPath,
   siblingDirectionForKey,
   siblingDirectionForMouseButton,
+  siblingPath,
 } from "./spreadNavigation";
 
 describe("navigationForKey", () => {
@@ -168,31 +170,94 @@ describe("siblingDirectionForKey", () => {
   });
 });
 
-describe("siblingByPath", () => {
-  const files = ["/lib/v1.zip", "/lib/v2.zip", "/lib/v10.zip"];
+describe("siblingPath", () => {
+  const file = (name: string, modified_ms: number | null = null, size: number | null = null) => ({
+    path: `/lib/${name}`,
+    name,
+    modified_ms,
+    size,
+  });
+  const byName: FileSort = { key: "name", direction: "asc" };
+  const files = [file("v1.zip"), file("v2.zip"), file("v10.zip")];
 
   it("returns the neighbors of a file that is in the list", () => {
-    expect(siblingByPath(files, "/lib/v2.zip", "next")).toBe("/lib/v10.zip");
-    expect(siblingByPath(files, "/lib/v2.zip", "prev")).toBe("/lib/v1.zip");
-    expect(siblingByPath(files, "/lib/v1.zip", "prev")).toBeNull();
-    expect(siblingByPath(files, "/lib/v10.zip", "next")).toBeNull();
+    expect(siblingPath(files, byName, file("v2.zip"), "next")).toBe("/lib/v10.zip");
+    expect(siblingPath(files, byName, file("v2.zip"), "prev")).toBe("/lib/v1.zip");
+    expect(siblingPath(files, byName, file("v1.zip"), "prev")).toBeNull();
+    expect(siblingPath(files, byName, file("v10.zip"), "next")).toBeNull();
+  });
+
+  it("follows the order of the list it is given, whatever the sort", () => {
+    // 更新日時の新しい順に並べた一覧。名前の順とは違う
+    const newestFirst: FileSort = { key: "modified", direction: "desc" };
+    const sorted = [file("v2.zip", 300), file("v10.zip", 200), file("v1.zip", 100)];
+    expect(siblingPath(sorted, newestFirst, sorted[0], "next")).toBe("/lib/v10.zip");
+    expect(siblingPath(sorted, newestFirst, sorted[1], "next")).toBe("/lib/v1.zip");
+    expect(siblingPath(sorted, newestFirst, sorted[1], "prev")).toBe("/lib/v2.zip");
+    expect(siblingPath(sorted, newestFirst, sorted[2], "next")).toBeNull();
   });
 
   it("uses the place the name would take when the file is no longer in the list", () => {
     // v3.zip は消されたが、並び順では v2 と v10 のあいだ
-    expect(siblingByPath(files, "/lib/v3.zip", "next")).toBe("/lib/v10.zip");
-    expect(siblingByPath(files, "/lib/v3.zip", "prev")).toBe("/lib/v2.zip");
+    expect(siblingPath(files, byName, file("v3.zip"), "next")).toBe("/lib/v10.zip");
+    expect(siblingPath(files, byName, file("v3.zip"), "prev")).toBe("/lib/v2.zip");
+  });
+
+  it("uses the place the file had in a descending name order", () => {
+    const descending: FileSort = { key: "name", direction: "desc" };
+    const reversed = [...files].reverse();
+    expect(siblingPath(reversed, descending, file("v3.zip"), "next")).toBe("/lib/v2.zip");
+    expect(siblingPath(reversed, descending, file("v3.zip"), "prev")).toBe("/lib/v10.zip");
+  });
+
+  it("uses the place the last known date would take when the list is sorted by date", () => {
+    const newestFirst: FileSort = { key: "modified", direction: "desc" };
+    const sorted = [file("v2.zip", 300), file("v1.zip", 100)];
+    // 消された v10.zip は、最後に見えたとき更新日時が 200 だった
+    expect(siblingPath(sorted, newestFirst, file("v10.zip", 200), "next")).toBe("/lib/v1.zip");
+    expect(siblingPath(sorted, newestFirst, file("v10.zip", 200), "prev")).toBe("/lib/v2.zip");
   });
 
   it("handles a missing file that would come first or last", () => {
-    expect(siblingByPath(files, "/lib/a.zip", "prev")).toBeNull();
-    expect(siblingByPath(files, "/lib/a.zip", "next")).toBe("/lib/v1.zip");
-    expect(siblingByPath(files, "/lib/w.zip", "next")).toBeNull();
-    expect(siblingByPath(files, "/lib/w.zip", "prev")).toBe("/lib/v10.zip");
+    expect(siblingPath(files, byName, file("a.zip"), "prev")).toBeNull();
+    expect(siblingPath(files, byName, file("a.zip"), "next")).toBe("/lib/v1.zip");
+    expect(siblingPath(files, byName, file("w.zip"), "next")).toBeNull();
+    expect(siblingPath(files, byName, file("w.zip"), "prev")).toBe("/lib/v10.zip");
   });
 
   it("returns nothing when there are no other files", () => {
-    expect(siblingByPath([], "/lib/v1.zip", "next")).toBeNull();
-    expect(siblingByPath(["/lib/v1.zip"], "/lib/v1.zip", "prev")).toBeNull();
+    expect(siblingPath([], byName, file("v1.zip"), "next")).toBeNull();
+    expect(siblingPath([file("v1.zip")], byName, file("v1.zip"), "prev")).toBeNull();
+  });
+});
+
+describe("currentEntry", () => {
+  const listed = { path: "/lib/v2.zip", name: "v2.zip", modified_ms: 300, size: 20 };
+
+  it("takes the entry from the list when the file is there", () => {
+    const stale = { ...listed, modified_ms: 1 };
+    expect(currentEntry([listed], "/lib/v2.zip", stale)).toBe(listed);
+  });
+
+  it("falls back to what was last seen for the same file once it left the list", () => {
+    expect(currentEntry([], "/lib/v2.zip", listed)).toBe(listed);
+  });
+
+  it("does not reuse what was last seen for another file", () => {
+    expect(currentEntry([], "/lib/v9.zip", listed)).toEqual({
+      path: "/lib/v9.zip",
+      name: "v9.zip",
+      modified_ms: null,
+      size: null,
+    });
+  });
+
+  it("treats a file never seen in the list as one without a date or size", () => {
+    expect(currentEntry([], "C:\\lib\\v9.zip", null)).toEqual({
+      path: "C:\\lib\\v9.zip",
+      name: "v9.zip",
+      modified_ms: null,
+      size: null,
+    });
   });
 });

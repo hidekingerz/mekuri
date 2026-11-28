@@ -1,4 +1,4 @@
-import { expect, test } from "./helpers";
+import { expect, test, WINDOWS_USER_AGENT } from "./helpers";
 
 test.describe("ファイルをゴミ箱へ", () => {
   test("メニューからの確認は 1 回で、キャンセルすれば消えない", async ({ main }) => {
@@ -32,10 +32,28 @@ test.describe("ファイルをゴミ箱へ", () => {
     await main.page.keyboard.press("Escape");
     await expect(main.dialog()).toHaveCount(0);
 
+    await main.page.keyboard.press("Control+Backspace");
+    await expect(main.dialog()).toHaveCount(0);
+
     await main.page.keyboard.press("Meta+Backspace");
     await expect(main.dialog()).toBeVisible();
     await main.cancelTrash();
     expect(await main.calls("trash_files")).toEqual([]);
+  });
+
+  test.describe("Windows", () => {
+    test.use({ userAgent: WINDOWS_USER_AGENT });
+
+    test("Delete だけで確認が出て、Backspace は修飾キーつきでも出ない", async ({ main }) => {
+      await main.openAuthorA();
+      await main.file("a1.zip").click();
+      await main.page.keyboard.press("Control+Backspace");
+      await main.page.keyboard.press("Meta+Backspace");
+      await expect(main.dialog()).toHaveCount(0);
+
+      await main.page.keyboard.press("Delete");
+      await expect(main.dialog()).toBeVisible();
+    });
   });
 
   test("確認すると、選んだ全件を 1 回の呼び出しで移し、一覧から消える", async ({ main }) => {

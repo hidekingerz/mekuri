@@ -5,13 +5,14 @@
 // ページから読めるもの:
 //   window.__MOCK_CALLS__    すべての invoke 呼び出し（{ cmd, args }）
 //   window.__MOCK_FS__       現在のファイルツリー（フォルダ → 子の名前。末尾 "/" がフォルダ）
-//   window.__MOCK_STORE__    settings.json の中身（favorites, recentFolders）
+//   window.__MOCK_STORE__    settings.json の中身（favorites, recentFolders, fileSort など）
 //   window.__MOCK_DRAGGED__  read_dragged_paths が返すパス（Finder からのドロップの再現用）
 //   window.__MOCK_EMIT__     アプリ内イベントを届ける（別ウィンドウからの通知の再現用）
 //   window.__MOCK_MENU__     最後に出たネイティブのコンテキストメニューの項目（text, enabled, checked, separator）
 //   window.__MOCK_MENU_CLICK__("文言")  その項目を選んだことにする
 //   window.__MOCK_CLOSED__   ウィンドウを閉じる呼び出しがあったか
 // 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, viewerSettings, archives, dragged,
+//   fileSort: { key, direction }, fileMeta: { "<パス>": { modified_ms, size } },
 //   nested: { "<パス>": ["内側1.zip", …] }, broken: { "<パス>": "エラーの文" },
 //   fail: { cmd: "message" }, delay: { cmd: ミリ秒 }, monitor: null }
 // fail と delay は呼び出しのたびに読むので、先に置いた window.__MOCK_OPTS__ の中身をあとから変えても効く
@@ -45,6 +46,7 @@
     favorites: opts.favorites || ["/m/manga", "/m/mag"],
     recentFolders: opts.recentFolders || [],
     ...(opts.viewerSettings ? { viewerSettings: opts.viewerSettings } : {}),
+    ...(opts.fileSort ? { fileSort: opts.fileSort } : {}),
   };
   const isDir = (p) => p in tree;
   const parent = (p) => p.slice(0, p.lastIndexOf("/"));
@@ -63,6 +65,7 @@
       has_subfolders: d && (tree[path] || []).some((c) => c.endsWith("/")),
       modified_ms: now,
       size: 1000,
+      ...opts.fileMeta?.[path],
     };
   };
   // 一覧に出るファイル（アーカイブと PDF、隠しファイルを除く）だけを数える（filesystem/mod.rs の count_files）

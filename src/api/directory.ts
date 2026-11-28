@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { DirectoryEntry } from "../types";
 import { errorToString } from "../utils/errorToString";
+import { type FileSort, sortEntries } from "../utils/fileSort";
+import { getFileSort } from "./settings";
 
 export async function readDirectory(path: string): Promise<DirectoryEntry[]> {
   return invoke<DirectoryEntry[]>("read_directory", { path });
@@ -39,14 +41,15 @@ export async function moveFile(src: string, destDir: string): Promise<string> {
   return invoke<string>("move_file", { src, destDir });
 }
 
-export async function getSiblingArchives(
+/** currentPath と同じフォルダのファイルを、メインウィンドウの一覧と同じ並び順で返す。 */
+export async function getSiblingFiles(
   currentPath: string,
-): Promise<{ archives: string[]; currentIndex: number }> {
-  const parentDir = getParentDirectory(currentPath);
-  const files = await readDirectoryFiles(parentDir);
-  const archives = files.map((f) => f.path);
-  const currentIndex = archives.indexOf(currentPath);
-  return { archives, currentIndex };
+): Promise<{ entries: DirectoryEntry[]; sort: FileSort }> {
+  const [files, sort] = await Promise.all([
+    readDirectoryFiles(getParentDirectory(currentPath)),
+    getFileSort(),
+  ]);
+  return { entries: sortEntries(files, sort.key, sort.direction), sort };
 }
 
 export async function trashFiles(paths: string[]): Promise<void> {

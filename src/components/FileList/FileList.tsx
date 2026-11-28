@@ -4,21 +4,17 @@ import { readDroppedPaths } from "../../api/fileDrop";
 import { emitFileTrashed, onFileChanged } from "../../api/fileEvents";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useFileSelection } from "../../hooks/useFileSelection";
+import { useFileSort } from "../../hooks/useFileSort";
 import { useFolderDropTarget } from "../../hooks/useFolderDropTarget";
 import { useTrashConfirm } from "../../hooks/useTrashConfirm";
 import type { DirectoryEntry } from "../../types";
 import { FILE_DRAG_MIME } from "../../utils/constants";
 import { errorToString } from "../../utils/errorToString";
 import { dragSource, encodeDragPaths } from "../../utils/fileDrag";
-import {
-  SORT_KEY_LABELS,
-  type SortDirection,
-  type SortKey,
-  sortEntries,
-} from "../../utils/fileSort";
+import { SORT_KEY_LABELS, type SortKey, sortEntries } from "../../utils/fileSort";
 import { isListKeySource, moveListIndex } from "../../utils/listKeyboard";
 import type { ResolvedRecentFolder } from "../../utils/recentFolders";
-import { isTrashShortcut } from "../../utils/trashShortcut";
+import { isMacUserAgent, isTrashShortcut } from "../../utils/trashShortcut";
 import { ArchiveIcon, FolderIcon, PdfIcon } from "../Icons/Icons";
 import { RecentFolderList } from "../RecentFolders/RecentFolderList";
 
@@ -59,8 +55,8 @@ export function FileList({
   const { confirm: confirmTrash, dialog: trashDialog } = useTrashConfirm();
   // キーボード操作の現在位置（最後にクリックまたは矢印で選んだ項目）
   const [cursorPath, setCursorPath] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const { sort, changeSort } = useFileSort();
+  const { key: sortKey, direction: sortDirection } = sort;
   const listRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -197,7 +193,7 @@ export function FileList({
       clear();
       return;
     }
-    if (isTrashShortcut(e) && selected.size > 0) {
+    if (isTrashShortcut(e, isMacUserAgent(navigator.userAgent)) && selected.size > 0) {
       e.preventDefault();
       trashPaths([...selected]);
       return;
@@ -329,7 +325,7 @@ export function FileList({
           className="file-list__sort-select"
           aria-label="並び順"
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          onChange={(e) => changeSort({ ...sort, key: e.target.value as SortKey })}
         >
           {(Object.keys(SORT_KEY_LABELS) as SortKey[]).map((key) => (
             <option key={key} value={key}>
@@ -342,7 +338,9 @@ export function FileList({
           className="file-list__sort-dir"
           aria-label={sortDirection === "asc" ? "昇順。クリックで降順" : "降順。クリックで昇順"}
           title={sortDirection === "asc" ? "昇順" : "降順"}
-          onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+          onClick={() =>
+            changeSort({ ...sort, direction: sortDirection === "asc" ? "desc" : "asc" })
+          }
         >
           {sortDirection === "asc" ? "↑" : "↓"}
         </button>

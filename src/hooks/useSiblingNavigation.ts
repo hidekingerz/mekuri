@@ -1,33 +1,43 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getSiblingArchives } from "../api/directory";
-import { onFileChanged } from "../api/fileEvents";
-import type { SiblingNavigation } from "../types";
+import { getSiblingFiles } from "../api/directory";
+import { onFileChanged, onFileSortChanged } from "../api/fileEvents";
+import type { DirectoryEntry, SiblingNavigation } from "../types";
+import { DEFAULT_FILE_SORT, type FileSort } from "../utils/fileSort";
 import {
-  siblingByPath,
+  currentEntry,
   siblingDirectionForKey,
   siblingDirectionForMouseButton,
+  siblingPath,
 } from "../utils/spreadNavigation";
 import { appTitle, fileNameFromPath } from "../utils/windowLabel";
 
-type Siblings = { archives: string[]; currentIndex: number };
+type Siblings = {
+  /** 同じフォルダのファイル。メインウィンドウの一覧と同じ並び順 */
+  entries: DirectoryEntry[];
+  sort: FileSort;
+  /** 開いているファイルが最後に一覧で見えたときの情報。一覧から消えたあと、並びの中の元の位置を求めるのに使う */
+  lastSeen: DirectoryEntry | null;
+};
 
-const NO_SIBLINGS: Siblings = { archives: [], currentIndex: -1 };
+const NO_SIBLINGS: Siblings = { entries: [], sort: DEFAULT_FILE_SORT, lastSeen: null };
 
-/**
- * 同一フォルダ内の前後のアーカイブへ移動する。Alt+↓/↑ のキー操作と
- * マウスの戻る/進むボタンを登録し、ボタンやメニューから呼ぶための移動関数と端判定を返す。
- */
 /** 確認ダイアログが開いているあいだは、裏でファイルを切り替えない。 */
 const dialogOpen = () => document.querySelector("dialog[open]") !== null;
+
+/**
+ * 同一フォルダ内の前後のファイルへ移動する。順序は、メインウィンドウのファイル一覧の並び順に合わせる。
+ * Alt+↓/↑ のキー操作とマウスの戻る/進むボタンを登録し、ボタンやメニューから呼ぶための移動関数と端判定を返す。
+ */
 
 export function useSiblingNavigation(
   archivePath: string | null,
   onNavigate: (newPath: string) => void,
 ): SiblingNavigation {
   const [siblings, setSiblings] = useState<Siblings>(NO_SIBLINGS);
+  const { lastSeen } = siblings;
 
-  // 端判定用に兄弟一覧を保持し、他ウィンドウでのファイル移動・削除時にも追従する
+  // 端判定用に兄弟一覧を保持し、他ウィンドウでのファイル移動・削除と、並び順の変更にも追従する
   useEffect(() => {
     if (!archivePath) {
       setSiblings(NO_SIBLINGS);
@@ -37,19 +47,29 @@ export function useSiblingNavigation(
     let cancelled = false;
     const refresh = async () => {
       try {
-        const result = await getSiblingArchives(archivePath);
-        if (!cancelled) setSiblings(result);
+        const { entries, sort } = await getSiblingFiles(archivePath);
+        if (cancelled) return;
+        setSiblings((prev) => ({
+          entries,
+          sort,
+          lastSeen:
+            entries.find((entry) => entry.path === archivePath) ??
+            (prev.lastSeen?.path === archivePath ? prev.lastSeen : null),
+        }));
       } catch (err) {
         console.error("Failed to load sibling archives:", err);
       }
     };
 
     void refresh();
-    const unlistenPromise = onFileChanged(() => void refresh());
+    const unlistenPromises = [
+      onFileChanged(() => void refresh()),
+      onFileSortChanged(() => void refresh()),
+    ];
 
     return () => {
       cancelled = true;
-      void unlistenPromise.then((unlisten) => unlisten());
+      for (const promise of unlistenPromises) void promise.then((unlisten) => unlisten());
     };
   }, [archivePath]);
 
@@ -57,9 +77,10 @@ export function useSiblingNavigation(
     async (direction: "next" | "prev") => {
       if (!archivePath) return;
       try {
-        // 移動時は最新の一覧で判定する (保持中の一覧が古い可能性があるため)
-        const { archives } = await getSiblingArchives(archivePath);
-        const newPath = siblingByPath(archives, archivePath, direction);
+        // 移動時は最新の一覧と並び順で判定する (保持中のものが古い可能性があるため)
+        const { entries, sort } = await getSiblingFiles(archivePath);
+        const current = currentEntry(entries, archivePath, lastSeen);
+        const newPath = siblingPath(entries, sort, current, direction);
         // 一覧を待つあいだに確認ダイアログが開いていたら、その裏では切り替えない
         if (!newPath || dialogOpen()) return;
 
@@ -69,7 +90,7 @@ export function useSiblingNavigation(
         console.error("Failed to navigate to sibling archive:", err);
       }
     },
-    [archivePath, onNavigate],
+    [archivePath, onNavigate, lastSeen],
   );
 
   const goNext = useCallback(() => void navigate("next"), [navigate]);
@@ -109,15 +130,12 @@ export function useSiblingNavigation(
     };
   }, [archivePath, goNext, goPrev]);
 
-  return useMemo(
-    () => ({
-      hasNext:
-        archivePath !== null && siblingByPath(siblings.archives, archivePath, "next") !== null,
-      hasPrev:
-        archivePath !== null && siblingByPath(siblings.archives, archivePath, "prev") !== null,
-      goNext,
-      goPrev,
-    }),
-    [siblings, archivePath, goNext, goPrev],
-  );
+  return useMemo(() => {
+    const has = (direction: "next" | "prev") => {
+      if (archivePath === null) return false;
+      const current = currentEntry(siblings.entries, archivePath, siblings.lastSeen);
+      return siblingPath(siblings.entries, siblings.sort, current, direction) !== null;
+    };
+    return { hasNext: has("next"), hasPrev: has("prev"), goNext, goPrev };
+  }, [siblings, archivePath, goNext, goPrev]);
 }

@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
-import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
+import { getSiblingFiles, moveFile, trashFile } from "./api/directory";
 import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
 import { recordRecentFolder } from "./api/recentFolders";
 import { saveViewerSettings } from "./api/settings";
@@ -18,8 +18,8 @@ import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
 import { describeOpenError } from "./utils/openErrorMessage";
 import type { ReadingDirection } from "./utils/spreadLayout";
-import { siblingByPath } from "./utils/spreadNavigation";
-import { isTrashShortcut } from "./utils/trashShortcut";
+import { currentEntry, siblingPath } from "./utils/spreadNavigation";
+import { isMacUserAgent, isTrashShortcut } from "./utils/trashShortcut";
 import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -84,10 +84,10 @@ function Viewer() {
     setTrashError(null);
     try {
       // 消したあとに開くファイル（次、無ければ前）は、消す前の一覧で決める
-      const { archives } = await getSiblingArchives(currentPath);
+      const { entries, sort } = await getSiblingFiles(currentPath);
+      const current = currentEntry(entries, currentPath, null);
       const nextPath =
-        siblingByPath(archives, currentPath, "next") ??
-        siblingByPath(archives, currentPath, "prev");
+        siblingPath(entries, sort, current, "next") ?? siblingPath(entries, sort, current, "prev");
 
       await trashFile(currentPath);
       await emitFileTrashed();
@@ -130,8 +130,7 @@ function Viewer() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // fn+Delete か Cmd/Ctrl+Backspace のみ。Backspace 単独では発火しない
-      if (!isTrashShortcut(e)) return;
+      if (!isTrashShortcut(e, isMacUserAgent(navigator.userAgent))) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       e.preventDefault();

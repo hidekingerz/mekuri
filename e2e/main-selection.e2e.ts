@@ -95,3 +95,26 @@ test.describe("Enter で開く", () => {
     expect(await main.openedViewers()).toHaveLength(1);
   });
 });
+
+test.describe("ファイル一覧の並び順", () => {
+  test("変えた並び順を保存して、開いているビューワーへ知らせる", async ({ main }) => {
+    await main.openAuthorA();
+    await main.page.getByLabel("並び順").selectOption("更新日時");
+    await expect.poll(() => main.savedFileSort()).toEqual({ key: "modified", direction: "asc" });
+    await main.page.getByRole("button", { name: "昇順。クリックで降順" }).click();
+    await expect.poll(() => main.savedFileSort()).toEqual({ key: "modified", direction: "desc" });
+    await expect
+      .poll(async () => (await main.emitted()).filter((e) => e === "file-sort-changed"))
+      .toHaveLength(2);
+  });
+
+  test.describe("前に名前の降順にしてあった", () => {
+    test.use({ mockOptions: { fileSort: { key: "name", direction: "desc" } } });
+
+    test("開いたときから、その並び順で表示する", async ({ main }) => {
+      await main.openAuthorA();
+      await expect(main.page.getByRole("button", { name: "降順。クリックで昇順" })).toBeVisible();
+      await expect(main.fileNames()).toHaveText(["a5.pdf", "a4.cbz", "a3.zip", "a2.zip", "a1.zip"]);
+    });
+  });
+});

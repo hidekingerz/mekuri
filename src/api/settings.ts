@@ -5,6 +5,7 @@ import {
   DEFAULT_VIEWER_HEIGHT,
   DEFAULT_VIEWER_WIDTH,
 } from "../utils/constants";
+import { DEFAULT_FILE_SORT, type FileSort, isFileSort } from "../utils/fileSort";
 import type { ReadingDirection, ViewMode } from "../utils/spreadLayout";
 import { getStore } from "./store";
 
@@ -61,4 +62,17 @@ export async function saveViewerSettings(settings: Partial<ViewerWindowSettings>
   const current =
     (await store.get<ViewerWindowSettings>("viewerSettings")) ?? DEFAULT_VIEWER_SETTINGS;
   await store.set("viewerSettings", { ...current, ...settings });
+}
+
+/** メインウィンドウのファイル一覧の並び順。ビューワーの前後のファイルの順にも使う。 */
+export async function getFileSort(): Promise<FileSort> {
+  const store = await getStore(STORE_DEFAULTS);
+  const saved = await store.get<unknown>("fileSort");
+  // 知らない値（別の版が保存したものなど）は使わず、名前の昇順にする
+  return isFileSort(saved) ? saved : DEFAULT_FILE_SORT;
+}
+
+export async function saveFileSort(sort: FileSort): Promise<void> {
+  const store = await getStore(STORE_DEFAULTS);
+  await store.set("fileSort", sort);
 }

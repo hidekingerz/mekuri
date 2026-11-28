@@ -92,7 +92,7 @@ ArchiveContents =
   | { type: "Empty" }                          // 画像もアーカイブもなし
 ```
 
-アーカイブを開く際に最初に呼ばれる。画像を直接含む場合はそのまま表示、ネストアーカイブを含む場合は選択 UI を表示する。
+アーカイブを開く際に最初に呼ばれる。画像を直接含む場合はそのまま表示、ネストアーカイブを含む場合は選択 UI を表示する（1 つだけなら、選択 UI を出さずにそれを展開して表示する）。
 
 ### アーカイブ画像一覧取得
 
@@ -214,6 +214,7 @@ Tauri のマルチウィンドウ機能を使用する。
   [ネストアーカイブを含む場合]
   → React (ビューワー): ネストアーカイブ選択 UI を表示
   → ユーザー操作: アーカイブを選択
+    （ネストアーカイブが 1 つだけなら、選択 UI を出さずにそれを選んだものとして進む）
   → React: invoke("extract_nested_archive", { parent_path, nested_name })
   → Rust: 一時ディレクトリに展開 → パス返却
   → React: invoke("list_archive_images", { archive_path: 展開パス })
@@ -254,6 +255,10 @@ Tauri のマルチウィンドウ機能を使用する。
 アプリ起動
   → React: useSettings.getWindowSettings() で設定読み込み
   → React: ウィンドウサイズ・カラム幅を復元 → ウィンドウ表示
+
+ファイル一覧の並び順の変更（メインウィンドウ）
+  → React: settings.json の fileSort に保存 → file-sort-changed イベントを emit
+  → React (ビューワー): fileSort を読み直し、前後のファイルの順と端判定を更新
 ```
 
 ## エラーハンドリング方針
@@ -284,7 +289,8 @@ Tauri のマルチウィンドウ機能を使用する。
 | `useArchiveLoader` | アーカイブの読み込み・内容分析・ネストアーカイブ展開 |
 | `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
 | `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
-| `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーとマウスの戻る/進むボタンの登録、ボタン・メニュー向けの移動関数と端判定の提供） |
+| `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーとマウスの戻る/進むボタンの登録、ボタン・メニュー向けの移動関数と端判定の提供）。順序は、保存されているファイル一覧の並び順に合わせ、`file-sort-changed` イベントで追従する |
+| `useFileSort` | ファイル一覧の並び順の復元と保存。変更時に `file-sort-changed` イベントを emit する（メインウィンドウのみ） |
 | `useUpdater` | アプリ内アップデートの状態管理・自動確認・ダウンロード/インストール・再起動（メインウィンドウのみ） |
 
 ## ユーティリティ

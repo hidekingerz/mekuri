@@ -22,7 +22,17 @@ export type MockOptions = {
   broken?: Record<string, string>;
   /** ビューワーで開くファイル（既定は VIEWER_FILE） */
   viewerFile?: string;
+  /** 保存済みのファイル一覧の並び順（無ければ名前の昇順） */
+  fileSort?: FileSort;
+  /** ファイルのパス → 更新日時とサイズ（無いファイルは、どれも同じ値） */
+  fileMeta?: Record<string, { modified_ms?: number | null; size?: number | null }>;
 };
+
+type FileSort = { key: "name" | "modified" | "size"; direction: "asc" | "desc" };
+
+/** Windows の WebView2 のユーザーエージェント（既定は playwright.config.ts の macOS）。 */
+export const WINDOWS_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
 
 /** ネイティブのコンテキストメニューの 1 項目。 */
 export type MenuEntry = {
@@ -74,6 +84,19 @@ export class MainWindow {
           .map((x) => x.args),
       cmd,
     );
+  }
+
+  /** 保存されているファイル一覧の並び順。 */
+  async savedFileSort(): Promise<unknown> {
+    return this.page.evaluate(
+      () =>
+        (window as unknown as { __MOCK_STORE__: { fileSort?: unknown } }).__MOCK_STORE__.fileSort,
+    );
+  }
+
+  /** ほかのウィンドウへ届けたアプリ内イベントの名前。 */
+  async emitted(): Promise<string[]> {
+    return (await this.calls("plugin:event|emit")).map((args) => args.event as string);
   }
 
   /** ビューワーを開く呼び出し。開いたファイル名と、指定された位置。 */
@@ -368,6 +391,18 @@ export class ViewerWindow {
       },
       [dir, name] as const,
     );
+  }
+
+  /** メインウィンドウでファイル一覧の並び順が変わったことを再現する。 */
+  async sortChangedElsewhere(sort: FileSort) {
+    await this.page.evaluate((s) => {
+      const w = window as unknown as {
+        __MOCK_STORE__: Record<string, unknown>;
+        __MOCK_EMIT__: (event: string) => void;
+      };
+      w.__MOCK_STORE__.fileSort = s;
+      w.__MOCK_EMIT__("file-sort-changed");
+    }, sort);
   }
 
   /** 短い間隔で wheel を続けて届ける（トラックパッドの慣性を模す）。 */

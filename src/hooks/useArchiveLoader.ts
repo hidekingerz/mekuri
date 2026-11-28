@@ -60,6 +60,13 @@ export function useArchiveLoader(archivePath: string | null) {
           setImageNames(contents.names);
           setEffectivePath(path);
           setCachedNestedArchives(null);
+        } else if (contents.type === "NestedArchives" && contents.names.length === 1) {
+          // 中のアーカイブが 1 つだけなら、選ばせずにそのまま開く
+          const extractedPath = await extractNestedArchive(path, contents.names[0]);
+          const names = await listArchiveImages(extractedPath);
+          if (cancelled) return;
+          setImageNames(names);
+          setEffectivePath(extractedPath);
         } else if (contents.type === "NestedArchives") {
           setNestedArchives(contents.names);
           setCachedNestedArchives(contents.names);

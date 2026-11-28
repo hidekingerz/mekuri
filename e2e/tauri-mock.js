@@ -1,6 +1,7 @@
 // Tauri の IPC を差し替える e2e 用のモック。Playwright の addInitScript でページに注入する。
 // Rust 側の代わりに、この中の仮のファイルツリーと store を読み書きする。
-// move_file / trash_* / count_files / search_directory の条件は src-tauri/src/filesystem/mod.rs に合わせてある。
+// read_directory / search_directory / move_file / trash_* / count_files の条件は src-tauri/src/filesystem/mod.rs に
+// 合わせてある（隠しファイルを除く、フォルダ・アーカイブ・PDF だけを返す、フォルダを先にして自然順に並べる）。
 //
 // ページから読めるもの:
 //   window.__MOCK_CALLS__    すべての invoke 呼び出し（{ cmd, args }）
@@ -11,8 +12,10 @@
 //   window.__MOCK_MENU__     最後に出たネイティブのコンテキストメニューの項目（text, enabled, checked, separator）
 //   window.__MOCK_MENU_CLICK__("文言")  その項目を選んだことにする
 //   window.__MOCK_CLOSED__   ウィンドウを閉じる呼び出しがあったか
+//   window.__MOCK_WINDOWS__  開いているウィンドウのラベル（"main" と、作られたビューワー）
 // 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, viewerSettings, archives, dragged,
 //   fileSort: { key, direction }, fileMeta: { "<パス>": { modified_ms, size } },
+//   dialog: フォルダ選択ダイアログが返すパス（無ければ、キャンセルしたことになる）,
 //   nested: { "<パス>": ["内側1.zip", …] }, broken: { "<パス>": "エラーの文" },
 //   fail: { cmd: "message" }, delay: { cmd: ミリ秒 }, monitor: null }
 // fail と delay は呼び出しのたびに読むので、先に置いた window.__MOCK_OPTS__ の中身をあとから変えても効く
@@ -48,6 +51,33 @@
     ...(opts.viewerSettings ? { viewerSettings: opts.viewerSettings } : {}),
     ...(opts.fileSort ? { fileSort: opts.fileSort } : {}),
   };
+  // archive/mod.rs の ARCHIVE_EXTENSIONS と PDF_EXTENSIONS
+  const ARCHIVE = /\.(zip|cbz|rar|cbr|7z)$/i;
+  const PDF = /\.pdf$/i;
+  const hidden = (name) => name.startsWith(".");
+  // natural_order.rs と同じ考え方の比較（数字は数値として比べ、大文字と小文字は区別しない）
+  const naturalCompare = (a, b) => {
+    const tokens = (s) => s.toLowerCase().match(/[0-9]+|[^0-9]/gu) || [];
+    const x = tokens(a);
+    const y = tokens(b);
+    for (let i = 0; i < Math.min(x.length, y.length); i++) {
+      if (x[i] === y[i]) continue;
+      const digits = /^[0-9]/.test(x[i]) && /^[0-9]/.test(y[i]);
+      if (digits) {
+        const p = x[i].replace(/^0+/, "");
+        const q = y[i].replace(/^0+/, "");
+        if (p !== q) return p.length - q.length || (p < q ? -1 : 1);
+        continue;
+      }
+      return x[i] < y[i] ? -1 : 1;
+    }
+    return x.length - y.length || (a < b ? -1 : a > b ? 1 : 0);
+  };
+  // フォルダを先頭に、それぞれ自然順で並べる（filesystem/mod.rs の sort_entries）
+  const sortEntries = (list) =>
+    list.sort((a, b) =>
+      a.is_dir !== b.is_dir ? (a.is_dir ? -1 : 1) : naturalCompare(a.name, b.name),
+    );
   const isDir = (p) => p in tree;
   const parent = (p) => p.slice(0, p.lastIndexOf("/"));
   const base = (p) => p.slice(p.lastIndexOf("/") + 1);
@@ -60,9 +90,9 @@
       name: n,
       path,
       is_dir: d,
-      is_archive: !d && /\.(zip|cbz|rar|cbr)$/i.test(n),
-      is_pdf: !d && /\.pdf$/i.test(n),
-      has_subfolders: d && (tree[path] || []).some((c) => c.endsWith("/")),
+      is_archive: !d && ARCHIVE.test(n),
+      is_pdf: !d && !ARCHIVE.test(n) && PDF.test(n),
+      has_subfolders: d && (tree[path] || []).some((c) => c.endsWith("/") && !hidden(c)),
       modified_ms: now,
       size: 1000,
       ...opts.fileMeta?.[path],
@@ -77,7 +107,7 @@
           : n +
             (c.endsWith("/")
               ? countFiles(`${dir}/${c.slice(0, -1)}`)
-              : /\.(zip|cbz|rar|cbr|pdf)$/i.test(c)
+              : ARCHIVE.test(c) || PDF.test(c)
                 ? 1
                 : 0),
       0,
@@ -105,6 +135,8 @@
   window.__MOCK_CALLS__ = calls;
   window.__MOCK_FS__ = tree;
   window.__MOCK_STORE__ = store;
+  const windows = ["main"];
+  window.__MOCK_WINDOWS__ = windows;
   window.__MOCK_DRAGGED__ = opts.dragged || []; // read_dragged_paths が返すパス（Finder ドロップの再現用）
   const dispatch = (event, payload) => {
     for (const h of listeners.get(event) || []) callbacks.get(h)?.({ event, id: 0, payload });
@@ -133,7 +165,11 @@
         case "plugin:store|load":
           return 1;
         case "plugin:store|get":
-          return [store[args.key], args.key in store];
+          // 実際の IPC と同じく、写しを返す（受け取った側が書き換えても、保存するまで store は変わらない）
+          return [
+            args.key in store ? JSON.parse(JSON.stringify(store[args.key])) : undefined,
+            args.key in store,
+          ];
         case "plugin:store|set":
           store[args.key] = args.value;
           return null;
@@ -159,7 +195,12 @@
         }
         case "read_directory": {
           if (!isDir(args.path)) throw `Failed to read directory: ${args.path}`;
-          return tree[args.path].filter((c) => !c.startsWith(".")).map((c) => entry(args.path, c));
+          return sortEntries(
+            tree[args.path]
+              .filter((c) => !hidden(c))
+              .map((c) => entry(args.path, c))
+              .filter((e) => e.is_dir || e.is_archive || e.is_pdf),
+          );
         }
         case "existing_dirs":
           return args.paths.filter(isDir);
@@ -230,18 +271,22 @@
           return `data:image/svg+xml;base64,${btoa(svg)}`;
         }
         case "search_directory": {
-          // 名前に query を含むものを再帰で集める（filesystem/mod.rs:218-）
-          const q = args.query.toLowerCase();
+          // 名前に query を含むフォルダ・アーカイブ・PDF を再帰で集める（filesystem/mod.rs の search_directory）。
+          // 濁点などの合成の違い（NFC と NFD）は区別しない
+          if (!isDir(args.path)) throw `Failed to search directory: ${args.path}`;
+          const fold = (s) => s.normalize("NFC").toLowerCase();
+          const q = fold(args.query);
           const out = [];
           const walk = (dir) => {
             for (const c of tree[dir] || []) {
+              if (hidden(c)) continue;
               const e = entry(dir, c);
-              if (e.name.toLowerCase().includes(q)) out.push(e);
+              if ((e.is_dir || e.is_archive || e.is_pdf) && fold(e.name).includes(q)) out.push(e);
               if (e.is_dir) walk(e.path);
             }
           };
           walk(args.path);
-          return out;
+          return sortEntries(out);
         }
         // ---- ネイティブのコンテキストメニュー ----
         // 作られた項目を覚え、popup されたメニューの中身を window.__MOCK_MENU__ に置く。
@@ -285,7 +330,12 @@
           window.__MOCK_CLOSED__ = true;
           return null;
         case "plugin:window|get_all_windows":
-          return ["main"];
+          return windows;
+        case "plugin:webview|create_webview_window":
+          windows.push(args.options.label);
+          return null;
+        case "plugin:dialog|open":
+          return opts.dialog ?? null;
         // 2 倍の画面（論理 1600x1000、メニューバー 25px を除いた作業領域）
         case "plugin:window|current_monitor":
           return opts.monitor === null
@@ -298,7 +348,7 @@
                 workArea: { position: { x: 0, y: 50 }, size: { width: 3200, height: 2000 } },
               };
         case "plugin:webview|get_all_webviews":
-          return [{ windowLabel: "main", label: "main" }];
+          return windows.map((w) => ({ windowLabel: w, label: w }));
         case "was_opened_via_file":
           return false;
         case "plugin:updater|check":

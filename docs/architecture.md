@@ -36,9 +36,10 @@ UI の描画とユーザー操作を担当する。Tauri の IPC（`invoke`）�
 | コンポーネント | 責務 |
 |---------------|------|
 | `FavoritesSidebar` | お気に入りフォルダの一覧表示・選択・削除（コンテキストメニュー） |
-| `FolderTree` | ディレクトリ階層のツリー表示・操作 |
-| `TreeNode` | ツリーノード描画・展開/折りたたみ・コンテキストメニュー（お気に入り追加） |
-| `FileList` | 選択中フォルダ内のアーカイブファイル一覧表示 |
+| `FolderTree` | ディレクトリ階層のツリー表示・操作、コンテキストメニュー（お気に入り追加・ゴミ箱）、検索に一致したフォルダの一覧。お気に入りごとに作り直す（`key`）。読み込みの結果は、待っているあいだに変わったかもしれない最新のツリーへ反映する |
+| `TreeNode` | ツリーノード描画・展開/折りたたみ |
+| `FileList` | 選択中フォルダ内のアーカイブ・PDF の一覧表示、並べ替え、検索結果の表示（ファイルにはお気に入りからの場所を添える）。同じフォルダの読み直しでは一覧を出したままにする |
+| `RecentFolderList` | 最近開いたフォルダの一覧 |
 | `SpreadViewer` | 見開き/単ページ画像表示・ページ送り・プログレスバー・読み方向切替。`SpreadViewerHandle` を `useImperativeHandle` で公開し、外部からモード切替が可能 |
 | `PageImage` | 個別の画像表示 |
 | `Icons` | カスタム SVG アイコン（ChevronRight, FolderIcon, ArchiveIcon, PdfIcon, RtlIcon, LtrIcon 等） |
@@ -72,12 +73,26 @@ DirectoryEntry {
   is_archive: boolean
   is_pdf: boolean
   has_subfolders: boolean
+  modified_ms: number | null   // 最終更新日時（UNIX ミリ秒）
+  size: number | null          // ファイルサイズ（バイト）。フォルダは null
 }
 ```
 
 ツリーの遅延読み込みに対応する。フォルダを展開した時点でそのフォルダの直下のみを取得する。
 `has_subfolders` はサブフォルダの有無を示し、UI 側でシェブロン表示の制御に使用する。
-結果はディレクトリ優先、自然順ソート済みで返却される。隠しファイルとアーカイブ以外のファイルは除外される。
+結果はディレクトリ優先、自然順ソート済みで返却される。隠しファイルと、アーカイブでも PDF でもないファイルは除外される。
+
+### 検索
+
+```
+Command: search_directory
+Input:   { path: string, query: string }
+Output:  DirectoryEntry[]
+```
+
+`path` 以下を再帰的にたどり、名前に `query` を含むフォルダ・アーカイブ・PDF を返す。大文字と小文字、合成の違い（NFC と NFD。macOS では濁点・半濁点のある名前が分解された形で保存されていることがある）は区別しない。隠しファイルと隠しフォルダの中は対象にしない。結果はディレクトリ優先、自然順ソート済み。`path` を読めなければ `Err` を返し、途中のサブフォルダが読めない場合はそのフォルダを飛ばす。
+
+フロントエンド（`useFolderSearch`）は、検索語の前後の空白を除き、入力が 300ms 止まってから呼ぶ。前の検索語の応答が後から返っても使わない。失敗は「一致なし」と区別して表示する。
 
 ### アーカイブ内容分析
 
@@ -171,12 +186,14 @@ Tauri のマルチウィンドウ機能を使用する。
 ```
 ユーザー操作: 「フォルダを追加」ボタンクリック
   → React: open() でフォルダ選択ダイアログを表示
-  → React: useFavorites.addFavorite() で tauri-plugin-store に保存
-  → React: FavoritesSidebar を更新
+  → React: api/favorites の addFavorite() で tauri-plugin-store に保存
+  → React: FavoritesSidebar を更新し、追加したお気に入りを開く
 
 ユーザー操作: お気に入りを右クリック → 削除
-  → React: useFavorites.removeFavorite() で tauri-plugin-store から削除
-  → React: FavoritesSidebar を更新
+  → React: api/favorites の removeFavorite() で tauri-plugin-store から削除
+  → React: FavoritesSidebar を更新。表示中のお気に入りを外した場合は、ツリーと一覧も閉じる
+
+保存に失敗した場合は、ツールバーのバナーで知らせる（登録・削除は行われない）
 ```
 
 ### フォルダツリー表示
@@ -197,13 +214,13 @@ Tauri のマルチウィンドウ機能を使用する。
 ```
 ユーザー操作: フォルダ選択
   → React: invoke("read_directory", { path })
-  → React: アーカイブファイルのみフィルタして FileList に表示
+  → React: アーカイブと PDF だけをフィルタして FileList に表示
 ```
 
 ### アーカイブ閲覧
 
 ```
-ユーザー操作: アーカイブファイルをクリック
+ユーザー操作: アーカイブファイルをダブルクリック（または選んで Enter）
   → React (メイン): 既存ウィンドウを検索 → あればフォーカス、なければ新規生成
   → React (ビューワー): invoke("analyze_archive_contents", { archive_path })
   → Rust: archive::analyze_contents → 内容判定
@@ -234,7 +251,7 @@ Tauri のマルチウィンドウ機能を使用する。
 ### PDF 閲覧
 
 ```
-ユーザー操作: PDF ファイルをクリック
+ユーザー操作: PDF ファイルをダブルクリック（または選んで Enter）
   → React (メイン): ビューワーウィンドウを生成
   → React (ビューワー): invoke("read_file_base64", { path }) で PDF バイナリを取得
   → React (ビューワー): pdfjs-dist で PDF をロード（CMap/標準フォント設定付き）
@@ -274,8 +291,11 @@ Tauri のマルチウィンドウ機能を使用する。
 
 | コンポーネント | エラー発生箇所 | 表示方法 |
 |---------------|---------------|---------|
-| `FolderTree` | ルートディレクトリ読み込み失敗 | ツリー領域にエラーメッセージを表示 |
-| `FolderTree` | サブフォルダ展開失敗 | 子ノードを空配列として扱い、静かに処理 |
+| `FolderTree` | ルートディレクトリ読み込み失敗 | ツリー領域にエラーメッセージを表示。「再読み込み」で読み直す |
+| `FolderTree` | サブフォルダ展開失敗 | 開いた表示にせず、次に開こうとしたときに読み直す（画面には出さない） |
+| `FileList` | フォルダの読み込み失敗 | 一覧の領域に理由を表示。「再読み込み」で読み直す |
+| `App` | お気に入りの保存の失敗 | ツールバーのバナーに表示 |
+| `App` / `FileList` | 検索の失敗 | 検索結果の領域に「検索できませんでした」と理由を表示（一致なしとは別の表示） |
 | `ViewerApp` | アーカイブ内容分析の失敗 | エラー画面を表示（エラー詳細付き） |
 | `ViewerApp` | アーカイブ内に画像なし | 「このアーカイブには画像がありません」と、前後のファイル・閉じるのボタンを表示（ネストの選択の一覧から展開した中身なら、その一覧へ戻れる） |
 | `ViewerApp` | ネストアーカイブ展開失敗 | エラー画面を表示（選択の一覧から選んだものなら、その一覧へ戻れる。ネストが 1 つだけで一覧を出していないときは戻れない） |
@@ -285,10 +305,15 @@ Tauri のマルチウィンドウ機能を使用する。
 
 | フック / モジュール | 責務 |
 |-------------------|------|
-| `useDirectory` | `read_directory` の呼び出し、フォルダ/ファイルのフィルタリング、兄弟ファイル取得 |
+| `api/directory`（フックではない） | `read_directory` の呼び出し、フォルダ/ファイルのフィルタリング、兄弟ファイル取得、検索、移動、ゴミ箱 |
+| `api/favorites`（フックではない） | お気に入りフォルダの読み書き（`tauri-plugin-store` 経由で永続化） |
+| `useFolderSearch` | お気に入り配下の検索（デバウンス、古い応答の破棄、失敗の保持） |
+| `useMainWindowSetup` | メインウィンドウの設定復元・表示・リサイズ保存 |
+| `useColumnResize` | ツリー列の幅のドラッグ変更と保存。表示時にウィンドウ幅で制限する |
+| `useRecentFolders` | 最近開いたフォルダの読み込みと、表示用の絞り込み |
+| `useContextMenu` | コンテキストメニューの開閉（外側のクリック・別の場所の右クリック・Esc・フォーカス喪失で閉じる） |
 | `useArchiveLoader` | アーカイブの読み込み・内容分析・ネストアーカイブ展開 |
 | `usePdfLoader` | PDF ファイルの読み込み・ページレンダリング（pdfjs-dist 経由） |
-| `useFavorites` | お気に入りフォルダの CRUD（`tauri-plugin-store` 経由で永続化） |
 | `useSiblingNavigation` | 兄弟ファイル間のナビゲーション（Alt+矢印キーとマウスの戻る/進むボタンの登録、ボタン・メニュー向けの移動関数と端判定の提供）。順序は、保存されているファイル一覧の並び順に合わせ、`file-sort-changed` イベントで追従する |
 | `useFileSort` | ファイル一覧の並び順の復元と保存。変更時に `file-sort-changed` イベントを emit する（メインウィンドウのみ） |
 | `useUpdater` | アプリ内アップデートの状態管理・自動確認・ダウンロード/インストール・再起動（メインウィンドウのみ） |
@@ -299,6 +324,14 @@ Tauri のマルチウィンドウ機能を使用する。
 |-----------|------|
 | `spreadLayout` | ページの組み方の計算。見開きは表紙を単ページにして以降を 2 ページずつ（残りが半端なら末尾は単ページ）、3 ページ・ウィンドウ追従は表紙なしで枚数ずつ。横長のページは単独にして、その後ろから組み直す。RTL/LTR の並びは描画時に反映する |
 | `windowLabel` | アーカイブパスからウィンドウラベルのハッシュ生成、ファイル名抽出 |
+| `paths` | パスの文字列の扱い（親・名前・中にあるかの判定・連結）。区切りは `/` と `\` の両方に対応する |
+| `folderTree` | ツリーのノードの更新（子のマージ、開閉、削除）と、ルートから対象までの階層の計算 |
+| `fileSort` | ファイル一覧の並べ替えと、並び順の保存値の検証 |
+| `naturalOrder` | 自然順の比較（Rust の `natural_order::compare` と同じ結果） |
+| `recentFolders` | 最近開いたフォルダの記録と、表示用の解決 |
+| `favorites` | フォルダの中にあるお気に入りの抽出 |
+| `columnLayout` | ツリー列の幅の制限 |
+| `listKeyboard` | 一覧・ツリーのキー操作での移動先の計算 |
 | `pdf` | PDF ファイルの読み込みとページレンダリング（pdfjs-dist 使用、CMap/標準フォント対応） |
 | `fileType` | ファイルパスの拡張子からファイル種別（archive/pdf/unknown）を判定 |
 | `updateState` | アップデート UI の状態遷移（副作用なし。`useUpdater` から利用） |

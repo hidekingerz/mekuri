@@ -142,6 +142,14 @@ body {
   font-weight: 500;
 }
 
+.file-list__location {
+  margin-left: auto;
+  padding-left: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .tree-node__location {
   margin-left: 8px;
   font-size: 11px;

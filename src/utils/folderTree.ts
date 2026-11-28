@@ -1,4 +1,5 @@
 import type { DirectoryEntry, TreeNodeData } from "../types";
+import { isSameOrInside, joinPath, parentPath, segmentsBelow } from "./paths";
 
 /**
  * 既存ノード配列と再取得したエントリをマージする。
@@ -15,6 +16,7 @@ export function mergeNodes(existing: TreeNodeData[], fresh: DirectoryEntry[]): T
 
 /**
  * ツリー内の path のノードの children を fresh とのマージ結果に置き換える。
+ * サブフォルダの有無（シェブロンを出すか）も fresh に合わせ、無くなったら閉じる。
  * path が見つからなければ入力配列をそのまま返す。
  */
 export function replaceChildren(
@@ -22,14 +24,43 @@ export function replaceChildren(
   path: string,
   fresh: DirectoryEntry[],
 ): TreeNodeData[] {
+  return updateNode(nodes, path, (node) => ({
+    entry: { ...node.entry, has_subfolders: fresh.length > 0 },
+    children: mergeNodes(node.children ?? [], fresh),
+    isOpen: node.isOpen && fresh.length > 0,
+  }));
+}
+
+/** path のノードを開く・閉じる。path が見つからなければ入力配列をそのまま返す。 */
+export function setNodeOpen(nodes: TreeNodeData[], path: string, isOpen: boolean): TreeNodeData[] {
+  return updateNode(nodes, path, (node) => (node.isOpen === isOpen ? node : { ...node, isOpen }));
+}
+
+/** path のノード。読み込んだ範囲に無ければ null。 */
+export function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
+  for (const node of nodes) {
+    if (node.entry.path === path) return node;
+    const found = node.children && findNode(node.children, path);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** path のノードを update の結果に置き換える。変わらなければ入力配列をそのまま返す。 */
+function updateNode(
+  nodes: TreeNodeData[],
+  path: string,
+  update: (node: TreeNodeData) => TreeNodeData,
+): TreeNodeData[] {
   let changed = false;
   const result = nodes.map((node) => {
     if (node.entry.path === path) {
-      changed = true;
-      return { ...node, children: mergeNodes(node.children ?? [], fresh) };
+      const updated = update(node);
+      if (updated !== node) changed = true;
+      return updated;
     }
     if (node.children) {
-      const children = replaceChildren(node.children, path, fresh);
+      const children = updateNode(node.children, path, update);
       if (children !== node.children) {
         changed = true;
         return { ...node, children };
@@ -40,94 +71,24 @@ export function replaceChildren(
   return changed ? result : nodes;
 }
 
-/** 子フォルダを読み込む関数。Tauri の IPC はコンポーネント側で注入する。 */
-export type LoadChildren = (path: string) => Promise<DirectoryEntry[]>;
-
-/** エントリ配列を未展開・未読み込みのノードにする。 */
-export function toNodes(entries: DirectoryEntry[]): TreeNodeData[] {
-  return entries.map((entry) => ({ entry, children: null, isOpen: false }));
-}
-
 /**
  * rootPath から targetPath までの各階層のパスを返す (targetPath 自身は含まない)。
  * targetPath が rootPath 配下でなければ空配列。
  */
 export function getAncestorPaths(rootPath: string, targetPath: string): string[] {
-  if (!targetPath.startsWith(rootPath)) return [];
-  const segments = targetPath.slice(rootPath.length).split("/").filter(Boolean);
+  const segments = segmentsBelow(rootPath, targetPath) ?? [];
   const paths: string[] = [];
   let current = rootPath;
   for (const segment of segments.slice(0, -1)) {
-    current = `${current}/${segment}`;
+    current = joinPath(current, segment);
     paths.push(current);
   }
   return paths;
 }
 
-/** 未読み込みなら子を読み込む。失敗は空フォルダとして扱う。 */
-async function ensureChildren(node: TreeNodeData, load: LoadChildren): Promise<TreeNodeData[]> {
-  if (node.children !== null) return node.children;
-  try {
-    return toNodes(await load(node.entry.path));
-  } catch {
-    return [];
-  }
-}
-
-/** path のノードを開閉する。開くときに子が未読み込みなら load で取得する。 */
-export async function toggleNode(
-  nodes: TreeNodeData[],
-  path: string,
-  load: LoadChildren,
-): Promise<TreeNodeData[]> {
-  const result: TreeNodeData[] = [];
-  for (const node of nodes) {
-    if (node.entry.path === path) {
-      if (node.isOpen) {
-        result.push({ ...node, isOpen: false });
-      } else {
-        result.push({ ...node, isOpen: true, children: await ensureChildren(node, load) });
-      }
-    } else if (node.children && node.isOpen) {
-      result.push({ ...node, children: await toggleNode(node.children, path, load) });
-    } else {
-      result.push(node);
-    }
-  }
-  return result;
-}
-
-/** pathsToExpand に含まれるノードを再帰的に開く。子が未読み込みなら load で取得する。 */
-export async function expandPaths(
-  nodes: TreeNodeData[],
-  pathsToExpand: Set<string>,
-  load: LoadChildren,
-): Promise<TreeNodeData[]> {
-  const result: TreeNodeData[] = [];
-  for (const node of nodes) {
-    if (pathsToExpand.has(node.entry.path)) {
-      const children = await ensureChildren(node, load);
-      result.push({
-        ...node,
-        isOpen: true,
-        children: await expandPaths(children, pathsToExpand, load),
-      });
-    } else if (node.children && node.isOpen) {
-      result.push({ ...node, children: await expandPaths(node.children, pathsToExpand, load) });
-    } else {
-      result.push(node);
-    }
-  }
-  return result;
-}
-
 /** root から path の親までの相対パス（例: "a/b"）。直下や root の外なら空文字。 */
 export function relativeParent(rootPath: string, targetPath: string): string {
-  return (
-    getAncestorPaths(rootPath, targetPath)
-      .map((p) => p.slice(rootPath.length).replace(/^\/+/, ""))
-      .pop() ?? ""
-  );
+  return (segmentsBelow(rootPath, targetPath) ?? []).slice(0, -1).join("/");
 }
 
 /** ツリーから path のノードを取り除く。親の子が空になったら、親を閉じて展開マークも消す。 */
@@ -166,7 +127,7 @@ export function selectionAfterRemoval(
   rootPath: string,
 ): string | null {
   if (selected === null) return null;
-  if (selected !== removed && !selected.startsWith(`${removed}/`)) return selected;
-  const parent = removed.slice(0, removed.lastIndexOf("/"));
-  return parent === rootPath || parent === "" ? null : parent;
+  if (!isSameOrInside(removed, selected)) return selected;
+  const parent = parentPath(removed);
+  return parent === null || parent === rootPath ? null : parent;
 }

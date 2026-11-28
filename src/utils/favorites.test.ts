@@ -20,3 +20,18 @@ describe("favoritesInside", () => {
     expect(favoritesInside(favorites, "/m/manga/B")).toEqual([]);
   });
 });
+
+describe("favoritesInside with other path shapes", () => {
+  it("finds favorites below a folder whose path uses backslashes", () => {
+    expect(
+      favoritesInside(
+        ["C:\\manga\\作者A", "C:\\manga\\作者A\\完結", "C:\\manga\\作者B"],
+        "C:\\manga\\作者A",
+      ),
+    ).toEqual(["C:\\manga\\作者A", "C:\\manga\\作者A\\完結"]);
+  });
+
+  it("leaves out a favorite that only shares the start of the name", () => {
+    expect(favoritesInside(["/m/manga2", "/m/manga/x"], "/m/manga")).toEqual(["/m/manga/x"]);
+  });
+});

@@ -30,6 +30,7 @@ function App() {
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [trashError, setTrashError] = useState<string | null>(null);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,7 @@ function App() {
     setQuery: setSearchQuery,
     results: searchResults,
     folders: searchFolders,
+    error: searchError,
     isActive: searchActive,
     rerun: rerunSearch,
     clear: clearSearch,
@@ -60,12 +62,17 @@ function App() {
 
   const handleAddFolder = useCallback(async () => {
     const selected = await open({ directory: true });
-    if (selected) {
+    if (!selected) return;
+    setFavoriteError(null);
+    try {
       await addFavorite(selected);
-      setFavoritesRefresh((n) => n + 1);
-      setSelectedFavorite(selected);
-      setSelectedFolder(null);
+    } catch (err) {
+      setFavoriteError(errorToString(err));
+      return;
     }
+    setFavoritesRefresh((n) => n + 1);
+    setSelectedFavorite(selected);
+    setSelectedFolder(null);
   }, []);
 
   const handleReload = useCallback(() => {
@@ -123,6 +130,17 @@ function App() {
 
   const handleFavoriteAdded = useCallback(() => {
     setFavoritesRefresh((n) => n + 1);
+  }, []);
+
+  // 表示中のお気に入りを外したら、そのツリーと一覧も閉じる（外したのに中身だけ残さない）
+  const handleFavoriteRemoved = useCallback((path: string) => {
+    setFavoritesRefresh((n) => n + 1);
+    setSelectedFavorite((current) => {
+      if (current !== path) return current;
+      setSelectedFolder(null);
+      setRevealPath(null);
+      return null;
+    });
   }, []);
 
   const handleFileDrop = useCallback(async (srcPaths: string[], destDir: string) => {
@@ -244,6 +262,19 @@ function App() {
             </button>
           </div>
         )}
+        {favoriteError && (
+          <div className="toolbar__banner toolbar__banner--error" role="alert">
+            <span>お気に入りを保存できませんでした: {favoriteError}</span>
+            <button
+              type="button"
+              className="toolbar__banner-close"
+              aria-label="閉じる"
+              onClick={() => setFavoriteError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
         {trashError && (
           <div className="toolbar__banner toolbar__banner--error" role="alert">
             <span>ゴミ箱に移動できませんでした: {trashError}</span>
@@ -268,16 +299,21 @@ function App() {
           refreshTrigger={favoritesRefresh}
           onFileDrop={handleFileDrop}
           onAddFolder={handleAddFolder}
-          onFavoriteRemoved={handleFavoriteAdded}
+          onFavoriteRemoved={handleFavoriteRemoved}
+          onFavoriteError={setFavoriteError}
         />
         <div className="app__tree-column" style={{ width: treeColumnWidth, flexShrink: 0 }}>
           {selectedFavorite ? (
             <FolderTree
+              // お気に入りごとに作り直す。読み込みの途中で切り替えても、前のお気に入りの結果が混ざらない
+              key={selectedFavorite}
               rootPath={selectedFavorite}
               selectedPath={selectedFolder}
               onFolderSelect={handleFolderSelect}
               onFavoriteAdded={handleFavoriteAdded}
+              onFavoriteError={setFavoriteError}
               searchFolders={searchFolders}
+              searchError={searchError}
               revealPath={revealPath}
               onRevealComplete={handleRevealComplete}
               onFileDrop={handleFileDrop}
@@ -299,6 +335,8 @@ function App() {
             onOpenFiles={openViewerWindows}
             onFolderSelect={handleFolderSelect}
             searchResults={searchResults}
+            searchError={searchError}
+            searchRoot={selectedFavorite}
             reloadTrigger={reloadTrigger}
             onFileDrop={handleFileDrop}
             recentFolders={recentFolders}

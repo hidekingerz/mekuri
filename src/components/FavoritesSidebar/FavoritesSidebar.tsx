@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getFavorites, removeFavorite } from "../../api/favorites";
 import { readDroppedPaths } from "../../api/fileDrop";
 import { useContextMenu } from "../../hooks/useContextMenu";
+import { errorToString } from "../../utils/errorToString";
 import { dragSource } from "../../utils/fileDrag";
 import { fileNameFromPath } from "../../utils/windowLabel";
 import { FolderIcon } from "../Icons/Icons";
@@ -13,8 +14,10 @@ type FavoritesSidebarProps = {
   onFileDrop?: (srcPaths: string[], destDir: string) => void;
   /** 空状態の「フォルダを追加」ボタンから呼ぶ */
   onAddFolder?: () => void;
-  /** お気に入りを外したときに呼ぶ */
-  onFavoriteRemoved?: () => void;
+  /** お気に入りを外したときに、外したパスを渡して呼ぶ */
+  onFavoriteRemoved?: (path: string) => void;
+  /** お気に入りの保存の失敗を知らせる（null は、前の失敗の表示を消す） */
+  onFavoriteError?: (message: string | null) => void;
 };
 
 export function FavoritesSidebar({
@@ -24,6 +27,7 @@ export function FavoritesSidebar({
   onFileDrop,
   onAddFolder,
   onFavoriteRemoved,
+  onFavoriteError,
 }: FavoritesSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
@@ -40,13 +44,19 @@ export function FavoritesSidebar({
   }, [loadFavorites, refreshTrigger]);
 
   const handleRemove = useCallback(async () => {
-    if (contextMenu) {
-      await removeFavorite(contextMenu.path);
-      closeContextMenu();
-      loadFavorites();
-      onFavoriteRemoved?.();
+    if (!contextMenu) return;
+    const path = contextMenu.path;
+    closeContextMenu();
+    onFavoriteError?.(null);
+    try {
+      await removeFavorite(path);
+    } catch (err) {
+      onFavoriteError?.(errorToString(err));
+      return;
     }
-  }, [contextMenu, closeContextMenu, loadFavorites, onFavoriteRemoved]);
+    loadFavorites();
+    onFavoriteRemoved?.(path);
+  }, [contextMenu, closeContextMenu, loadFavorites, onFavoriteRemoved, onFavoriteError]);
 
   return (
     <div className="favorites-sidebar">
@@ -70,6 +80,7 @@ export function FavoritesSidebar({
               key={path}
               type="button"
               className={`favorites-sidebar__item ${selectedPath === path ? "favorites-sidebar__item--selected" : ""}${dragOverPath === path ? " favorites-sidebar__item--drop-target" : ""}`}
+              aria-current={selectedPath === path ? "true" : undefined}
               onClick={() => onSelect(path)}
               onContextMenu={(e) => openContextMenu(e, path)}
               onDragOver={(e) => {

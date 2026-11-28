@@ -6,14 +6,13 @@ import { useFolderDropTarget } from "../../hooks/useFolderDropTarget";
 import type { DirectoryEntry, TreeNodeData } from "../../types";
 import { errorToString } from "../../utils/errorToString";
 import {
-  expandPaths,
+  findNode,
   getAncestorPaths,
   mergeNodes,
   relativeParent,
   removeNode,
   replaceChildren,
-  toggleNode as toggleTreeNode,
-  toNodes,
+  setNodeOpen,
 } from "../../utils/folderTree";
 import { moveListIndex } from "../../utils/listKeyboard";
 import { FolderIcon } from "../Icons/Icons";
@@ -24,7 +23,11 @@ type FolderTreeProps = {
   selectedPath: string | null;
   onFolderSelect: (path: string) => void;
   onFavoriteAdded?: () => void;
+  /** お気に入りの保存の失敗を知らせる（null は、前の失敗の表示を消す） */
+  onFavoriteError?: (message: string | null) => void;
   searchFolders: DirectoryEntry[] | null;
+  /** 検索の失敗。検索していないか、成功していれば null */
+  searchError?: string | null;
   revealPath: string | null;
   onRevealComplete: () => void;
   onFileDrop: (srcPaths: string[], destDir: string) => void;
@@ -38,7 +41,9 @@ export function FolderTree({
   selectedPath,
   onFolderSelect,
   onFavoriteAdded,
+  onFavoriteError,
   searchFolders,
+  searchError = null,
   revealPath,
   onRevealComplete,
   onFileDrop,
@@ -49,41 +54,48 @@ export function FolderTree({
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ルートの読み込みをやり直すための番号（失敗したあとの「再読み込み」で進める）
+  const [rootLoadId, setRootLoadId] = useState(0);
+  // 展開を終えたあとに、見える位置までスクロールする項目
+  const [scrollToPath, setScrollToPath] = useState<string | null>(null);
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
+  // いまのツリー。読み込みを待ったあとの処理は、待つ前のツリーではなくこれを見る
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
 
-  const loadRoot = useCallback(async () => {
-    if (loaded) return;
+  // ルート直下を読み込む。お気に入りごとに別のインスタンスになる（呼び出し側が key を付ける）ので、
+  // 別のお気に入りの読み込み結果がここへ届くことはない
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rootLoadId is intentionally used to retry
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    try {
-      const entries = await readDirectoryFolders(rootPath);
-      setNodes(toNodes(entries));
-      setLoaded(true);
-    } catch (err) {
-      setError(errorToString(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [rootPath, loaded]);
+    readDirectoryFolders(rootPath)
+      .then((entries) => {
+        if (cancelled) return;
+        setNodes((prev) => mergeNodes(prev, entries));
+        setLoaded(true);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(errorToString(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rootPath, rootLoadId]);
 
-  useEffect(() => {
-    if (!loaded && !loading) {
-      loadRoot();
-    }
-  }, [loaded, loading, loadRoot]);
-
-  const [prevRoot, setPrevRoot] = useState(rootPath);
-  if (prevRoot !== rootPath) {
-    setPrevRoot(rootPath);
-    setNodes([]);
-    setLoaded(false);
-    setError(null);
-  }
-
-  // Reload ボタン: 選択中フォルダ (未選択ならルート) の子フォルダを再取得し、展開状態を保ってマージする
+  // Reload ボタン: 選択中フォルダ (未選択ならルート) の子フォルダを再取得し、展開状態を保ってマージする。
+  // ルートをまだ読めていなければ（失敗したあとなど）、ルートの読み込みからやり直す
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloadTrigger is intentionally used to force re-fetch
   useEffect(() => {
-    if (!reloadTrigger || !loaded) return;
+    if (!reloadTrigger) return;
+    if (!loaded) {
+      setRootLoadId((n) => n + 1);
+      return;
+    }
     const target = selectedPath ?? rootPath;
     let cancelled = false;
     readDirectoryFolders(target)
@@ -101,32 +113,50 @@ export function FolderTree({
     };
   }, [reloadTrigger]);
 
-  // revealPath が設定されたらツリーを自動展開
+  // path の直下を、まだ読んでいなければ読み込んで開く。読み込みの結果は、待っているあいだに
+  // ほかの操作で変わったかもしれない最新のツリーへ入れる。読めなければ false
+  const openNode = useCallback(async (path: string): Promise<boolean> => {
+    if (findNode(nodesRef.current, path)?.children == null) {
+      try {
+        const entries = await readDirectoryFolders(path);
+        setNodes((prev) => replaceChildren(prev, path, entries));
+      } catch (err) {
+        // 開いた表示にしない。次に開こうとしたときに読み直す
+        console.error("Failed to load folder:", err);
+        return false;
+      }
+    }
+    setNodes((prev) => setNodeOpen(prev, path, true));
+    return true;
+  }, []);
+
+  // revealPath が設定されたら、そこまでのフォルダを上から順に開く
   useEffect(() => {
     if (!revealPath || !loaded) return;
-
-    const ancestors = getAncestorPaths(rootPath, revealPath);
-    if (ancestors.length === 0) {
+    let cancelled = false;
+    void (async () => {
+      for (const path of getAncestorPaths(rootPath, revealPath)) {
+        if (cancelled || !(await openNode(path))) break;
+      }
+      if (cancelled) return;
+      setScrollToPath(revealPath);
       onRevealComplete();
-      return;
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [revealPath, loaded, rootPath, onRevealComplete, openNode]);
 
-    const pathsToExpand = new Set(ancestors);
-    setNodes((prev) => {
-      expandPaths(prev, pathsToExpand, readDirectoryFolders).then((expanded) => {
-        setNodes(expanded);
-        onRevealComplete();
-      });
-      return prev;
-    });
-  }, [revealPath, loaded, rootPath, onRevealComplete]);
-
-  const toggleNode = useCallback((path: string) => {
-    setNodes((prev) => {
-      toggleTreeNode(prev, path, readDirectoryFolders).then(setNodes);
-      return prev;
-    });
-  }, []);
+  const toggleNode = useCallback(
+    (path: string) => {
+      const node = findNode(nodesRef.current, path);
+      // サブフォルダの無いフォルダは、開いても中に出すものが無い
+      if (!node?.entry.has_subfolders) return;
+      if (node.isOpen) setNodes((prev) => setNodeOpen(prev, path, false));
+      else void openNode(path);
+    },
+    [openNode],
+  );
 
   const treeRef = useRef<HTMLDivElement>(null);
 
@@ -137,14 +167,31 @@ export function FolderTree({
       ?.focus();
   }, []);
 
+  // 展開のあと、項目が画面の外にあれば見える位置まで寄せる
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nodes の更新で項目が描かれてから探す
+  useEffect(() => {
+    if (!scrollToPath) return;
+    const item = treeRef.current?.querySelector<HTMLElement>(
+      `[role="treeitem"][data-path="${CSS.escape(scrollToPath)}"]`,
+    );
+    if (!item) return;
+    item.scrollIntoView({ block: "nearest" });
+    setScrollToPath(null);
+  }, [scrollToPath, nodes]);
+
   const handleAddFavorite = useCallback(async () => {
-    if (contextMenu) {
-      await addFavorite(contextMenu.path);
-      focusTreeItem(contextMenu.path);
-      closeContextMenu();
+    if (!contextMenu) return;
+    const path = contextMenu.path;
+    focusTreeItem(path);
+    closeContextMenu();
+    onFavoriteError?.(null);
+    try {
+      await addFavorite(path);
       onFavoriteAdded?.();
+    } catch (err) {
+      onFavoriteError?.(errorToString(err));
     }
-  }, [contextMenu, focusTreeItem, closeContextMenu, onFavoriteAdded]);
+  }, [contextMenu, focusTreeItem, closeContextMenu, onFavoriteAdded, onFavoriteError]);
 
   const handleTrashFolder = useCallback(async () => {
     if (!contextMenu) return;
@@ -184,7 +231,9 @@ export function FolderTree({
       return (
         <>
           {header}
-          <div className="folder-tree-loading">一致するフォルダがありません</div>
+          <div className="folder-tree-loading">
+            {searchError ? "検索できませんでした" : "一致するフォルダがありません"}
+          </div>
         </>
       );
     }
@@ -242,26 +291,29 @@ export function FolderTree({
   }
 
   return (
-    <div
-      className="folder-tree"
-      role="tree"
-      aria-label="フォルダツリー"
-      ref={treeRef}
-      onKeyDown={handleTreeKeyDown}
-    >
-      {nodes.map((node) => (
-        <TreeNode
-          key={node.entry.path}
-          node={node}
-          depth={0}
-          selectedPath={selectedPath}
-          onToggle={toggleNode}
-          onSelect={onFolderSelect}
-          onContextMenu={openContextMenu}
-          onFileDrop={onFileDrop}
-        />
-      ))}
+    <>
+      <div
+        className="folder-tree"
+        role="tree"
+        aria-label="フォルダツリー"
+        ref={treeRef}
+        onKeyDown={handleTreeKeyDown}
+      >
+        {nodes.map((node) => (
+          <TreeNode
+            key={node.entry.path}
+            node={node}
+            depth={0}
+            selectedPath={selectedPath}
+            onToggle={toggleNode}
+            onSelect={onFolderSelect}
+            onContextMenu={openContextMenu}
+            onFileDrop={onFileDrop}
+          />
+        ))}
+      </div>
 
+      {/* メニューはツリー（role="tree"）の外に置く。中に置くと、ツリーの子として許されない要素になる */}
       {contextMenu && (
         <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" className="context-menu__item" onClick={handleAddFavorite}>
@@ -277,6 +329,6 @@ export function FolderTree({
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }

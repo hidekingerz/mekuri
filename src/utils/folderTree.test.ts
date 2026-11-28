@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { DirectoryEntry, TreeNodeData } from "../types";
 import {
-  expandPaths,
+  findNode,
   getAncestorPaths,
   mergeNodes,
   relativeParent,
   removeNode,
   replaceChildren,
   selectionAfterRemoval,
-  toggleNode,
-  toNodes,
+  setNodeOpen,
 } from "./folderTree";
 
 function dir(path: string, hasSubfolders = false): DirectoryEntry {
@@ -60,11 +59,16 @@ describe("mergeNodes", () => {
 });
 
 describe("replaceChildren", () => {
+  const withSubfolders = (n: TreeNodeData, has: boolean): TreeNodeData => ({
+    ...n,
+    entry: { ...n.entry, has_subfolders: has },
+  });
+
   it("merges fresh entries into the children of the node at path, preserving grandchildren state", () => {
     const deep = node("/root/a/x/deep");
     const x = node("/root/a/x", { isOpen: true, children: [deep] });
     const y = node("/root/a/y");
-    const a = node("/root/a", { isOpen: true, children: [x, y] });
+    const a = node("/root/a", { isOpen: true, children: [x, y] }, true);
     const nodes = [a, node("/root/b")];
 
     const result = replaceChildren(nodes, "/root/a", [dir("/root/a/x"), dir("/root/a/z")]);
@@ -78,13 +82,27 @@ describe("replaceChildren", () => {
 
     const result = replaceChildren([a], "/root/a/x", [dir("/root/a/x/new")]);
 
-    expect(result).toEqual([{ ...a, children: [{ ...x, children: [node("/root/a/x/new")] }] }]);
+    expect(result).toEqual([
+      { ...a, children: [withSubfolders({ ...x, children: [node("/root/a/x/new")] }, true)] },
+    ]);
   });
 
   it("populates children of a node that was never expanded without opening it", () => {
-    const a = node("/root/a");
+    const a = node("/root/a", {}, true);
     const result = replaceChildren([a], "/root/a", [dir("/root/a/x")]);
     expect(result).toEqual([{ ...a, isOpen: false, children: [node("/root/a/x")] }]);
+  });
+
+  it("shows the chevron once a folder gained its first subfolder", () => {
+    const a = node("/root/a", {}, false);
+    const [result] = replaceChildren([a], "/root/a", [dir("/root/a/new")]);
+    expect(result.entry.has_subfolders).toBe(true);
+  });
+
+  it("drops the chevron and closes a folder whose subfolders are all gone", () => {
+    const a = node("/root/a", { isOpen: true, children: [node("/root/a/x")] }, true);
+    const [result] = replaceChildren([a], "/root/a", []);
+    expect(result).toEqual(withSubfolders({ ...a, isOpen: false, children: [] }, false));
   });
 
   it("returns the same array when the path is not in the tree", () => {
@@ -100,21 +118,47 @@ describe("replaceChildren", () => {
   });
 });
 
-/** 呼び出されたパスを記録し、あらかじめ用意した子エントリを返す読み込み関数 */
-function fakeLoader(tree: Record<string, DirectoryEntry[]>) {
-  const calls: string[] = [];
-  const load = async (path: string) => {
-    calls.push(path);
-    const entries = tree[path];
-    if (!entries) throw new Error(`no such dir: ${path}`);
-    return entries;
-  };
-  return { load, calls };
-}
+describe("setNodeOpen", () => {
+  it("opens and closes the node at path, keeping its children", () => {
+    const a = node("/root/a", { children: [node("/root/a/x")] });
+    const opened = setNodeOpen([a, node("/root/b")], "/root/a", true);
+    expect(opened).toEqual([{ ...a, isOpen: true }, node("/root/b")]);
+    expect(setNodeOpen(opened, "/root/a", false)).toEqual([a, node("/root/b")]);
+  });
 
-describe("toNodes", () => {
-  it("wraps entries as collapsed, unloaded nodes", () => {
-    expect(toNodes([dir("/root/a"), dir("/root/b")])).toEqual([node("/root/a"), node("/root/b")]);
+  it("reaches a nested node, even inside a closed parent", () => {
+    const x = node("/root/a/x", { children: [] });
+    const a = node("/root/a", { isOpen: false, children: [x] });
+    expect(setNodeOpen([a], "/root/a/x", true)).toEqual([
+      { ...a, children: [{ ...x, isOpen: true }] },
+    ]);
+  });
+
+  it("returns the same array when nothing changes", () => {
+    const nodes = [node("/root/a", { isOpen: true, children: [] })];
+    expect(setNodeOpen(nodes, "/root/a", true)).toBe(nodes);
+    expect(setNodeOpen(nodes, "/root/missing", true)).toBe(nodes);
+  });
+});
+
+describe("findNode", () => {
+  const x = node("/root/a/x");
+  const a = node("/root/a", { isOpen: false, children: [x] });
+
+  it("finds a node at any loaded depth", () => {
+    expect(findNode([a, node("/root/b")], "/root/a")).toBe(a);
+    expect(findNode([a, node("/root/b")], "/root/a/x")).toBe(x);
+  });
+
+  it("keeps looking in later branches when an earlier one has children but no match", () => {
+    const y = node("/root/b/y");
+    const b = node("/root/b", { children: [y] });
+    expect(findNode([a, b], "/root/b/y")).toBe(y);
+  });
+
+  it("returns null for a path that is not loaded", () => {
+    expect(findNode([a], "/root/a/x/deep")).toBeNull();
+    expect(findNode([], "/root/a")).toBeNull();
   });
 });
 
@@ -130,88 +174,16 @@ describe("getAncestorPaths", () => {
   it("returns each ancestor between the root and the target, excluding the target", () => {
     expect(getAncestorPaths("/root", "/root/a/b/c")).toEqual(["/root/a", "/root/a/b"]);
   });
-});
 
-describe("toggleNode", () => {
-  it("opens a collapsed node and loads its children exactly once", async () => {
-    const { load, calls } = fakeLoader({ "/root/a": [dir("/root/a/x")] });
-    const result = await toggleNode([node("/root/a")], "/root/a", load);
-    expect(result).toEqual([node("/root/a", { isOpen: true, children: [node("/root/a/x")] })]);
-    expect(calls).toEqual(["/root/a"]);
+  it("does not take a folder that only shares the start of the root's name for a folder inside it", () => {
+    expect(getAncestorPaths("/m/manga", "/m/manga2/x/y")).toEqual([]);
   });
 
-  it("closes an open node without reloading", async () => {
-    const { load, calls } = fakeLoader({});
-    const open = node("/root/a", { isOpen: true, children: [node("/root/a/x")] });
-    const result = await toggleNode([open], "/root/a", load);
-    expect(result).toEqual([{ ...open, isOpen: false }]);
-    expect(calls).toEqual([]);
-  });
-
-  it("reopens a node using its already loaded children", async () => {
-    const { load, calls } = fakeLoader({});
-    const closed = node("/root/a", { isOpen: false, children: [node("/root/a/x")] });
-    const result = await toggleNode([closed], "/root/a", load);
-    expect(result).toEqual([{ ...closed, isOpen: true }]);
-    expect(calls).toEqual([]);
-  });
-
-  it("treats a failed load as an empty folder", async () => {
-    const { load } = fakeLoader({});
-    const result = await toggleNode([node("/root/a")], "/root/a", load);
-    expect(result).toEqual([node("/root/a", { isOpen: true, children: [] })]);
-  });
-
-  it("leaves the other nodes as they are", async () => {
-    const { load } = fakeLoader({ "/root/a": [] });
-    const b = node("/root/b");
-    const result = await toggleNode([node("/root/a"), b], "/root/a", load);
-    expect(result[1]).toBe(b);
-  });
-
-  it("toggles a nested node inside an open parent", async () => {
-    const { load } = fakeLoader({ "/root/a/x": [dir("/root/a/x/deep")] });
-    const a = node("/root/a", { isOpen: true, children: [node("/root/a/x")] });
-    const result = await toggleNode([a], "/root/a/x", load);
-    expect(result).toEqual([
-      { ...a, children: [node("/root/a/x", { isOpen: true, children: [node("/root/a/x/deep")] })] },
+  it("works with backslash separators", () => {
+    expect(getAncestorPaths("C:\\manga", "C:\\manga\\作者A\\完結\\X")).toEqual([
+      "C:\\manga\\作者A",
+      "C:\\manga\\作者A\\完結",
     ]);
-  });
-});
-
-describe("expandPaths", () => {
-  it("opens every listed path, loading children as needed, and leaves others untouched", async () => {
-    const { load, calls } = fakeLoader({
-      "/root/a": [dir("/root/a/b")],
-      "/root/a/b": [dir("/root/a/b/c")],
-    });
-    const nodes = [node("/root/a"), node("/root/z")];
-    const result = await expandPaths(nodes, new Set(["/root/a", "/root/a/b"]), load);
-    expect(result).toEqual([
-      node("/root/a", {
-        isOpen: true,
-        children: [node("/root/a/b", { isOpen: true, children: [node("/root/a/b/c")] })],
-      }),
-      node("/root/z"),
-    ]);
-    expect(calls).toEqual(["/root/a", "/root/a/b"]);
-  });
-
-  it("expands listed paths inside an open node that is not listed itself", async () => {
-    const { load } = fakeLoader({ "/root/a/b": [dir("/root/a/b/c")] });
-    const a = node("/root/a", { isOpen: true, children: [node("/root/a/b")] });
-    const result = await expandPaths([a], new Set(["/root/a/b"]), load);
-    expect(result).toEqual([
-      { ...a, children: [node("/root/a/b", { isOpen: true, children: [node("/root/a/b/c")] })] },
-    ]);
-  });
-
-  it("does not reload children that are already loaded", async () => {
-    const { load, calls } = fakeLoader({});
-    const a = node("/root/a", { isOpen: false, children: [node("/root/a/b")] });
-    const result = await expandPaths([a], new Set(["/root/a"]), load);
-    expect(result).toEqual([{ ...a, isOpen: true }]);
-    expect(calls).toEqual([]);
   });
 });
 
@@ -226,6 +198,10 @@ describe("relativeParent", () => {
 
   it("returns an empty string when the path is outside the root", () => {
     expect(relativeParent("/root", "/other/a/target")).toBe("");
+  });
+
+  it("works with backslash separators", () => {
+    expect(relativeParent("C:\\manga", "C:\\manga\\作者A\\完結\\X")).toBe("作者A/完結");
   });
 });
 
@@ -283,5 +259,24 @@ describe("selectionAfterRemoval", () => {
   it("keeps an unrelated selection, including a sibling with a shared prefix", () => {
     expect(selectionAfterRemoval("/root/ab", "/root/a", "/root")).toBe("/root/ab");
     expect(selectionAfterRemoval(null, "/root/a", "/root")).toBeNull();
+  });
+});
+
+describe("selectionAfterRemoval with other path shapes", () => {
+  it("moves the selection to the parent for backslash paths", () => {
+    expect(
+      selectionAfterRemoval("C:\\manga\\作者A\\完結\\X", "C:\\manga\\作者A\\完結", "C:\\manga"),
+    ).toBe("C:\\manga\\作者A");
+    expect(selectionAfterRemoval("C:\\manga\\作者A", "C:\\manga\\作者A", "C:\\manga")).toBeNull();
+  });
+
+  it("clears the selection when the removed folder has no parent", () => {
+    expect(selectionAfterRemoval("/a/x", "/a", "/root")).toBeNull();
+  });
+
+  it("keeps a selection that only shares the start of the removed folder's name", () => {
+    expect(selectionAfterRemoval("/m/manga/作者AB", "/m/manga/作者A", "/m/manga")).toBe(
+      "/m/manga/作者AB",
+    );
   });
 });

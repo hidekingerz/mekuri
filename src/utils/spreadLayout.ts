@@ -10,7 +10,14 @@
  * RTL/LTR reading direction is applied at render time.
  */
 
-export type ViewMode = "single" | "spread" | "triple" | "fit";
+const VIEW_MODES = ["single", "spread", "triple", "fit"] as const;
+
+export type ViewMode = (typeof VIEW_MODES)[number];
+
+/** 保存された値などが、知っている表示モードかどうか。 */
+export function isViewMode(value: unknown): value is ViewMode {
+  return (VIEW_MODES as readonly unknown[]).includes(value);
+}
 
 export type ReadingDirection = "rtl" | "ltr";
 

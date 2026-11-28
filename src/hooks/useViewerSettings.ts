@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getViewerSettings, saveViewerSettings } from "../api/settings";
-import type { ReadingDirection, ViewMode } from "../utils/spreadLayout";
+import { isViewMode, type ReadingDirection, type ViewMode } from "../utils/spreadLayout";
 
 /**
  * ビューワーの表示モードと読み方向。マウント時に保存値を復元し、変更時に永続化する。
@@ -13,7 +13,8 @@ export function useViewerSettings(defaultReadingDirection: ReadingDirection) {
 
   useEffect(() => {
     getViewerSettings().then((settings) => {
-      if (settings.viewMode) {
+      // 知らない値（別の版が保存したものなど）は使わず、既定の見開きのままにする
+      if (isViewMode(settings.viewMode)) {
         setViewModeState(settings.viewMode);
       }
       if (settings.readingDirection) {

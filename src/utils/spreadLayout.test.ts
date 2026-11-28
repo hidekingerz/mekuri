@@ -4,6 +4,7 @@ import {
   computeFitPageCount,
   currentPageFromGroup,
   groupIndexForPage,
+  isViewMode,
   isWidePage,
 } from "./spreadLayout";
 
@@ -215,5 +216,17 @@ describe("buildPageGroups with an unknown mode", () => {
   it("falls back to the spread layout instead of looping forever", () => {
     const unknown = "bogus" as unknown as Parameters<typeof buildPageGroups>[1];
     expect(buildPageGroups(4, unknown)).toEqual([[0], [1, 2], [3]]);
+  });
+});
+
+describe("isViewMode", () => {
+  it("accepts the four view modes", () => {
+    for (const mode of ["single", "spread", "triple", "fit"]) expect(isViewMode(mode)).toBe(true);
+  });
+
+  it("rejects anything else", () => {
+    for (const value of ["bogus", "SPREAD", "fit ", "", 3, null, undefined, ["spread"]]) {
+      expect(isViewMode(value)).toBe(false);
+    }
   });
 });

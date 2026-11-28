@@ -116,6 +116,20 @@ test.describe("キーボードでのページ送り", () => {
     }
   });
 
+  test("ボタンにフォーカスがあるときの修飾キー + Space は、ページも送らず、ボタンも押さない", async ({
+    viewer,
+  }) => {
+    await viewer.page.keyboard.press("Space");
+    for (const name of ["次の見開き", "単ページ表示"]) {
+      await viewer.button(name).focus();
+      for (const combo of ["Shift+Space", "Alt+Space", "Control+Space", "Meta+Space"]) {
+        await viewer.page.keyboard.press(combo);
+        await expect(viewer.position(), `${name} ${combo}`).toHaveText("2 / 6");
+      }
+    }
+    await expect(viewer.button("見開き表示")).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("フッターのボタンにフォーカスがあっても、Space はページ送りになる", async ({ viewer }) => {
     await viewer.button("単ページ表示").focus();
     await viewer.page.keyboard.press("Space");
@@ -189,6 +203,14 @@ test.describe("クリックとホイールでのページ送り", () => {
     await expect(viewer.position()).toHaveText("2 / 6");
   });
 
+  test("端で送れなかったホイールは、反対向きのホイールを止めない", async ({ viewer }) => {
+    await viewer.page.keyboard.press("End");
+    await expect(viewer.position()).toHaveText("6 / 6");
+    await viewer.wheelBurst(1, 0, 120); // 最後の見開きなので進めない
+    await viewer.wheelBurst(1, 0, -120);
+    await expect(viewer.position()).toHaveText("5 / 6");
+  });
+
   test("200ms のあいだに続けて届いたホイールでは、1 回ぶんだけ進む", async ({ viewer }) => {
     await viewer.wheelBurst(4, 20);
     await viewer.page.waitForTimeout(100);
@@ -255,6 +277,17 @@ test.describe("表示モード", () => {
       .toBeGreaterThan(narrow.length);
     expect(await viewer.settledPages()).toContain(6);
     expect((await viewer.savedSettings())?.viewMode).toBe("fit");
+  });
+
+  test.describe("保存された表示モードが知らない値のとき", () => {
+    test.use({
+      mockOptions: { viewerSettings: { width: 1200, height: 900, viewMode: "bogus" } },
+    });
+
+    test("見開き表示として開き、見開きのボタンが押された表示になる", async ({ viewer }) => {
+      await expect(viewer.position()).toHaveText("1 / 6");
+      await expect(viewer.button("見開き表示")).toHaveAttribute("aria-pressed", "true");
+    });
   });
 
   test.describe("保存された設定があるとき", () => {
@@ -365,6 +398,30 @@ test.describe("横長のページ", () => {
       expect(seen.filter((group) => group.includes(4) || group.includes(9))).toEqual([[9], [4]]);
       expect(seen[0]).toEqual([10]);
       expect(seen[1]).toEqual([9]);
+    });
+  });
+
+  test.describe("6 ページ目が横長（12 ページ）", () => {
+    test.use({
+      mockOptions: {
+        archives: { [VIEWER_FILE]: pagesOf([P, P, P, P, P, W, P, P, P, P, P, P]) },
+      },
+    });
+
+    test("後ろから戻ったあとに表示モードを切り替えても、読んでいた位置を保つ", async ({
+      viewer,
+    }) => {
+      await viewer.button("3ページ表示").click();
+      await viewer.page.keyboard.press("End");
+      expect(await viewer.settledPages()).toEqual([12, 11, 10]);
+      await viewer.page.keyboard.press("ArrowRight");
+      expect(await viewer.settledPages()).toEqual([9, 8, 7]);
+
+      // 7 ページ目から始まる組を読んでいる。単ページにしても、見開きに戻しても 7 ページ目が出る
+      await viewer.button("単ページ表示").click();
+      expect(await viewer.settledPages()).toEqual([7]);
+      await viewer.button("見開き表示").click();
+      expect(await viewer.settledPages()).toContain(7);
     });
   });
 

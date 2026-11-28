@@ -12,26 +12,42 @@ import {
 } from "./spreadNavigation";
 
 describe("navigationForKey", () => {
+  const key = (k: string) => ({ key: k });
+
   it("space always goes to the next spread", () => {
-    expect(navigationForKey(" ", true)).toBe("next");
-    expect(navigationForKey(" ", false)).toBe("next");
+    expect(navigationForKey(key(" "), true)).toBe("next");
+    expect(navigationForKey(key(" "), false)).toBe("next");
   });
 
   it("arrow keys follow the reading direction", () => {
-    expect(navigationForKey("ArrowLeft", true)).toBe("next");
-    expect(navigationForKey("ArrowRight", true)).toBe("prev");
-    expect(navigationForKey("ArrowLeft", false)).toBe("prev");
-    expect(navigationForKey("ArrowRight", false)).toBe("next");
+    expect(navigationForKey(key("ArrowLeft"), true)).toBe("next");
+    expect(navigationForKey(key("ArrowRight"), true)).toBe("prev");
+    expect(navigationForKey(key("ArrowLeft"), false)).toBe("prev");
+    expect(navigationForKey(key("ArrowRight"), false)).toBe("next");
   });
 
-  it("Home and End jump to the first and last spread", () => {
-    expect(navigationForKey("Home", true)).toBe("first");
-    expect(navigationForKey("End", false)).toBe("last");
+  it("Home and End jump to the first and last spread in either reading direction", () => {
+    for (const isRtl of [true, false]) {
+      expect(navigationForKey(key("Home"), isRtl)).toBe("first");
+      expect(navigationForKey(key("End"), isRtl)).toBe("last");
+    }
   });
 
   it("ignores unrelated keys", () => {
-    expect(navigationForKey("a", true)).toBeNull();
-    expect(navigationForKey("Enter", false)).toBeNull();
+    expect(navigationForKey(key("a"), true)).toBeNull();
+    expect(navigationForKey(key("Enter"), false)).toBeNull();
+  });
+
+  it.each([
+    "shiftKey",
+    "altKey",
+    "ctrlKey",
+    "metaKey",
+  ] as const)("does not turn the page while %s is held", (modifier) => {
+    for (const k of [" ", "ArrowLeft", "ArrowRight", "Home", "End"]) {
+      expect(navigationForKey({ key: k, [modifier]: true }, true)).toBeNull();
+      expect(navigationForKey({ key: k, [modifier]: true }, false)).toBeNull();
+    }
   });
 });
 
@@ -49,9 +65,19 @@ describe("navigationForClick", () => {
 
 describe("navigationForWheel", () => {
   it("scrolling down goes next, scrolling up goes prev, no scroll does nothing", () => {
-    expect(navigationForWheel(10)).toBe("next");
-    expect(navigationForWheel(-3)).toBe("prev");
-    expect(navigationForWheel(0)).toBeNull();
+    expect(navigationForWheel({ deltaY: 10 })).toBe("next");
+    expect(navigationForWheel({ deltaY: -3 })).toBe("prev");
+    expect(navigationForWheel({ deltaY: 0 })).toBeNull();
+  });
+
+  it.each([
+    "shiftKey",
+    "altKey",
+    "ctrlKey",
+    "metaKey",
+  ] as const)("does not turn the page while %s is held", (modifier) => {
+    expect(navigationForWheel({ deltaY: 10, [modifier]: true })).toBeNull();
+    expect(navigationForWheel({ deltaY: -10, [modifier]: true })).toBeNull();
   });
 });
 
@@ -68,6 +94,12 @@ describe("progressRatio", () => {
 });
 
 describe("groupIndexFromRatio", () => {
+  it("picks the nearest group when the position falls between two groups", () => {
+    // 5 グループ: 0.3 → 1.2 番目 → 1、0.4 → 1.6 番目 → 2
+    expect(groupIndexFromRatio(0.3, 5)).toBe(1);
+    expect(groupIndexFromRatio(0.4, 5)).toBe(2);
+  });
+
   it("rounds the ratio to the nearest group index", () => {
     expect(groupIndexFromRatio(0, 5)).toBe(0);
     expect(groupIndexFromRatio(0.5, 5)).toBe(2);

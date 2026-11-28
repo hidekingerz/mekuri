@@ -167,6 +167,45 @@ mod tests {
         assert_eq!(result, vec!["page01.jpg", "page02.png", "page03.jpg"]);
     }
 
+    /// 桁数の違う番号・フォルダ入りの名前を、格納順でも文字コード順でもなく自然順で返す。
+    const UNSORTED_PAGES: &[(&str, &[u8])] = &[
+        ("10.jpg", b"x"),
+        ("ch10/1.jpg", b"x"),
+        ("2.jpg", b"x"),
+        ("ch2/10.jpg", b"x"),
+        ("1.jpg", b"x"),
+        ("ch2/2.jpg", b"x"),
+        ("__MACOSX/._1.jpg", b"macos metadata"),
+        ("notes.txt", b"not an image"),
+    ];
+    const NATURAL_ORDER: &[&str] = &[
+        "1.jpg",
+        "2.jpg",
+        "10.jpg",
+        "ch2/2.jpg",
+        "ch2/10.jpg",
+        "ch10/1.jpg",
+    ];
+
+    #[test]
+    fn test_list_images_uses_natural_order() {
+        let zip_file = create_test_zip(UNSORTED_PAGES);
+
+        let result = list_images(zip_file.path().to_str().unwrap()).unwrap();
+        assert_eq!(result, NATURAL_ORDER);
+    }
+
+    #[test]
+    fn test_analyze_contents_lists_images_in_natural_order() {
+        let zip_file = create_test_zip(UNSORTED_PAGES);
+
+        let result = analyze_contents(zip_file.path().to_str().unwrap()).unwrap();
+        match result {
+            ArchiveContents::Images { names } => assert_eq!(names, NATURAL_ORDER),
+            other => panic!("expected images, got {other:?}"),
+        }
+    }
+
     #[test]
     fn test_list_images_empty_zip() {
         let zip_file = create_test_zip(&[("readme.txt", b"no images here")]);

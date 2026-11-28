@@ -2,9 +2,21 @@
 
 export type NavigationAction = "next" | "prev" | "first" | "last";
 
-/** キー入力を読み方向を考慮したページ移動に変換する。対象外のキーは null。 */
-export function navigationForKey(key: string, isRtl: boolean): NavigationAction | null {
-  switch (key) {
+type KeyLike = {
+  key: string;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+};
+
+/**
+ * キー入力を読み方向を考慮したページ移動に変換する。対象外のキーは null。
+ * 修飾キー（Shift・Alt・Ctrl・Cmd）を押しながらの入力は、ページ送りとして扱わない。
+ */
+export function navigationForKey(e: KeyLike, isRtl: boolean): NavigationAction | null {
+  if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return null;
+  switch (e.key) {
     case " ":
       return "next";
     case "ArrowLeft":
@@ -26,10 +38,22 @@ export function navigationForClick(isLeftHalf: boolean, isRtl: boolean): "next" 
   return isRtl ? "prev" : "next";
 }
 
-/** ホイールの縦方向の移動量をページ移動に変換する。0 なら null。 */
-export function navigationForWheel(deltaY: number): "next" | "prev" | null {
-  if (deltaY > 0) return "next";
-  if (deltaY < 0) return "prev";
+type WheelLike = {
+  deltaY: number;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+};
+
+/**
+ * ホイールの縦方向の移動量をページ移動に変換する。0 なら null。
+ * 修飾キーを押しながらの入力（トラックパッドのピンチは Ctrl つきで届く）は、ページ送りとして扱わない。
+ */
+export function navigationForWheel(e: WheelLike): "next" | "prev" | null {
+  if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return null;
+  if (e.deltaY > 0) return "next";
+  if (e.deltaY < 0) return "prev";
   return null;
 }
 

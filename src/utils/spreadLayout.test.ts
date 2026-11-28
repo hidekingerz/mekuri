@@ -4,6 +4,7 @@ import {
   computeFitPageCount,
   currentPageFromGroup,
   groupIndexForPage,
+  isViewMode,
   isWidePage,
 } from "./spreadLayout";
 
@@ -175,5 +176,57 @@ describe("isWidePage", () => {
     expect(isWidePage(1240 / 1754)).toBe(false);
     expect(isWidePage(1)).toBe(false);
     expect(isWidePage(Number.NaN)).toBe(false);
+  });
+});
+
+describe("buildPageGroups with wide pages in less common places", () => {
+  it("shows a wide page right after the cover alone (spread)", () => {
+    expect(buildPageGroups(5, "spread", 2, new Set([1]))).toEqual([[0], [1], [2, 3], [4]]);
+  });
+
+  it("shows a wide last page alone (spread)", () => {
+    expect(buildPageGroups(3, "spread", 2, new Set([2]))).toEqual([[0], [1], [2]]);
+  });
+
+  it("shows consecutive wide pages one at a time (spread)", () => {
+    expect(buildPageGroups(6, "spread", 2, new Set([2, 3]))).toEqual([[0], [1], [2], [3], [4, 5]]);
+  });
+
+  it("cuts a group short at a wide page in the middle (fit)", () => {
+    expect(buildPageGroups(7, "fit", 3, new Set([4]))).toEqual([[0, 1, 2], [3], [4], [5, 6]]);
+  });
+});
+
+describe("isWidePage near the boundary", () => {
+  it("treats anything wider than tall as wide", () => {
+    expect(isWidePage(1.01)).toBe(true);
+    // A4 を横に 2 枚並べたスキャン
+    expect(isWidePage(Math.SQRT2)).toBe(true);
+  });
+});
+
+describe("computeFitPageCount rounding", () => {
+  it("counts only pages that fit completely", () => {
+    // 高さ 1000・縦横比 1 のページが 2.7 枚ぶんの幅 → 2 枚
+    expect(computeFitPageCount(2700, 1000, 1)).toBe(2);
+  });
+});
+
+describe("buildPageGroups with an unknown mode", () => {
+  it("falls back to the spread layout instead of looping forever", () => {
+    const unknown = "bogus" as unknown as Parameters<typeof buildPageGroups>[1];
+    expect(buildPageGroups(4, unknown)).toEqual([[0], [1, 2], [3]]);
+  });
+});
+
+describe("isViewMode", () => {
+  it("accepts the four view modes", () => {
+    for (const mode of ["single", "spread", "triple", "fit"]) expect(isViewMode(mode)).toBe(true);
+  });
+
+  it("rejects anything else", () => {
+    for (const value of ["bogus", "SPREAD", "fit ", "", 3, null, undefined, ["spread"]]) {
+      expect(isViewMode(value)).toBe(false);
+    }
   });
 });

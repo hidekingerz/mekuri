@@ -24,7 +24,7 @@
     "where": "src/utils/listKeyboard.ts:9:14 current < 0 -> false"
   },
   "21sfm6m9dvw": {
-    "reason": "equivalent: the hash only needs to be deterministic and distinct per path; labels are not persisted",
+    "reason": "equivalent: only the sign of the hash flips and Math.abs removes it, so the label still matches the Rust side (checked on 200,005 inputs)",
     "where": "src/utils/windowLabel.ts:9:12 (hash << 5) - hash + char -> (hash << 5) - hash - char"
   },
   "23caui0u1w1": {

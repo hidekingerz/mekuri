@@ -68,6 +68,11 @@ mekuri/
 │       ├── global.css             #     グローバルスタイル（メインウィンドウ）
 │       └── viewer.css             #     ビューワー用スタイル
 │
+├── e2e/                           # 画面の確認 (Playwright)
+│   ├── tauri-mock.js              #   Tauri の IPC を差し替えるモック（仮のファイルツリーと store）
+│   ├── helpers.ts                 #   メインウィンドウの操作とモックの読み取り
+│   └── *.e2e.ts                   #   テスト（選択・ゴミ箱・移動・最近開いたフォルダ・アクセシビリティ）
+│
 ├── src-tauri/                     # バックエンド (Rust/Tauri)
 │   ├── Cargo.toml                 #   Rust 依存定義
 │   ├── tauri.conf.json            #   Tauri 設定（ウィンドウ、権限等）
@@ -92,7 +97,9 @@ mekuri/
 ├── index.html                     #   メインウィンドウ HTML
 ├── viewer.html                    #   ビューワーウィンドウ HTML
 ├── vite.config.ts                 #   Vite 設定
+├── playwright.config.ts           #   Playwright 設定（e2e）
 ├── tsconfig.json                  #   TypeScript 設定
+├── tsconfig.e2e.json              #   e2e の型チェック用の設定
 ├── biome.json                     #   Biome 設定（リンタ + フォーマッタ）
 ├── package.json                   #   フロントエンド依存定義
 ├── pnpm-lock.yaml                 #   ロックファイル

@@ -624,10 +624,13 @@ test.describe("メインウィンドウの一覧の並び順に合わせた移�
     }) => {
       await viewer.page.keyboard.press("Alt+ArrowUp");
       await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      // 一覧は v1, v3, v2 の順。前の v1.zip と、開いている v3.zip が消される
+      await viewer.trashedElsewhere("/lib", "v1.zip");
       await viewer.trashedElsewhere("/lib", "v3.zip");
-      // v3.zip は v1.zip と v2.zip のあいだにあった
+      // v3.zip は v2.zip より上にあったので、前は無く、次が v2.zip（末尾として扱うと逆になる）
+      await expect(viewer.button("前のファイル")).toBeDisabled();
       await expect(viewer.button("次のファイル")).toBeEnabled();
-      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await viewer.page.keyboard.press("Alt+ArrowUp");
       await viewer.page.keyboard.press("Alt+ArrowDown");
       await expect.poll(() => viewer.currentFile()).toBe("v2.zip");
     });
@@ -685,13 +688,16 @@ test.describe("メインウィンドウの一覧の並び順に合わせた移�
       mockOptions: {
         ...base,
         fileMeta,
-        fileSort: { key: "created", direction: "asc" } as never,
+        // 向きが知らない値。そのまま使うと、更新日時の降順として並んでしまう
+        fileSort: { key: "modified", direction: "down" } as never,
       },
     });
 
-    test("名前の順で移動する", async ({ viewer }) => {
+    test("名前の昇順で移動する", async ({ viewer }) => {
+      await expect(viewer.button("次のファイル")).toBeEnabled();
       await viewer.page.keyboard.press("Alt+ArrowDown");
       await expect.poll(() => viewer.currentFile()).toBe("v3.zip");
+      await expect(viewer.button("次のファイル")).toBeDisabled();
     });
   });
 });

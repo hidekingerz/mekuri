@@ -43,7 +43,6 @@ pdfjs-dist が必要とする CMap ファイルと標準フォントファイル
 | `serde`, `serde_json` | JSON シリアライズ / デシリアライズ | IPC データ変換用 |
 | `zip` | ZIP/CBZ ファイル展開 | deflate 機能のみ有効 |
 | `unrar` | RAR/CBR ファイル展開 | |
-| `natord` | 自然順ソート | ファイル名ソート用 |
 | `base64` | Base64 エンコーディング | 画像データ転送用 |
 | `tempfile` | 一時ファイル/ディレクトリ作成 | ネストアーカイブ展開用 |
 

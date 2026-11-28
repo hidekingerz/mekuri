@@ -2,6 +2,7 @@
 //! Tauri コマンドからの呼び出しは `commands::fs` が担当する。
 
 use crate::archive;
+use crate::natural_order;
 use base64::Engine;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -297,7 +298,7 @@ fn sort_entries(entries: &mut [DirectoryEntry]) {
     entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
-        _ => natord::compare(&a.name, &b.name),
+        _ => natural_order::compare(&a.name, &b.name),
     });
 }
 
@@ -392,6 +393,21 @@ mod tests {
         assert!(result[0].is_dir);
         assert!(result[1].is_pdf);
         assert!(result[2].is_archive);
+    }
+
+    #[test]
+    fn read_directory_orders_by_number_and_ignores_case() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["vol010.zip", "Vol3.zip", "vol9.zip", "vol2.zip"] {
+            fs::write(dir.path().join(name), "").unwrap();
+        }
+
+        let result = read_directory(dir.path()).unwrap();
+        let names: Vec<&str> = result.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["vol2.zip", "Vol3.zip", "vol9.zip", "vol010.zip"]
+        );
     }
 
     #[test]

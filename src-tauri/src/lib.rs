@@ -3,6 +3,7 @@ mod commands;
 mod drag_pasteboard;
 mod filesystem;
 pub mod launch;
+mod natural_order;
 pub mod window_label;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

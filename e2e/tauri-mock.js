@@ -14,7 +14,7 @@
 // 先に window.__MOCK_OPTS__ = { tree, favorites, recentFolders, viewerSettings, archives, dragged,
 //   nested: { "<パス>": ["内側1.zip", …] }, broken: { "<パス>": "エラーの文" },
 //   fail: { cmd: "message" }, delay: { cmd: ミリ秒 }, monitor: null }
-// fail と delay は、あとから window.__MOCK_OPTS__ を書き換えても効く
+// fail と delay は呼び出しのたびに読むので、先に置いた window.__MOCK_OPTS__ の中身をあとから変えても効く
 // を置くと初期値を変えられる。
 (() => {
   const opts = window.__MOCK_OPTS__ || {};

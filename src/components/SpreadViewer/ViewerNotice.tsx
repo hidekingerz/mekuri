@@ -9,13 +9,22 @@ type ViewerNoticeProps = {
   tone: "error" | "empty";
   siblingNav: SiblingNavigation;
   onClose: () => void;
+  /** ネストしたアーカイブの一覧へ戻る（一覧があるときだけ渡す） */
+  onBack?: () => void;
 };
 
 /**
  * ビューワーで内容を表示できないときの画面。エラーでも空でも、
  * 前後のファイルへ進む手段と閉じる手段を残す。
  */
-export function ViewerNotice({ title, detail, tone, siblingNav, onClose }: ViewerNoticeProps) {
+export function ViewerNotice({
+  title,
+  detail,
+  tone,
+  siblingNav,
+  onClose,
+  onBack,
+}: ViewerNoticeProps) {
   return (
     <div
       className={`viewer-notice viewer-notice--${tone}`}
@@ -31,6 +40,11 @@ export function ViewerNotice({ title, detail, tone, siblingNav, onClose }: Viewe
         )}
       </div>
       <div className="viewer-notice__actions">
+        {onBack && (
+          <button type="button" onClick={onBack}>
+            アーカイブ一覧に戻る
+          </button>
+        )}
         <button
           type="button"
           onClick={siblingNav.goPrev}

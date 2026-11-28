@@ -16,8 +16,9 @@ const RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/Unsupported archive format/i, "対応していない形式のファイルです"],
   [/ZIP archive|Zip archive/i, "この ZIP ファイルは壊れているか、ZIP 形式ではありません"],
   [/RAR archive|RAR header/i, "この RAR ファイルは壊れているか、RAR 形式ではありません"],
+  [/No password given|Incorrect Password/i, "パスワードで保護された PDF は開けません"],
   [
-    /Invalid PDF|PDF structure|PDF header|password/i,
+    /Invalid PDF|PDF structure|PDF header/i,
     "この PDF ファイルは壊れているか、PDF 形式ではありません",
   ],
 ];

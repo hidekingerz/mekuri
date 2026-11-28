@@ -37,6 +37,7 @@ mekuri/
 │   │   ├── useContextMenu.ts      #     コンテキストメニュー
 │   │   ├── useElementSize.ts      #     要素サイズの追跡 (ResizeObserver)
 │   │   ├── useFileSelection.ts    #     ファイル複数選択（Cmd/Shift クリック）
+│   │   ├── useFileSort.ts         #     ファイル一覧の並び順の復元と保存
 │   │   ├── useFolderSearch.ts     #     お気に入り配下のデバウンス付き検索
 │   │   ├── useMainWindowSetup.ts  #     メインウィンドウの設定復元・表示・リサイズ保存
 │   │   ├── useUpdater.ts          #     アプリ内アップデートの状態と操作

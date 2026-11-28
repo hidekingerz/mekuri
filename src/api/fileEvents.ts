@@ -3,6 +3,8 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 /** ウィンドウをまたいでファイルの移動・削除を通知するアプリ内イベント */
 const FILE_MOVED = "file-moved";
 const FILE_TRASHED = "file-trashed";
+/** メインウィンドウでファイル一覧の並び順が変わったことの通知 */
+const FILE_SORT_CHANGED = "file-sort-changed";
 
 export function emitFileMoved(): Promise<void> {
   return emit(FILE_MOVED);
@@ -21,4 +23,13 @@ export async function onFileChanged(listener: () => void): Promise<UnlistenFn> {
   return () => {
     for (const unlisten of unlisteners) unlisten();
   };
+}
+
+export function emitFileSortChanged(): Promise<void> {
+  return emit(FILE_SORT_CHANGED);
+}
+
+/** ファイル一覧の並び順が変わったときに listener を呼ぶ。戻り値で購読を解除する。 */
+export function onFileSortChanged(listener: () => void): Promise<UnlistenFn> {
+  return listen(FILE_SORT_CHANGED, listener);
 }

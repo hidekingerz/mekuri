@@ -1,3 +1,7 @@
+import type { DirectoryEntry } from "../types";
+import { compareEntries, type FileSort } from "./fileSort";
+import { fileNameFromPath } from "./windowLabel";
+
 /** ビューワーのページ移動操作。入力 (キー・クリック・ホイール) を移動に変換する純粋関数。 */
 
 export type NavigationAction = "next" | "prev" | "first" | "last";
@@ -73,12 +77,6 @@ export function groupIndexFromRatio(ratio: number, groupCount: number): number {
   return Math.max(0, Math.min(index, groupCount - 1));
 }
 
-/** index の要素を取り除いたあとに表示すべき隣接要素。後ろを優先し、無ければ前。単独や範囲外なら null。 */
-export function siblingAfterRemoval<T>(items: T[], index: number): T | null {
-  if (index < 0 || index >= items.length) return null;
-  return items[index + 1] ?? items[index - 1] ?? null;
-}
-
 /** index の隣の要素 (next は後ろ、prev は前)。端や範囲外なら null。 */
 export function adjacentSibling<T>(
   items: T[],
@@ -87,6 +85,42 @@ export function adjacentSibling<T>(
 ): T | null {
   if (index < 0 || index >= items.length) return null;
   return items[direction === "next" ? index + 1 : index - 1] ?? null;
+}
+
+/** 前後のファイルを決めるのに使う、ファイルの情報。 */
+type SiblingEntry = Pick<DirectoryEntry, "path" | "name" | "modified_ms" | "size">;
+
+/**
+ * 開いているファイルの情報。一覧にあればそれを、無ければ最後に一覧で見えたときのもの（lastSeen）を使う。
+ * 一度も見えていないファイルは、更新日時もサイズも分からないものとして扱う。
+ */
+export function currentEntry<T extends SiblingEntry>(
+  entries: T[],
+  path: string,
+  lastSeen: SiblingEntry | null,
+): SiblingEntry {
+  const listed = entries.find((entry) => entry.path === path);
+  if (listed) return listed;
+  if (lastSeen?.path === path) return lastSeen;
+  return { path, name: fileNameFromPath(path), modified_ms: null, size: null };
+}
+
+/**
+ * current の隣のファイルのパス (next は後ろ、prev は前)。端なら null。entries は sort の順に並べたもの。
+ * current が一覧に無いとき（別のウィンドウで消された・動かされた、開く前から無かった）は、
+ * その並び順で入るはずの位置の前後を返す。そうしないと、開けないファイルから動けなくなる。
+ */
+export function siblingPath(
+  entries: SiblingEntry[],
+  sort: FileSort,
+  current: SiblingEntry,
+  direction: "next" | "prev",
+): string | null {
+  const index = entries.findIndex((entry) => entry.path === current.path);
+  if (index !== -1) return adjacentSibling(entries, index, direction)?.path ?? null;
+
+  const insertAt = entries.filter((entry) => compareEntries(entry, current, sort) < 0).length;
+  return (direction === "next" ? entries[insertAt] : entries[insertAt - 1])?.path ?? null;
 }
 
 /** マウスの戻る (button 3) / 進む (button 4) ボタンを兄弟ファイルの移動方向に対応づける。他のボタンは null。 */

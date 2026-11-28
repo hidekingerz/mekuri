@@ -21,7 +21,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1200, height: 760 } },
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1200, height: 760 },
+        // OS で変わる操作（ゴミ箱のショートカット）は、主な対象の macOS として確かめる。
+        // Windows での動作を見るテストは、test.use({ userAgent }) で切り替える
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+      },
     },
   ],
   webServer: {

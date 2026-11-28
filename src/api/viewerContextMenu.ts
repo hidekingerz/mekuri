@@ -31,6 +31,8 @@ export async function showViewerContextMenu(
       CheckMenuItem.new({
         text,
         checked: state?.viewMode === mode,
+        // ページを表示していない画面（開けない・空・ネストの選択）では選べない
+        enabled: state !== null,
         action: () => state?.setViewMode(mode),
       }),
     ),
@@ -48,7 +50,8 @@ export async function showViewerContextMenu(
   });
 
   const directionItem = await MenuItem.new({
-    text: state?.readingDirection === "rtl" ? "左→右 (LTR) に切替" : "右→左 (RTL) に切替",
+    text: state?.readingDirection === "ltr" ? "右→左 (RTL) に切替" : "左→右 (LTR) に切替",
+    enabled: state !== null,
     action: () => state?.toggleReadingDirection(),
   });
 

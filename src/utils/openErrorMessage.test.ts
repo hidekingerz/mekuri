@@ -10,10 +10,11 @@ describe("describeOpenError", () => {
     });
   });
 
-  it("explains a corrupt RAR", () => {
-    expect(describeOpenError("Failed to open RAR archive: bad data", "archive").summary).toBe(
-      "この RAR ファイルは壊れているか、RAR 形式ではありません",
-    );
+  it("explains a file that is not a RAR", () => {
+    // unrar が RAR でないファイルに返す実際の文
+    expect(
+      describeOpenError("Failed to open RAR archive: Not a RAR archive", "archive").summary,
+    ).toBe("この RAR ファイルは壊れているか、RAR 形式ではありません");
   });
 
   it("explains a missing file", () => {
@@ -41,6 +42,13 @@ describe("describeOpenError", () => {
       "アーカイブを開けませんでした",
     );
     expect(describeOpenError("something odd", "pdf").summary).toBe("PDF を開けませんでした");
+  });
+
+  it("explains a password-protected PDF", () => {
+    // pdf.js がパスワードつきの PDF に返す実際の文
+    expect(describeOpenError("No password given", "pdf").summary).toBe(
+      "パスワードで保護された PDF は開けません",
+    );
   });
 
   it("explains a broken PDF", () => {

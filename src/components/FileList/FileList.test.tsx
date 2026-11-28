@@ -3,7 +3,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readDirectoryFiles, trashFiles } from "../../api/directory";
-import { onFileChanged } from "../../api/fileEvents";
+import { emitFileSortChanged, onFileChanged } from "../../api/fileEvents";
+import { getFileSort, saveFileSort } from "../../api/settings";
 import type { DirectoryEntry } from "../../types";
 import { FileList } from "./FileList";
 
@@ -14,7 +15,12 @@ vi.mock("../../api/directory", () => ({
 }));
 vi.mock("../../api/fileEvents", () => ({
   emitFileTrashed: vi.fn(async () => {}),
+  emitFileSortChanged: vi.fn(async () => {}),
   onFileChanged: vi.fn(async () => () => {}),
+}));
+vi.mock("../../api/settings", () => ({
+  getFileSort: vi.fn(),
+  saveFileSort: vi.fn(async () => {}),
 }));
 vi.mock("../../api/fileDrop", () => ({ readDroppedPaths: vi.fn(async () => []) }));
 
@@ -64,6 +70,7 @@ const dialog = () => screen.queryByRole("dialog");
 beforeEach(() => {
   folder = ["a1.zip", "a2.zip", "a3.zip", "a4.zip"];
   vi.mocked(readDirectoryFiles).mockImplementation(async () => folder.map(entry));
+  vi.mocked(getFileSort).mockResolvedValue({ key: "name", direction: "asc" });
   vi.mocked(trashFiles).mockImplementation(async (paths) => {
     folder = folder.filter((name) => !paths.includes(`${FOLDER}/${name}`));
   });
@@ -72,7 +79,15 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
+
+const MAC_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+const WINDOWS_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const runOn = (userAgent: string) =>
+  vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(userAgent);
 
 describe("selection", () => {
   it("selects only the clicked file", async () => {
@@ -188,12 +203,27 @@ describe("moving files to the trash", () => {
     expect(trashFiles).not.toHaveBeenCalled();
   });
 
-  it("asks with Cmd+Backspace but not with Backspace alone", async () => {
+  it("asks with Cmd+Backspace on macOS but not with Backspace alone or Ctrl+Backspace", async () => {
+    runOn(MAC_USER_AGENT);
     const user = await renderList();
     await user.click(item("a1.zip"));
     await user.keyboard("{Backspace}");
     expect(dialog()).toBeNull();
+    await user.keyboard("{Control>}{Backspace}{/Control}");
+    expect(dialog()).toBeNull();
     await user.keyboard("{Meta>}{Backspace}{/Meta}");
+    expect(dialog()).not.toBeNull();
+  });
+
+  it("asks only with Delete outside macOS", async () => {
+    runOn(WINDOWS_USER_AGENT);
+    const user = await renderList();
+    await user.click(item("a1.zip"));
+    await user.keyboard("{Meta>}{Backspace}{/Meta}");
+    expect(dialog()).toBeNull();
+    await user.keyboard("{Control>}{Backspace}{/Control}");
+    expect(dialog()).toBeNull();
+    await user.keyboard("{Delete}");
     expect(dialog()).not.toBeNull();
   });
 
@@ -242,5 +272,46 @@ describe("moving files to the trash", () => {
 
     await waitFor(() => expect(trashFiles).toHaveBeenCalledTimes(1));
     expect(trashFiles).toHaveBeenCalledWith([`${FOLDER}/a1.zip`, `${FOLDER}/a3.zip`]);
+  });
+});
+
+describe("sort order", () => {
+  const names = () =>
+    list()
+      .getAllByRole("option")
+      .map((el) => el.textContent);
+
+  it("restores the order saved last time", async () => {
+    vi.mocked(getFileSort).mockResolvedValue({ key: "name", direction: "desc" });
+    await renderList();
+    await waitFor(() => expect(names()).toEqual(["a4.zip", "a3.zip", "a2.zip", "a1.zip"]));
+    expect(screen.getByRole("button", { name: "降順。クリックで昇順" })).toBeTruthy();
+  });
+
+  it("saves a changed order and then tells the viewer windows", async () => {
+    const user = await renderList();
+    await user.click(screen.getByRole("button", { name: "昇順。クリックで降順" }));
+    expect(names()).toEqual(["a4.zip", "a3.zip", "a2.zip", "a1.zip"]);
+    expect(saveFileSort).toHaveBeenLastCalledWith({ key: "name", direction: "desc" });
+    await waitFor(() => expect(emitFileSortChanged).toHaveBeenCalledTimes(1));
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "並び順" }), "サイズ");
+    expect(saveFileSort).toHaveBeenLastCalledWith({ key: "size", direction: "desc" });
+    await waitFor(() => expect(emitFileSortChanged).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the order the user picked while the saved one was still loading", async () => {
+    let finishLoading: (sort: { key: "name"; direction: "asc" }) => void = () => {};
+    vi.mocked(getFileSort).mockReturnValue(
+      new Promise((resolve) => {
+        finishLoading = resolve;
+      }),
+    );
+    const user = await renderList();
+    await user.click(screen.getByRole("button", { name: "昇順。クリックで降順" }));
+    finishLoading({ key: "name", direction: "asc" });
+    // 読み終えた値が届くのを待つ
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(names()).toEqual(["a4.zip", "a3.zip", "a2.zip", "a1.zip"]);
   });
 });

@@ -16,12 +16,15 @@ export function usePdfLoader(pdfPath: string | null): PdfLoaderResult {
   const [pageCount, setPageCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 下の状態がどのファイルのものか（ファイルが変わった直後の描画では、まだ前のファイルの状態が残る）
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
 
   useEffect(() => {
     if (!pdfPath) return;
 
     let cancelled = false;
+    setLoadedPath(pdfPath);
     setLoading(true);
     setError(null);
     setPageCount(0);
@@ -68,6 +71,10 @@ export function usePdfLoader(pdfPath: string | null): PdfLoaderResult {
     // PDF.js pages are 1-indexed
     return renderPageToDataUrl(doc, pageIndex + 1);
   }, []);
+
+  if (pdfPath !== null && loadedPath !== pdfPath) {
+    return { pageCount: 0, pageNames: [], loading: true, error: null, getPageDataUrl };
+  }
 
   const pageNames = Array.from({ length: pageCount }, (_, i) => `${i + 1} ページ`);
 

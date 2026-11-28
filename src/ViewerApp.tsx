@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getArchiveImage } from "./api/archive";
-import { getSiblingArchives, moveFile, trashFile } from "./api/directory";
+import { getSiblingFiles, moveFile, trashFile } from "./api/directory";
 import { emitFileMoved, emitFileTrashed } from "./api/fileEvents";
 import { recordRecentFolder } from "./api/recentFolders";
 import { saveViewerSettings } from "./api/settings";
@@ -18,8 +18,8 @@ import { errorToString } from "./utils/errorToString";
 import { detectFileType } from "./utils/fileType";
 import { describeOpenError } from "./utils/openErrorMessage";
 import type { ReadingDirection } from "./utils/spreadLayout";
-import { siblingAfterRemoval } from "./utils/spreadNavigation";
-import { isTrashShortcut } from "./utils/trashShortcut";
+import { currentEntry, siblingPath } from "./utils/spreadNavigation";
+import { isMacUserAgent, isTrashShortcut } from "./utils/trashShortcut";
 import { appTitle, fileNameFromPath } from "./utils/windowLabel";
 
 function Viewer() {
@@ -58,6 +58,9 @@ function Viewer() {
 
   const navigateToArchive = useCallback((path: string) => {
     setResumePage(0);
+    // 前のファイルでの失敗の表示は持ち越さない
+    setTrashError(null);
+    setMoveError(null);
     setArchivePath(path);
   }, []);
 
@@ -67,20 +70,30 @@ function Viewer() {
   const archivePathRef = useRef(archivePath);
   archivePathRef.current = archivePath;
 
+  // ゴミ箱へ移している最中かどうか（終わるまで、もう一度は受け付けない）
+  const trashingRef = useRef(false);
+
   const handleTrash = useCallback(async () => {
     const currentPath = archivePathRef.current;
-    if (!currentPath) return;
+    if (!currentPath || trashingRef.current) return;
 
     const confirmed = await confirmTrash([currentPath]);
-    if (!confirmed) return;
+    if (!confirmed || trashingRef.current) return;
 
+    trashingRef.current = true;
+    setTrashError(null);
     try {
-      // Resolve next sibling before trashing so the deleted file is still listed.
-      const { archives, currentIndex } = await getSiblingArchives(currentPath);
-      const nextPath = siblingAfterRemoval(archives, currentIndex);
+      // 消したあとに開くファイル（次、無ければ前）は、消す前の一覧で決める
+      const { entries, sort } = await getSiblingFiles(currentPath);
+      const current = currentEntry(entries, currentPath, null);
+      const nextPath =
+        siblingPath(entries, sort, current, "next") ?? siblingPath(entries, sort, current, "prev");
 
       await trashFile(currentPath);
       await emitFileTrashed();
+
+      // 移しているあいだに利用者が別のファイルへ移っていたら、そのファイルを開いたままにする
+      if (archivePathRef.current !== currentPath) return;
 
       if (nextPath) {
         navigateToArchive(nextPath);
@@ -90,6 +103,8 @@ function Viewer() {
       }
     } catch (err) {
       setTrashError(errorToString(err));
+    } finally {
+      trashingRef.current = false;
     }
   }, [navigateToArchive, confirmTrash]);
 
@@ -115,8 +130,7 @@ function Viewer() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // fn+Delete か Cmd/Ctrl+Backspace のみ。Backspace 単独では発火しない
-      if (!isTrashShortcut(e)) return;
+      if (!isTrashShortcut(e, isMacUserAgent(navigator.userAgent))) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       e.preventDefault();
@@ -129,7 +143,8 @@ function Viewer() {
   useEffect(() => {
     function handleContextMenu(e: MouseEvent) {
       e.preventDefault();
-      if (!archivePathRef.current) return;
+      // 確認ダイアログが開いているあいだは、メニューから別の操作をさせない
+      if (!archivePathRef.current || document.querySelector("dialog[open]")) return;
       void showViewerContextMenu(spreadViewerRef.current, siblingNav, () => void handleTrash());
     }
 
@@ -179,16 +194,53 @@ function Viewer() {
 
   const closeWindow = () => void getCurrentWindow().close();
 
+  const showsNestedList =
+    !isPdf && archive.nestedArchives !== null && archive.nestedArchives.length > 0;
+  const showsPages =
+    archivePath !== null && !error && !loading && !showsNestedList && pageCount > 0;
+
+  // ページを表示していない画面（開けない・読み込み中・ネストの選択・空）では、タイトルにページ数を付けない
+  useEffect(() => {
+    if (!archivePath || showsPages) return;
+    void getCurrentWindow().setTitle(appTitle(fileNameFromPath(archivePath)));
+  }, [archivePath, showsPages]);
+
+  // ゴミ箱の確認と、移動・ゴミ箱の失敗の表示。開けないファイルや空のファイルの画面でも
+  // ゴミ箱へ移せるよう、どの画面にも置く
+  const overlays = (
+    <>
+      {trashDialog}
+      {moveError && (
+        <div className="viewer__banner" role="alert">
+          <span>ファイルを移動できませんでした: {moveError}</span>
+          <button type="button" aria-label="閉じる" onClick={() => setMoveError(null)}>
+            ×
+          </button>
+        </div>
+      )}
+      {trashError && (
+        <div className="viewer__banner" role="alert">
+          <span>ゴミ箱に移動できませんでした: {trashError}</span>
+          <button type="button" aria-label="閉じる" onClick={() => setTrashError(null)}>
+            ×
+          </button>
+        </div>
+      )}
+    </>
+  );
+
   if (error) {
     const described = describeOpenError(error, isPdf ? "pdf" : "archive");
     return (
       <div className="viewer">
+        {overlays}
         <ViewerNotice
           tone="error"
           title={described.summary}
           detail={described.detail}
           siblingNav={siblingNav}
           onClose={closeWindow}
+          onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         />
       </div>
     );
@@ -197,15 +249,17 @@ function Viewer() {
   if (!archivePath || loading) {
     return (
       <div className="viewer viewer--loading">
+        {overlays}
         <p>読み込み中...</p>
       </div>
     );
   }
 
   // Show nested archive selection (archive mode only)
-  if (!isPdf && archive.nestedArchives && archive.nestedArchives.length > 0) {
+  if (showsNestedList && archive.nestedArchives) {
     return (
       <div className="viewer viewer--nested">
+        {overlays}
         <div className="nested-selector">
           <h2 className="nested-selector__title">アーカイブを選択</h2>
           <p className="nested-selector__desc">
@@ -241,11 +295,13 @@ function Viewer() {
   if (pageCount === 0 || (!isPdf && archive.isEmpty)) {
     return (
       <div className="viewer">
+        {overlays}
         <ViewerNotice
           tone="empty"
           title={isPdf ? "この PDF にはページがありません" : "このアーカイブには画像がありません"}
           siblingNav={siblingNav}
           onClose={closeWindow}
+          onBack={!isPdf && archive.hasNestedCache ? handleBackToNestedList : undefined}
         />
       </div>
     );
@@ -253,23 +309,7 @@ function Viewer() {
 
   return (
     <div className="viewer">
-      {trashDialog}
-      {moveError && (
-        <div className="viewer__banner" role="alert">
-          <span>ファイルを移動できませんでした: {moveError}</span>
-          <button type="button" aria-label="閉じる" onClick={() => setMoveError(null)}>
-            ×
-          </button>
-        </div>
-      )}
-      {trashError && (
-        <div className="viewer__banner" role="alert">
-          <span>ゴミ箱に移動できませんでした: {trashError}</span>
-          <button type="button" aria-label="閉じる" onClick={() => setTrashError(null)}>
-            ×
-          </button>
-        </div>
-      )}
+      {overlays}
       <SpreadViewer
         key={archivePath}
         ref={spreadViewerRef}

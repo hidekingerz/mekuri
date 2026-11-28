@@ -45,14 +45,17 @@ export function useSiblingNavigation(
     }
 
     let cancelled = false;
-    // 取得の通し番号。あとから始めた取得が先に返ることがあるので、遅れて返った古い結果は使わない
-    let latest = 0;
+    // 取得の通し番号。あとから始めた取得が先に返ることがあるので、すでに反映したものより古い結果は使わない
+    // （失敗した取得は反映しないので、その前に始めて成功した取得の結果は使える）
+    let started = 0;
+    let applied = 0;
     const refresh = async () => {
-      latest += 1;
-      const id = latest;
+      started += 1;
+      const id = started;
       try {
         const { entries, sort } = await getSiblingFiles(archivePath);
-        if (cancelled || id !== latest) return;
+        if (cancelled || id < applied) return;
+        applied = id;
         setSiblings((prev) => ({
           entries,
           sort,

@@ -58,9 +58,10 @@ struct ExtractionSource {
 }
 
 impl ExtractionSource {
-    /// 親の情報を読めなければ None（展開のほうが、その失敗を報告する）
+    /// 親を開けなければ None（展開のほうが、その失敗を報告する）。
+    /// 開けるかどうかまで見るのは、読めなくなった親の、前の展開先を返さないため
     fn of(parent_path: &str, nested_name: &str) -> Option<Self> {
-        let metadata = std::fs::metadata(parent_path).ok()?;
+        let metadata = std::fs::File::open(parent_path).ok()?.metadata().ok()?;
         Some(Self {
             parent: parent_path.to_string(),
             nested: nested_name.to_string(),
@@ -256,6 +257,10 @@ mod tests {
 
     /// dir に、inner.zip と other.zip（どちらも pages の画像を持つ）を入れた outer.zip を作る
     fn write_outer_zip(dir: &Path, pages: &[&str]) -> String {
+        write_outer_zip_at(&dir.join("outer.zip"), pages)
+    }
+
+    fn write_outer_zip_at(outer_path: &Path, pages: &[&str]) -> String {
         use std::io::Write;
         let options = ::zip::write::SimpleFileOptions::default();
 
@@ -266,14 +271,19 @@ mod tests {
         }
         let inner_bytes = inner.finish().unwrap().into_inner();
 
-        let outer_path = dir.join("outer.zip");
-        let mut outer = ::zip::ZipWriter::new(std::fs::File::create(&outer_path).unwrap());
+        let mut outer = ::zip::ZipWriter::new(std::fs::File::create(outer_path).unwrap());
         for name in ["inner.zip", "other.zip"] {
             outer.start_file(name, options).unwrap();
             outer.write_all(&inner_bytes).unwrap();
         }
         outer.finish().unwrap();
         outer_path.to_string_lossy().to_string()
+    }
+
+    fn set_modified(path: &str, seconds: u64) {
+        let time = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(seconds);
+        let file = std::fs::File::options().write(true).open(path).unwrap();
+        file.set_modified(time).unwrap();
     }
 
     #[test]
@@ -325,6 +335,68 @@ mod tests {
         let second = extract_nested_archive(&outer, "inner.zip").unwrap();
 
         assert_eq!(list_images(&second).unwrap(), ["1.jpg"]);
+    }
+
+    #[test]
+    fn test_extract_nested_archive_keeps_parents_with_the_same_date_and_size_apart() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = write_outer_zip_at(&dir.path().join("a.zip"), &["a.jpg"]);
+        let b = write_outer_zip_at(&dir.path().join("b.zip"), &["b.jpg"]);
+        set_modified(&a, 1_700_000_000);
+        set_modified(&b, 1_700_000_000);
+        assert_eq!(
+            std::fs::metadata(&a).unwrap().len(),
+            std::fs::metadata(&b).unwrap().len()
+        );
+
+        let from_a = extract_nested_archive(&a, "inner.zip").unwrap();
+        let from_b = extract_nested_archive(&b, "inner.zip").unwrap();
+
+        assert_eq!(list_images(&from_a).unwrap(), ["a.jpg"]);
+        assert_eq!(list_images(&from_b).unwrap(), ["b.jpg"]);
+    }
+
+    #[test]
+    fn test_extract_nested_archive_extracts_again_when_only_the_date_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let outer = write_outer_zip(dir.path(), &["1.jpg"]);
+        set_modified(&outer, 1_700_000_000);
+        let first = extract_nested_archive(&outer, "inner.zip").unwrap();
+
+        set_modified(&outer, 1_700_000_001);
+        let second = extract_nested_archive(&outer, "inner.zip").unwrap();
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn test_extract_nested_archive_extracts_again_when_only_the_size_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let outer = write_outer_zip(dir.path(), &["1.jpg"]);
+        set_modified(&outer, 1_700_000_000);
+        let first = extract_nested_archive(&outer, "inner.zip").unwrap();
+
+        write_outer_zip(dir.path(), &["1.jpg", "2.jpg"]);
+        set_modified(&outer, 1_700_000_000);
+        let second = extract_nested_archive(&outer, "inner.zip").unwrap();
+
+        assert_ne!(first, second);
+        assert_eq!(list_images(&second).unwrap(), ["1.jpg", "2.jpg"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_extract_nested_archive_does_not_serve_an_extraction_of_an_unreadable_parent() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let outer = write_outer_zip(dir.path(), &["1.jpg"]);
+        extract_nested_archive(&outer, "inner.zip").unwrap();
+
+        std::fs::set_permissions(&outer, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let again = extract_nested_archive(&outer, "inner.zip");
+        std::fs::set_permissions(&outer, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        assert!(again.unwrap_err().contains("Failed to open archive"));
     }
 
     #[test]

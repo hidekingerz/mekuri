@@ -715,6 +715,43 @@ test.describe("メインウィンドウの一覧の並び順に合わせた移�
     });
   });
 
+  test.describe("並び順の変更を読んでいる最中に、あとから始めた取得が失敗する", () => {
+    test.use({
+      expectedConsoleError: /Failed to load sibling archives/,
+      mockOptions: {
+        ...base,
+        viewerFile: "/lib/v1.zip",
+        fileMeta: {
+          "/lib/v1.zip": { size: 30 },
+          "/lib/v2.zip": { size: 10 },
+          "/lib/v3.zip": { size: 20 },
+        },
+      },
+    });
+
+    test("先に始めて成功した取得の結果を、捨てずに使う", async ({ viewer }) => {
+      // 名前の順では v1.zip は先頭
+      await expect(viewer.button("前のファイル")).toBeDisabled();
+      // 並び順の変更を読む取得は、800ms 後に成功して返る
+      await viewer.setDelay("read_directory", 800);
+      await viewer.sortChangedElsewhere({ key: "size", direction: "asc" });
+      // そのあとに始まった取得は、すぐ失敗する
+      await viewer.page.evaluate(() => {
+        const w = window as unknown as {
+          __MOCK_OPTS__: { delay: Record<string, number>; fail?: Record<string, string> };
+          __MOCK_EMIT__: (event: string) => void;
+        };
+        w.__MOCK_OPTS__.delay.read_directory = 0;
+        w.__MOCK_OPTS__.fail = { read_directory: "Failed to read directory: /lib" };
+        w.__MOCK_EMIT__("file-trashed");
+        delete w.__MOCK_OPTS__.fail;
+      });
+      // サイズの昇順では v1.zip は末尾
+      await expect(viewer.button("前のファイル")).toBeEnabled();
+      await expect(viewer.button("次のファイル")).toBeDisabled();
+    });
+  });
+
   test.describe("保存されている並び順が、いまの版の知らない値", () => {
     test.use({
       mockOptions: {
